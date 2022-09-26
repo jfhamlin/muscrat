@@ -9,12 +9,11 @@ import (
 	"sync"
 	"time"
 
+	"github.com/jfhamlin/muscrat/internal/pkg/generator"
 	"github.com/jfhamlin/muscrat/internal/pkg/notes"
 
 	"github.com/bspaans/bleep/audio"
-	"github.com/bspaans/bleep/controller"
 	"github.com/bspaans/bleep/sinks"
-	"github.com/bspaans/bleep/synth"
 
 	"github.com/mjibson/go-dsp/spectral"
 )
@@ -23,13 +22,10 @@ import (
 type App struct {
 	ctx context.Context
 
-	controller *controller.Controller
-	mixer      *synth.Mixer
-
 	gain float64
 
-	generator     SampleGenerator
-	nextGenerator SampleGenerator
+	generator     generator.SampleGenerator
+	nextGenerator generator.SampleGenerator
 	fade          float64
 
 	fftBuffer []float64
@@ -46,32 +42,17 @@ func NewApp() *App {
 	return &App{}
 }
 
-type SampleConfig struct {
-	// The sample rate of the output stream.
-	SampleRateHz int
-}
-
-type SampleGenerator interface {
-	GenerateSamples(cfg SampleConfig, n int) []float64
-}
-
-type SampleGeneratorFunc func(SampleConfig, int) []float64
-
-func (gs SampleGeneratorFunc) GenerateSamples(cfg SampleConfig, n int) []float64 {
-	return gs(cfg, n)
-}
-
 // SampleGeneratorSet is a sample generator that sums the outputs of
 // multiple sample generators.
 type SampleGeneratorSet struct {
-	Generators []SampleGenerator
+	Generators []generator.SampleGenerator
 	Weights    []float64
 }
 
-func (s *SampleGeneratorSet) GenerateSamples(cfg SampleConfig, n int) []float64 {
+func (s *SampleGeneratorSet) GenerateSamples(ctx context.Context, cfg generator.SampleConfig, n int) []float64 {
 	res := make([]float64, n)
 	for i, g := range s.Generators {
-		samples := g.GenerateSamples(cfg, n)
+		samples := g.GenerateSamples(ctx, cfg, n)
 		for j := 0; j < n; j++ {
 			res[j] += s.Weights[i] * samples[j]
 		}
@@ -79,7 +60,7 @@ func (s *SampleGeneratorSet) GenerateSamples(cfg SampleConfig, n int) []float64 
 	return res
 }
 
-func NewSampleGeneratorSet(generators []SampleGenerator, weights []float64) *SampleGeneratorSet {
+func NewSampleGeneratorSet(generators []generator.SampleGenerator, weights []float64) *SampleGeneratorSet {
 	if len(weights) > len(generators) {
 		weights = weights[:len(generators)]
 	}
@@ -105,30 +86,28 @@ func NewSampleGeneratorSet(generators []SampleGenerator, weights []float64) *Sam
 
 // SampleScaler is a sample generator that scales the output of another.
 type SampleScaler struct {
-	Generator SampleGenerator
+	Generator generator.SampleGenerator
 	Gain      float64
 }
 
-func (s *SampleScaler) GenerateSamples(cfg SampleConfig, n int) []float64 {
-	samples := s.Generator.GenerateSamples(cfg, n)
+func (s *SampleScaler) GenerateSamples(ctx context.Context, cfg generator.SampleConfig, n int) []float64 {
+	samples := s.Generator.GenerateSamples(ctx, cfg, n)
 	for i := 0; i < n; i++ {
 		samples[i] *= s.Gain
 	}
 	return samples
 }
 
-func NewSampleScaler(g SampleGenerator, gain float64) *SampleScaler {
+func NewSampleScaler(g generator.SampleGenerator, gain float64) *SampleScaler {
 	return &SampleScaler{
 		Generator: g,
 		Gain:      gain,
 	}
 }
 
-// middle C frequency is 256Hz
-
-func sineHarmonizer(rootHz float64) SampleGenerator {
+func sineHarmonizer(rootHz float64) generator.SampleGenerator {
 	const numGens = 2
-	sines := make([]SampleGenerator, numGens)
+	sines := make([]generator.SampleGenerator, numGens)
 	weights := make([]float64, numGens)
 
 	sines[0] = sineGenerator(rootHz)
@@ -140,9 +119,9 @@ func sineHarmonizer(rootHz float64) SampleGenerator {
 	return NewSampleGeneratorSet(sines, weights)
 }
 
-func sineGenerator(hz float64) SampleGenerator {
+func sineGenerator(hz float64) generator.SampleGenerator {
 	phase := 0.0
-	return SampleGeneratorFunc(func(cfg SampleConfig, n int) []float64 {
+	return generator.SampleGeneratorFunc(func(ctx context.Context, cfg generator.SampleConfig, n int) []float64 {
 		res := make([]float64, n)
 		for i := 0; i < n; i++ {
 			res[i] = math.Sin(phase)
@@ -152,7 +131,7 @@ func sineGenerator(hz float64) SampleGenerator {
 	})
 }
 
-func noiseGenerator(cfg SampleConfig, n int) []float64 {
+func noiseGenerator(cfg generator.SampleConfig, n int) []float64 {
 	res := make([]float64, n)
 	for i := 0; i < n; i++ {
 		res[i] = rand.Float64()
@@ -204,14 +183,14 @@ func (a *App) getSamples(cfg *audio.AudioConfig, n int) []int {
 
 	var samps []float64
 	if a.generator != nil {
-		samps = a.generator.GenerateSamples(SampleConfig{SampleRateHz: cfg.SampleRate}, n)
+		samps = a.generator.GenerateSamples(context.Background(), generator.SampleConfig{SampleRateHz: cfg.SampleRate}, n)
 	} else {
 		samps = make([]float64, n)
 	}
 
 	if a.nextGenerator != nil {
 		const fadeDuration = 0.2
-		nextSamps := a.nextGenerator.GenerateSamples(SampleConfig{SampleRateHz: cfg.SampleRate}, n)
+		nextSamps := a.nextGenerator.GenerateSamples(context.Background(), generator.SampleConfig{SampleRateHz: cfg.SampleRate}, n)
 		// fade between the two generators until fade is 1
 		for i := 0; i < n; i++ {
 			samps[i] = samps[i]*(1-a.fade) + nextSamps[i]*a.fade
@@ -234,9 +213,7 @@ func (a *App) getSamples(cfg *audio.AudioConfig, n int) []int {
 		a.fftBuffer = a.fftBuffer[len(a.fftBuffer)-1024*4:]
 	}
 	if time.Since(lastSpectrumCheck) > 2*time.Second {
-		start := time.Now()
 		pow, freqs := spectral.Pwelch(samps, float64(cfg.SampleRate), &spectral.PwelchOptions{})
-		fmt.Println("FFT took", time.Since(start))
 		res := make([]struct{ Freq, Power float64 }, len(pow))
 		var powerSum float64
 		for i := range pow {
@@ -304,7 +281,7 @@ func (a *App) GetNotes() []string {
 }
 
 func (a *App) SetChord(noteNames []string, noteWeights []float64) {
-	gens := make([]SampleGenerator, len(noteNames))
+	gens := make([]generator.SampleGenerator, len(noteNames))
 	for i, noteName := range noteNames {
 		note := notes.GetNote(noteName)
 		if note == nil {

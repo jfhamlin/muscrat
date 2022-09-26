@@ -12,7 +12,7 @@ import {
 } from "../wailsjs/go/main/App";
 
 function App() {
-  const defaultNotes = ["C4", "E4", "Bb4", "D5"];
+  const defaultNotes = ["Gs2", "Db3", "Gs3", "A3"];
 
   const [noteOptions, setNoteOptions] = useState<string[]>(defaultNotes);
   useEffect(() => {
