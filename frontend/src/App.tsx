@@ -77,7 +77,7 @@ function FloatInput(props: {onValueChange: (value: number) => void}) {
 
   return (
     <div className="input-box">
-      <input type="number" value={value} step="0.1" onChange={handleValueChange} />
+      <input type="number" value={value} step="0.02" onChange={handleValueChange} />
     </div>
   );
 }

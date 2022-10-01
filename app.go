@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"log"
 	"math"
 	"math/rand"
 	"sort"
@@ -10,13 +11,23 @@ import (
 	"time"
 
 	"github.com/jfhamlin/muscrat/internal/pkg/generator"
+	"github.com/jfhamlin/muscrat/internal/pkg/graph"
 	"github.com/jfhamlin/muscrat/internal/pkg/notes"
 
 	"github.com/bspaans/bleep/audio"
 	"github.com/bspaans/bleep/sinks"
 
 	"github.com/mjibson/go-dsp/spectral"
+
+	"net/http"
+	_ "net/http/pprof"
 )
+
+func init() {
+	go func() {
+		log.Println(http.ListenAndServe("localhost:6060", nil))
+	}()
+}
 
 // App struct
 type App struct {
@@ -32,6 +43,8 @@ type App struct {
 
 	waveformCallback WaveformCallback
 
+	outputChannel chan []float64
+
 	note int
 
 	mtx sync.Mutex
@@ -39,7 +52,9 @@ type App struct {
 
 // NewApp creates a new App application struct
 func NewApp() *App {
-	return &App{}
+	return &App{
+		outputChannel: make(chan []float64, 1),
+	}
 }
 
 // SampleGeneratorSet is a sample generator that sums the outputs of
@@ -178,6 +193,12 @@ var (
 )
 
 func (a *App) getSamples(cfg *audio.AudioConfig, n int) []int {
+	samples := <-a.outputChannel
+	samples = scaleSamples(samples, a.gain)
+	return transformSampleBuffer(cfg, samples)
+}
+
+func (a *App) getSamplesOld(cfg *audio.AudioConfig, n int) []int {
 	a.mtx.Lock()
 	defer a.mtx.Unlock()
 
@@ -223,39 +244,12 @@ func (a *App) getSamples(cfg *audio.AudioConfig, n int) []int {
 		sort.Slice(res, func(i, j int) bool {
 			return res[i].Power > res[j].Power
 		})
-		// fmt.Println("XXXXX frequency spectrum:")
-		// for i := range res {
-		// 	fmt.Printf("  %v: %v\n", res[i].Freq, res[i].Power)
-		// 	if i > 10 {
-		// 		break
-		// 	}
-		// }
-		// fmt.Println("XXXXX", n, "samples", "power sum:", powerSum)
-		// fmt.Println("")
+
 		lastSpectrumCheck = time.Now()
 		a.fftBuffer = a.fftBuffer[:0]
 	}
 
 	return transformSampleBuffer(cfg, samps)
-	// result := noiseGenerator(SampleConfig{SampleRateHz: cfg.SampleRate})
-
-	// maxValue := math.Pow(2, float64(cfg.BitDepth))
-
-	// for i := 0; i < n; i++ {
-	// 	s := (result*a.gain + 1) * (maxValue / 2)
-	// 	s = math.Max(0, math.Ceil(s))
-	// 	result[i] = int(math.Min(s, maxValue-1))
-	// }
-
-	// if cfg.Stereo {
-	// 	newResult := make([]int, n*2)
-	// 	for i := 0; i < n; i++ {
-	// 		newResult[2*i] = result[i]
-	// 		newResult[2*i+1] = result[i]
-	// 	}
-	// 	result = newResult
-	// }
-	// return result
 }
 
 // startup is called when the app starts. The context is saved
@@ -270,6 +264,37 @@ func (a *App) startup(ctx context.Context) {
 		panic(err)
 	}
 	sink.Start(a.getSamples)
+
+	g := &graph.Graph{}
+	sinkID, outputChannel := g.AddSinkNode()
+	var sineNodeIDs []graph.NodeID
+	for _, note := range []string{"Gs2", "Db3", "Gs3", "As3", "Ab3", "Gs4"} {
+		id := g.AddGeneratorNode(sineHarmonizer(notes.GetNote(note).Frequency))
+		sineNodeIDs = append(sineNodeIDs, id)
+	}
+	mixerNodeID := g.AddGeneratorNode(generator.SampleGeneratorFunc(func(ctx context.Context, cfg generator.SampleConfig, n int) []float64 {
+		res := make([]float64, n)
+		for _, samples := range cfg.InputSamples {
+			for i := 0; i < n; i++ {
+				res[i] += samples[i] / float64(len(cfg.InputSamples))
+			}
+		}
+		return res
+	}))
+	g.AddEdge(mixerNodeID, sinkID)
+	for _, id := range sineNodeIDs {
+		g.AddEdge(id, mixerNodeID)
+	}
+	fmt.Println(len(g.Nodes), "nodes")
+	for _, e := range g.Edges {
+		fmt.Printf("%v -> %v\n", e.From, e.To)
+	}
+	go func() {
+		for samples := range outputChannel {
+			a.outputChannel <- samples
+		}
+	}()
+	go graph.RunGraph(ctx, g, generator.SampleConfig{SampleRateHz: cfg.SampleRate})
 }
 
 func (a *App) SetGain(gain float64) {
