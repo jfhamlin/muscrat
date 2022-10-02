@@ -6,6 +6,10 @@ export function GetNotes() {
   return window['go']['main']['App']['GetNotes']();
 }
 
+export function GraphDot() {
+  return window['go']['main']['App']['GraphDot']();
+}
+
 export function RegisterWaveformCallback(arg1) {
   return window['go']['main']['App']['RegisterWaveformCallback'](arg1);
 }

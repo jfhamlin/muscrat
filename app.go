@@ -13,6 +13,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode"
 
 	"github.com/fsnotify/fsnotify"
 
@@ -187,6 +188,108 @@ var Noise = generator.SampleGeneratorFunc(func(ctx context.Context, cfg generato
 	return res
 })
 
+func NewADSRGenerator(args map[string]value) generator.SampleGenerator {
+	attack, ok := args["a"].(float64)
+	if !ok {
+		attack = 0.1
+	}
+	decay, ok := args["d"].(float64)
+	if !ok {
+		decay = 0.1
+	}
+	sustain, ok := args["s"].(float64)
+	if !ok {
+		sustain = 0.5
+	}
+	release, ok := args["r"].(float64)
+	if !ok {
+		release = 0.1
+	}
+
+	type state int
+	const (
+		stateOff state = iota
+		stateAttackHi
+		stateAttackLo
+		stateDecayHi
+		stateDecayLo
+		stateSustain
+		stateRelease
+	)
+	// state :=
+
+	active := false
+	releasing := false
+	activeTime := 0.0
+	return generator.SampleGeneratorFunc(func(ctx context.Context, cfg generator.SampleConfig, n int) []float64 {
+		samples := make([]float64, n)
+		in := cfg.InputSamples[0]
+
+		for i := 0; i < n; i++ {
+			if !active && in[i] > 0 {
+				active = true
+				releasing = false
+				activeTime = 0
+			}
+			if !active {
+				samples[i] = 0
+				continue
+			}
+			if releasing && in[i] > 0 {
+				// start the attack again from the current level
+				releasing = false
+				// compute the activeTime whose value at attack would equal
+				// the current level while releasing
+				//
+				// sustain - activeTime_release/release*sustain = activeTime_attack / attack
+				// Multiply both sides by attack
+				// attack * (sustain - activeTime_release/release*sustain) = activeTime_attac
+				activeTime = attack * (sustain - activeTime/release*sustain)
+			}
+
+			// TODO: handle release while still decaying
+
+			switch {
+			case !releasing && activeTime < attack: // attack
+				samples[i] = activeTime / attack
+			case !releasing && activeTime < attack+decay: // decay
+				samples[i] = 1 - (activeTime-attack)/decay*(1-sustain)
+			case in[i] > 0: // sustain
+				samples[i] = sustain
+			case in[i] <= 0: // release
+				if !releasing {
+					releasing = true
+					activeTime = 0
+				}
+				if activeTime > release {
+					samples[i] = 0
+					active = false
+					continue
+				} else {
+					samples[i] = sustain - activeTime/release*sustain
+				}
+			}
+
+			activeTime += 1.0 / float64(cfg.SampleRateHz)
+		}
+
+		return samples
+	})
+}
+
+func NewConstantGenerator(val float64) generator.SampleGenerator {
+	var buf []float64
+	return generator.SampleGeneratorFunc(func(ctx context.Context, cfg generator.SampleConfig, n int) []float64 {
+		if len(buf) < n {
+			buf = make([]float64, n)
+			for i := 0; i < n; i++ {
+				buf[i] = val
+			}
+		}
+		return buf[:n]
+	})
+}
+
 func transformSampleBuffer(cfg *audio.AudioConfig, buf []float64) []int {
 	maxValue := float64(int(1) << cfg.BitDepth)
 
@@ -200,10 +303,10 @@ func transformSampleBuffer(cfg *audio.AudioConfig, buf []float64) []int {
 	for i, sample := range buf {
 		s := (sample + 1) * (maxValue / 2)
 		if s > maxValue {
-			fmt.Println("XXX clipping high")
+			//fmt.Println("XXX clipping high")
 		}
 		if s < 0 {
-			fmt.Println("XXX clipping low")
+			//fmt.Println("XXX clipping low")
 		}
 		s = math.Max(0, math.Ceil(s))
 		sout := int(math.Min(s, maxValue-1))
@@ -375,7 +478,7 @@ func (a *App) updateSignalGraphFromScriptFile(filename string) {
 		a.cancelSink()
 
 		// start the fade between the old and new graphs
-		const fadeTime = 10 * time.Millisecond
+		const fadeTime = 100 * time.Millisecond
 		startTime := time.Now()
 		fmt.Println("starting fade")
 		for time.Since(startTime) < fadeTime {
@@ -425,16 +528,26 @@ func (a *App) updateSignalGraphFromScriptFile(filename string) {
 	a.graphOutputChannel = graphOutputChannel
 }
 
+type value interface{}
+
 type command struct {
-	oscName string
-	oscArgs map[string]interface{}
-	freq    float64
-	amp     float64
+	ref     string
+	sigName string
+	sigArgs map[string]value
+}
+
+func (c command) String() string {
+	res := fmt.Sprintf("(%s", c.sigName)
+	for k, v := range c.sigArgs {
+		res += fmt.Sprintf(" %s=%v", k, v)
+	}
+	res += ")"
+	return res
 }
 
 func parseCommand(cmd string) (command, error) {
 	// parse the command. It should be of the form:
-	// <sin|saw|sqr|noise> [(OSC_ARGS)] <freq|midi note name> [<amp>]
+	// [ref = ]<sin|saw|sqr|noise> [(OSC_ARGS)]
 	// where OSC_ARGS is a comma-separated list of key=value pairs
 
 	// preprocess the command to add whitespace before and after allowed
@@ -449,10 +562,20 @@ func parseCommand(cmd string) (command, error) {
 		return res, fmt.Errorf("invalid command: %s", cmd)
 	}
 
-	res.oscName = fields[0]
+	// check if the command has a ref
+	if fields[1] == "=" {
+		res.ref = fields[0]
+		fields = fields[2:]
+	}
+
+	if len(fields) < 2 {
+		return res, fmt.Errorf("invalid command: %s", cmd)
+	}
+
+	res.sigName = fields[0]
 	fields = fields[1:]
 
-	res.oscArgs = make(map[string]interface{})
+	res.sigArgs = make(map[string]value)
 	if fields[0] == "(" {
 		fields = fields[1:]
 		for fields[0] != ")" && len(fields) > 0 {
@@ -463,8 +586,24 @@ func parseCommand(cmd string) (command, error) {
 			if fields[1] != "=" {
 				return res, fmt.Errorf("invalid command: %s", cmd)
 			}
-			value := fields[2]
-			res.oscArgs[key] = value
+			var val value
+			if key == "freq" {
+				var err error
+				val, err = parseFreq(fields[2])
+				if err != nil {
+					return res, fmt.Errorf("invalid command: %v", err)
+				}
+			} else if unicode.IsLetter([]rune(fields[2])[0]) {
+				// if the value is a reference to another signal, store it as a string
+				val = fields[2]
+			} else {
+				var err error
+				val, err = strconv.ParseFloat(fields[2], 64)
+				if err != nil {
+					return res, fmt.Errorf("invalid command, value not a float: %s", fields[2])
+				}
+			}
+			res.sigArgs[key] = val
 			fields = fields[3:]
 
 			if fields[0] == "," {
@@ -477,29 +616,8 @@ func parseCommand(cmd string) (command, error) {
 		fields = fields[1:]
 	}
 
-	if len(fields) < 1 {
-		return res, fmt.Errorf("invalid command, missing frequency: %s", cmd)
-	}
-
-	freq, err := parseFreq(fields[0])
-	if err != nil {
-		return res, fmt.Errorf("invalid command, invalid frequency: %s", cmd)
-	}
-	res.freq = freq
-	fields = fields[1:]
-
-	if len(fields) == 0 {
-		res.amp = 1
-		return res, nil
-	}
-	amp, err := strconv.ParseFloat(fields[0], 64)
-	if err != nil {
-		return res, fmt.Errorf("invalid command, invalid amplitude: %s", cmd)
-	}
-	res.amp = amp
-
-	if len(fields) > 1 {
-		return res, fmt.Errorf("invalid command, too many fields: %s", cmd)
+	if len(fields) > 0 {
+		return res, fmt.Errorf("invalid command: %s", cmd)
 	}
 
 	return res, nil
@@ -513,126 +631,117 @@ func parseFreq(note string) (float64, error) {
 	}
 }
 
+var (
+	commentsRe = regexp.MustCompile(`\#.*$`)
+)
+
 func scriptToGraph(synthDesc string) (g *graph.Graph, sinks []<-chan []float64, err error) {
 	// split synth file into lines
 	lines := strings.Split(synthDesc, "\n")
 	commands := make([]string, 0, len(lines))
 	for _, line := range lines {
+		// remove comments
+		line = commentsRe.ReplaceAllString(line, "")
 		line = strings.TrimSpace(line)
-		if line == "" || line[0] == '#' {
+		if line == "" {
 			continue
 		}
 		commands = append(commands, line)
 	}
 
 	g = &graph.Graph{}
-	sinkID, graphOutputChannel := g.AddSinkNode()
+	sinkID, graphOutputChannel := g.AddSinkNode(graph.WithLabel("output"))
 	var oscNodeIDs []graph.NodeID
 
+	nodesByRef := make(map[string]graph.NodeID)
 	for _, cmd := range commands {
 		command, cmdErr := parseCommand(cmd)
-		if err != nil {
+		if cmdErr != nil {
 			return nil, nil, cmdErr
 		}
-		// parse the command. It should be of the form:
-		// <sin|saw|sqr|noise>[(<key>=<value>[, ...])] <freq|midi note name> [<amp>]
-		/*
-			parts := strings.Split(cmd, " ")
-			if len(parts) < 2 {
-				err = fmt.Errorf("invalid command: %s", cmd)
-				return
-			}
-			if len(parts) > 3 {
-				err = fmt.Errorf("too many arguments: %s", cmd)
-				return
-			}
-			if len(parts) == 2 {
-				parts = append(parts, "1")
-			}
-			osc, note, ampStr := parts[0], parts[1], parts[2]
 
-			// parse the note
-			var freq float64
-			if note[0] >= '0' && note[0] <= '9' {
-				// it's a frequency
-				freq, err = strconv.ParseFloat(note, 64)
-				if err != nil {
-					err = fmt.Errorf("invalid frequency: %s", note)
-					return
-				}
-			} else {
-				// it's a note name
-				freq, err = noteNameToFreq(note)
-				if err != nil {
-					err = fmt.Errorf("invalid note name: %s", note)
-					return
-				}
-			}
-			var amp float64
-			amp, err = strconv.ParseFloat(ampStr, 64)
-			if err != nil {
-				err = fmt.Errorf("invalid amplitude: %s", ampStr)
-				return
-			}
-		*/
-		var genFunc func(freq float64) generator.SampleGenerator
+		freq, _ := command.sigArgs["freq"].(float64)
+		var gen generator.SampleGenerator
 
-		switch command.oscName {
+		var inEdges []graph.NodeID
+
+		switch command.sigName {
 		case "sin":
-			genFunc = func(freq float64) generator.SampleGenerator {
-				return wavtabGenerator(wavtabs.Sin(1024), freq)
-			}
+			gen = wavtabGenerator(wavtabs.Sin(1024), freq)
 		case "saw":
-			genFunc = func(freq float64) generator.SampleGenerator {
-				return wavtabGenerator(wavtabs.Saw(1024), freq)
-			}
+			gen = wavtabGenerator(wavtabs.Saw(1024), freq)
 		case "sqr":
-			defaultDutyCycle := "0.5"
-			dutyCycle, ok := command.oscArgs["dc"]
-			if !ok {
-				dutyCycle = defaultDutyCycle
+			dutyCycle := 0.5
+			dutyCycleVal, ok := command.sigArgs["dc"]
+			if ok {
+				dutyCycle, ok = dutyCycleVal.(float64)
+				if !ok {
+					err = fmt.Errorf("invalid duty cycle value: %v", dutyCycleVal)
+					return
+				}
 			}
-			dc, err := strconv.ParseFloat(dutyCycle.(string), 64)
-			if err != nil {
-				err = fmt.Errorf("invalid duty cycle: %s", dutyCycle)
-				return nil, nil, err
-			}
-			genFunc = func(freq float64) generator.SampleGenerator {
-				return wavtabGenerator(wavtabs.Square(1024, dc), freq)
-			}
+			gen = wavtabGenerator(wavtabs.Square(1024, dutyCycle), freq)
 		case "noise":
-			genFunc = func(freq float64) generator.SampleGenerator {
-				return Noise
+			gen = Noise
+		case "env":
+			gen = NewADSRGenerator(command.sigArgs)
+			if trig, ok := command.sigArgs["trigger"]; ok {
+				if trigRef, ok := trig.(string); ok {
+					tid, ok := nodesByRef[trigRef]
+					if !ok {
+						err = fmt.Errorf("invalid trigger reference: %s", trigRef)
+						return
+					}
+					inEdges = append(inEdges, tid)
+				}
 			}
 		default:
-			err = fmt.Errorf("invalid oscillator: %s", command.oscName)
+			err = fmt.Errorf("invalid signal generator: %s", command.sigName)
 			return
 		}
-		genID := g.AddGeneratorNode(genFunc(command.freq))
+		genID := g.AddGeneratorNode(gen, graph.WithLabel(command.String()))
+		for _, inEdge := range inEdges {
+			g.AddEdge(inEdge, genID)
+		}
 
-		amp := command.amp
-		if amp == 1 {
-			oscNodeIDs = append(oscNodeIDs, genID)
+		ampVal, ok := command.sigArgs["amp"]
+		if !ok {
+			if command.ref != "" {
+				nodesByRef[command.ref] = genID
+			} else {
+				oscNodeIDs = append(oscNodeIDs, genID)
+			}
 			continue
 		}
+
+		var ampValNodeID graph.NodeID
+		switch av := ampVal.(type) {
+		case string:
+			nid, ok := nodesByRef[av]
+			if !ok {
+				err = fmt.Errorf("invalid reference: %s", av)
+				return
+			}
+			ampValNodeID = nid
+		case float64:
+			ampValNodeID = g.AddGeneratorNode(NewConstantGenerator(av), graph.WithLabel(fmt.Sprintf("%.3f", av)))
+		}
+
 		ampID := g.AddGeneratorNode(generator.SampleGeneratorFunc(func(ctx context.Context, cfg generator.SampleConfig, n int) []float64 {
 			res := make([]float64, n)
 			for i := range res {
-				res[i] = amp * cfg.InputSamples[0][i]
+				res[i] = cfg.InputSamples[0][i] * cfg.InputSamples[1][i]
 			}
 			return res
-		}))
+		}), graph.WithLabel("*"))
 		g.AddEdge(genID, ampID)
+		g.AddEdge(ampValNodeID, ampID)
 
-		oscNodeIDs = append(oscNodeIDs, ampID)
-
-		// //gen := sineHarmonizer(notes.GetNote(note).Frequency)
-		// gen := harmonizer(func(hz float64) generator.SampleGenerator {
-		// 	return wavtabGenerator(wavtabs.Square(1024, 0.8), hz)
-		// }, notes.GetNote(note).Frequency, 3)
-		// //gen := wavtabGenerator(wavtabs.Square(1024, 0.8), notes.GetNote(note).Frequency)
-		// id := g.AddGeneratorNode(gen)
-		// oscNodeIDs = append(oscNodeIDs, id)
+		if command.ref != "" {
+			nodesByRef[command.ref] = ampID
+		} else {
+			oscNodeIDs = append(oscNodeIDs, ampID)
+		}
 	}
 	mixerNodeID := g.AddGeneratorNode(generator.SampleGeneratorFunc(func(ctx context.Context, cfg generator.SampleConfig, n int) []float64 {
 		res := make([]float64, n)
@@ -642,7 +751,7 @@ func scriptToGraph(synthDesc string) (g *graph.Graph, sinks []<-chan []float64, 
 			}
 		}
 		return res
-	}))
+	}), graph.WithLabel("mixer"))
 	g.AddEdge(mixerNodeID, sinkID)
 	for _, id := range oscNodeIDs {
 		g.AddEdge(id, mixerNodeID)
@@ -686,4 +795,14 @@ type WaveformCallback func(samples []float64, sampleFreq float64)
 
 func (a *App) RegisterWaveformCallback(cb WaveformCallback) {
 	a.waveformCallback = cb
+}
+
+func (a *App) GraphDot() string {
+	a.mtx.Lock()
+	defer a.mtx.Unlock()
+
+	if a.graph == nil {
+		return ""
+	}
+	return a.graph.Dot()
 }

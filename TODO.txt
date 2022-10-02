@@ -9,4 +9,39 @@ Either:
 ** DONE Choose oscillator for each note from the text file
 ** DONE Configure oscillator from the text file (e.g. square wave duty cycle)
 ** TODO Describe dynamic note changes in the text file
+*** DONE add support for an envelope signal generator
 ** TODO Describe a graph from the text file
+** TODO Refactor code out of app.go
+** TODO Transition between graphs by mutating the graph and fading between altered nodes
+** TODO Todos from GPT-3
+*** TODO Add a delay effect
+*** TODO Add a reverb effect
+*** TODO Add a chorus effect
+*** TODO Add a flanger effect
+*** TODO Add a phaser effect
+*** TODO Add a tremolo effect
+*** TODO Add a vibrato effect
+*** TODO Add a wah-wah effect
+*** TODO Add a distortion effect
+*** TODO Add a bitcrusher effect
+*** TODO Add a compressor effect
+*** TODO Add a limiter effect
+*** TODO Add a noise gate effect
+*** TODO Add a low-pass filter effect
+*** TODO Add a high-pass filter effect
+*** TODO Add a band-pass filter effect
+*** TODO Add a notch filter effect
+*** TODO Add a peak filter effect
+*** TODO Add a low-shelf filter effect
+*** TODO Add a high-shelf filter effect
+*** TODO Add a band-shelf filter effect
+*** TODO Add a parametric filter effect
+*** TODO Add a low-pass resonant filter effect
+*** TODO Add a high-pass resonant filter effect
+*** TODO Add a band-pass resonant filter effect
+*** TODO Add a notch resonant filter effect
+*** TODO Add a peak resonant filter effect
+*** TODO Add a low-shelf resonant filter effect
+*** TODO Add a high-shelf resonant filter effect
+*** TODO Add a band-shelf resonant filter effect
+*** TODO Add a parametric resonant filter effect

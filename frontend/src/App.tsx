@@ -6,11 +6,31 @@ import logo from './assets/images/logo-universal.png';
 import './App.css';
 import {
   SetGain,
-  RegisterWaveformCallback,
+  GraphDot,
 } from "../wailsjs/go/main/App";
 
+import Graphviz from 'graphviz-react';
+
 function App() {
-  const handleGainChange = (gain) => {
+  const [graphSeqNum, setGraphSeqNum] = useState(0);
+  const [graphDot, setGraphDot] = useState<string|undefined>();
+
+  useEffect(() => {
+    const ival = setInterval(() => {
+      setGraphSeqNum(graphSeqNum + 1);
+    }, 1000);
+
+    const updateGraph = async () => {
+      setGraphDot(await GraphDot());
+    };
+    updateGraph();
+
+    return () => {
+      clearInterval(ival);
+    };
+  }, [graphSeqNum]);
+
+  const handleGainChange = (gain: number) => {
     SetGain(gain);
   };
 
@@ -18,6 +38,9 @@ function App() {
     <div id="App">
       <h2>Synthesizer</h2>
       <FloatInput onValueChange={handleGainChange} />
+      <div>
+        {graphDot && <Graphviz options={{width: 800}} dot={graphDot} />}
+      </div>
     </div>
   )
 }
