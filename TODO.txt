@@ -1,3 +1,12 @@
+Synthesizer Task list
 
-1. Control notes with a text file
-2. ?
+** DONE Control notes with a text file
+** DONE Smooth transitions between graphs
+Either:
+*** duplicate the graph, fade out the old, fade in the new
+*** mutate the graph, fade between altered nodes
+** DONE Comment out lines in the text file
+** DONE Choose oscillator for each note from the text file
+** DONE Configure oscillator from the text file (e.g. square wave duty cycle)
+** TODO Describe dynamic note changes in the text file
+** TODO Describe a graph from the text file

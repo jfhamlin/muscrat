@@ -10,10 +10,6 @@ export function RegisterWaveformCallback(arg1) {
   return window['go']['main']['App']['RegisterWaveformCallback'](arg1);
 }
 
-export function SetChord(arg1, arg2) {
-  return window['go']['main']['App']['SetChord'](arg1, arg2);
-}
-
 export function SetGain(arg1) {
   return window['go']['main']['App']['SetGain'](arg1);
 }

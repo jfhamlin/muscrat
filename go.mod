@@ -4,6 +4,7 @@ go 1.18
 
 require (
 	github.com/bspaans/bleep v0.0.0-20220414232837-486f92844ed7
+	github.com/fsnotify/fsnotify v1.5.4
 	github.com/mjibson/go-dsp v0.0.0-20180508042940-11479a337f12
 	github.com/wailsapp/wails/v2 v2.0.0
 )
@@ -33,6 +34,6 @@ require (
 	github.com/wailsapp/mimetype v1.4.1 // indirect
 	golang.org/x/crypto v0.0.0-20210921155107-089bfa567519 // indirect
 	golang.org/x/net v0.0.0-20211015210444-4f30a5c0130f // indirect
-	golang.org/x/sys v0.0.0-20220114195835-da31bd327af9 // indirect
+	golang.org/x/sys v0.0.0-20220412211240-33da011f77ad // indirect
 	golang.org/x/text v0.3.7 // indirect
 )

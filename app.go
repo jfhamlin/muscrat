@@ -3,16 +3,23 @@ package main
 import (
 	"context"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"math"
 	"math/rand"
+	"regexp"
 	"sort"
+	"strconv"
+	"strings"
 	"sync"
 	"time"
+
+	"github.com/fsnotify/fsnotify"
 
 	"github.com/jfhamlin/muscrat/internal/pkg/generator"
 	"github.com/jfhamlin/muscrat/internal/pkg/graph"
 	"github.com/jfhamlin/muscrat/internal/pkg/notes"
+	"github.com/jfhamlin/muscrat/internal/pkg/wavtabs"
 
 	"github.com/bspaans/bleep/audio"
 	"github.com/bspaans/bleep/sinks"
@@ -43,9 +50,15 @@ type App struct {
 
 	waveformCallback WaveformCallback
 
-	outputChannel chan []float64
+	outputChannel      chan []float64
+	graphOutputChannel <-chan []float64
 
-	note int
+	synthFileName string
+	sampleRate    int
+
+	cancelGraph func()
+	cancelSink  func()
+	graph       *graph.Graph
 
 	mtx sync.Mutex
 }
@@ -53,7 +66,9 @@ type App struct {
 // NewApp creates a new App application struct
 func NewApp() *App {
 	return &App{
-		outputChannel: make(chan []float64, 1),
+		outputChannel: make(chan []float64, 4), // buffer four packets of samples
+		synthFileName: "synth.mrat",
+		gain:          0.25,
 	}
 }
 
@@ -120,8 +135,19 @@ func NewSampleScaler(g generator.SampleGenerator, gain float64) *SampleScaler {
 	}
 }
 
+func harmonizer(gengen func(hz float64) generator.SampleGenerator, rootHz float64, numGens int) generator.SampleGenerator {
+	gens := make([]generator.SampleGenerator, numGens)
+	weights := make([]float64, numGens)
+
+	for i := 0; i < numGens; i++ {
+		gens[i] = gengen(rootHz * float64(i+1))
+		weights[i] = 1.0 / float64(i+1)
+	}
+	return NewSampleGeneratorSet(gens, weights)
+}
+
 func sineHarmonizer(rootHz float64) generator.SampleGenerator {
-	const numGens = 2
+	const numGens = 1
 	sines := make([]generator.SampleGenerator, numGens)
 	weights := make([]float64, numGens)
 
@@ -135,27 +161,34 @@ func sineHarmonizer(rootHz float64) generator.SampleGenerator {
 }
 
 func sineGenerator(hz float64) generator.SampleGenerator {
+	return wavtabGenerator(wavtabs.Sin(1024), hz)
+}
+
+func wavtabGenerator(wavtab wavtabs.Table, hz float64) generator.SampleGenerator {
 	phase := 0.0
 	return generator.SampleGeneratorFunc(func(ctx context.Context, cfg generator.SampleConfig, n int) []float64 {
 		res := make([]float64, n)
 		for i := 0; i < n; i++ {
-			res[i] = math.Sin(phase)
-			phase += 2 * math.Pi * float64(hz) / float64(cfg.SampleRateHz)
+			res[i] = wavtab.Lerp(phase)
+			phase += float64(hz) / float64(cfg.SampleRateHz)
+			if phase > 1 {
+				phase -= 1
+			}
 		}
 		return res
 	})
 }
 
-func noiseGenerator(cfg generator.SampleConfig, n int) []float64 {
+var Noise = generator.SampleGeneratorFunc(func(ctx context.Context, cfg generator.SampleConfig, n int) []float64 {
 	res := make([]float64, n)
 	for i := 0; i < n; i++ {
-		res[i] = rand.Float64()
+		res[i] = 2*rand.Float64() - 1
 	}
 	return res
-}
+})
 
 func transformSampleBuffer(cfg *audio.AudioConfig, buf []float64) []int {
-	maxValue := math.Pow(2, float64(cfg.BitDepth))
+	maxValue := float64(int(1) << cfg.BitDepth)
 
 	var out []int
 	if cfg.Stereo {
@@ -166,6 +199,12 @@ func transformSampleBuffer(cfg *audio.AudioConfig, buf []float64) []int {
 
 	for i, sample := range buf {
 		s := (sample + 1) * (maxValue / 2)
+		if s > maxValue {
+			fmt.Println("XXX clipping high")
+		}
+		if s < 0 {
+			fmt.Println("XXX clipping low")
+		}
 		s = math.Max(0, math.Ceil(s))
 		sout := int(math.Min(s, maxValue-1))
 
@@ -258,19 +297,342 @@ func (a *App) startup(ctx context.Context) {
 	a.ctx = ctx
 
 	cfg := audio.NewAudioConfig()
+	a.sampleRate = cfg.SampleRate
 
+	// set up the audio output
 	sink, err := sinks.NewSDLSink(cfg)
 	if err != nil {
 		panic(err)
 	}
 	sink.Start(a.getSamples)
 
-	g := &graph.Graph{}
-	sinkID, outputChannel := g.AddSinkNode()
-	var sineNodeIDs []graph.NodeID
-	for _, note := range []string{"Gs2", "Db3", "Gs3", "As3", "Ab3", "Gs4"} {
-		id := g.AddGeneratorNode(sineHarmonizer(notes.GetNote(note).Frequency))
-		sineNodeIDs = append(sineNodeIDs, id)
+	watcher, err := fsnotify.NewWatcher()
+	if err != nil {
+		panic(err)
+	}
+	if err := watcher.Add(a.synthFileName); err != nil {
+		panic(err)
+	}
+
+	go func() {
+		defer watcher.Close()
+
+		for {
+			select {
+			case event, ok := <-watcher.Events:
+				if !ok {
+					return
+				}
+				if event.Op == fsnotify.Write {
+					a.updateSignalGraphFromScriptFile(a.synthFileName)
+				}
+			case err, ok := <-watcher.Errors:
+				if !ok {
+					return
+				}
+				fmt.Println("error:", err)
+				// TODO: handle program termination
+			}
+		}
+	}()
+
+	a.updateSignalGraphFromScriptFile(a.synthFileName)
+}
+
+func (a *App) updateSignalGraphFromScriptFile(filename string) {
+	// read the synth file
+	synthFile, err := ioutil.ReadFile(filename)
+	if err != nil {
+		panic(err)
+	}
+	g, sinkChannels, err := scriptToGraph(string(synthFile))
+	if err != nil {
+		fmt.Println("error parsing script:", err)
+		return
+	}
+	if len(sinkChannels) == 0 {
+		fmt.Println("no sink channels found")
+		return
+	}
+	graphOutputChannel := sinkChannels[0]
+
+	// if we already have a graph, stop it, then start the new one.
+	a.mtx.Lock()
+	defer a.mtx.Unlock()
+
+	graphStopChan := make(chan struct{})
+	sinkStopChan := make(chan struct{})
+	graphCtx, cancelGraph := context.WithCancel(context.Background())
+	sinkCtx, cancelSink := context.WithCancel(context.Background())
+
+	go func() {
+		defer close(graphStopChan)
+		graph.RunGraph(graphCtx, g, generator.SampleConfig{SampleRateHz: a.sampleRate})
+	}()
+
+	if a.graph != nil {
+		// stop the old sink goroutine
+		a.cancelSink()
+
+		// start the fade between the old and new graphs
+		const fadeTime = 10 * time.Millisecond
+		startTime := time.Now()
+		fmt.Println("starting fade")
+		for time.Since(startTime) < fadeTime {
+			sinceStart := time.Since(startTime)
+
+			samplesOld := <-a.graphOutputChannel
+			samplesNew := <-graphOutputChannel
+
+			samplesMixed := make([]float64, len(samplesOld))
+			for i := range samplesOld {
+				samplesMixed[i] = samplesOld[i]*(1-sinceStart.Seconds()/fadeTime.Seconds()) + samplesNew[i]*(sinceStart.Seconds()/fadeTime.Seconds())
+			}
+			a.outputChannel <- samplesMixed
+		}
+		fmt.Println("finished fade")
+
+		// stop the old graph and wait for it to finish
+		a.cancelGraph()
+	}
+
+	go func() {
+		defer close(sinkStopChan)
+		for {
+			select {
+			case <-sinkCtx.Done():
+				fmt.Println("sink context done")
+				return
+			case samples, ok := <-a.graphOutputChannel:
+				if !ok {
+					return
+				}
+				a.outputChannel <- samples
+			}
+		}
+	}()
+
+	// update state
+	a.cancelGraph = func() {
+		cancelGraph()
+		<-graphStopChan
+	}
+	a.cancelSink = func() {
+		cancelSink()
+		<-sinkStopChan
+	}
+	a.graph = g
+	a.graphOutputChannel = graphOutputChannel
+}
+
+type command struct {
+	oscName string
+	oscArgs map[string]interface{}
+	freq    float64
+	amp     float64
+}
+
+func parseCommand(cmd string) (command, error) {
+	// parse the command. It should be of the form:
+	// <sin|saw|sqr|noise> [(OSC_ARGS)] <freq|midi note name> [<amp>]
+	// where OSC_ARGS is a comma-separated list of key=value pairs
+
+	// preprocess the command to add whitespace before and after allowed
+	// non-alphanumeric characters
+	re := regexp.MustCompile(`[(,)=]`)
+	cmd = re.ReplaceAllString(cmd, " $0 ")
+
+	var res command
+
+	fields := strings.Fields(cmd)
+	if len(fields) < 2 {
+		return res, fmt.Errorf("invalid command: %s", cmd)
+	}
+
+	res.oscName = fields[0]
+	fields = fields[1:]
+
+	res.oscArgs = make(map[string]interface{})
+	if fields[0] == "(" {
+		fields = fields[1:]
+		for fields[0] != ")" && len(fields) > 0 {
+			if len(fields) < 3 {
+				return res, fmt.Errorf("invalid command: %s", cmd)
+			}
+			key := fields[0]
+			if fields[1] != "=" {
+				return res, fmt.Errorf("invalid command: %s", cmd)
+			}
+			value := fields[2]
+			res.oscArgs[key] = value
+			fields = fields[3:]
+
+			if fields[0] == "," {
+				fields = fields[1:]
+			}
+		}
+		if fields[0] != ")" {
+			return res, fmt.Errorf("invalid command, expected ')': %s", cmd)
+		}
+		fields = fields[1:]
+	}
+
+	if len(fields) < 1 {
+		return res, fmt.Errorf("invalid command, missing frequency: %s", cmd)
+	}
+
+	freq, err := parseFreq(fields[0])
+	if err != nil {
+		return res, fmt.Errorf("invalid command, invalid frequency: %s", cmd)
+	}
+	res.freq = freq
+	fields = fields[1:]
+
+	if len(fields) == 0 {
+		res.amp = 1
+		return res, nil
+	}
+	amp, err := strconv.ParseFloat(fields[0], 64)
+	if err != nil {
+		return res, fmt.Errorf("invalid command, invalid amplitude: %s", cmd)
+	}
+	res.amp = amp
+
+	if len(fields) > 1 {
+		return res, fmt.Errorf("invalid command, too many fields: %s", cmd)
+	}
+
+	return res, nil
+}
+
+func parseFreq(note string) (float64, error) {
+	if note[0] >= '0' && note[0] <= '9' {
+		return strconv.ParseFloat(note, 64)
+	} else {
+		return noteNameToFreq(note)
+	}
+}
+
+func scriptToGraph(synthDesc string) (g *graph.Graph, sinks []<-chan []float64, err error) {
+	// split synth file into lines
+	lines := strings.Split(synthDesc, "\n")
+	commands := make([]string, 0, len(lines))
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if line == "" || line[0] == '#' {
+			continue
+		}
+		commands = append(commands, line)
+	}
+
+	g = &graph.Graph{}
+	sinkID, graphOutputChannel := g.AddSinkNode()
+	var oscNodeIDs []graph.NodeID
+
+	for _, cmd := range commands {
+		command, cmdErr := parseCommand(cmd)
+		if err != nil {
+			return nil, nil, cmdErr
+		}
+		// parse the command. It should be of the form:
+		// <sin|saw|sqr|noise>[(<key>=<value>[, ...])] <freq|midi note name> [<amp>]
+		/*
+			parts := strings.Split(cmd, " ")
+			if len(parts) < 2 {
+				err = fmt.Errorf("invalid command: %s", cmd)
+				return
+			}
+			if len(parts) > 3 {
+				err = fmt.Errorf("too many arguments: %s", cmd)
+				return
+			}
+			if len(parts) == 2 {
+				parts = append(parts, "1")
+			}
+			osc, note, ampStr := parts[0], parts[1], parts[2]
+
+			// parse the note
+			var freq float64
+			if note[0] >= '0' && note[0] <= '9' {
+				// it's a frequency
+				freq, err = strconv.ParseFloat(note, 64)
+				if err != nil {
+					err = fmt.Errorf("invalid frequency: %s", note)
+					return
+				}
+			} else {
+				// it's a note name
+				freq, err = noteNameToFreq(note)
+				if err != nil {
+					err = fmt.Errorf("invalid note name: %s", note)
+					return
+				}
+			}
+			var amp float64
+			amp, err = strconv.ParseFloat(ampStr, 64)
+			if err != nil {
+				err = fmt.Errorf("invalid amplitude: %s", ampStr)
+				return
+			}
+		*/
+		var genFunc func(freq float64) generator.SampleGenerator
+
+		switch command.oscName {
+		case "sin":
+			genFunc = func(freq float64) generator.SampleGenerator {
+				return wavtabGenerator(wavtabs.Sin(1024), freq)
+			}
+		case "saw":
+			genFunc = func(freq float64) generator.SampleGenerator {
+				return wavtabGenerator(wavtabs.Saw(1024), freq)
+			}
+		case "sqr":
+			defaultDutyCycle := "0.5"
+			dutyCycle, ok := command.oscArgs["dc"]
+			if !ok {
+				dutyCycle = defaultDutyCycle
+			}
+			dc, err := strconv.ParseFloat(dutyCycle.(string), 64)
+			if err != nil {
+				err = fmt.Errorf("invalid duty cycle: %s", dutyCycle)
+				return nil, nil, err
+			}
+			genFunc = func(freq float64) generator.SampleGenerator {
+				return wavtabGenerator(wavtabs.Square(1024, dc), freq)
+			}
+		case "noise":
+			genFunc = func(freq float64) generator.SampleGenerator {
+				return Noise
+			}
+		default:
+			err = fmt.Errorf("invalid oscillator: %s", command.oscName)
+			return
+		}
+		genID := g.AddGeneratorNode(genFunc(command.freq))
+
+		amp := command.amp
+		if amp == 1 {
+			oscNodeIDs = append(oscNodeIDs, genID)
+			continue
+		}
+		ampID := g.AddGeneratorNode(generator.SampleGeneratorFunc(func(ctx context.Context, cfg generator.SampleConfig, n int) []float64 {
+			res := make([]float64, n)
+			for i := range res {
+				res[i] = amp * cfg.InputSamples[0][i]
+			}
+			return res
+		}))
+		g.AddEdge(genID, ampID)
+
+		oscNodeIDs = append(oscNodeIDs, ampID)
+
+		// //gen := sineHarmonizer(notes.GetNote(note).Frequency)
+		// gen := harmonizer(func(hz float64) generator.SampleGenerator {
+		// 	return wavtabGenerator(wavtabs.Square(1024, 0.8), hz)
+		// }, notes.GetNote(note).Frequency, 3)
+		// //gen := wavtabGenerator(wavtabs.Square(1024, 0.8), notes.GetNote(note).Frequency)
+		// id := g.AddGeneratorNode(gen)
+		// oscNodeIDs = append(oscNodeIDs, id)
 	}
 	mixerNodeID := g.AddGeneratorNode(generator.SampleGeneratorFunc(func(ctx context.Context, cfg generator.SampleConfig, n int) []float64 {
 		res := make([]float64, n)
@@ -282,19 +644,23 @@ func (a *App) startup(ctx context.Context) {
 		return res
 	}))
 	g.AddEdge(mixerNodeID, sinkID)
-	for _, id := range sineNodeIDs {
+	for _, id := range oscNodeIDs {
 		g.AddEdge(id, mixerNodeID)
 	}
 	fmt.Println(len(g.Nodes), "nodes")
 	for _, e := range g.Edges {
 		fmt.Printf("%v -> %v\n", e.From, e.To)
 	}
-	go func() {
-		for samples := range outputChannel {
-			a.outputChannel <- samples
-		}
-	}()
-	go graph.RunGraph(ctx, g, generator.SampleConfig{SampleRateHz: cfg.SampleRate})
+
+	return g, []<-chan []float64{graphOutputChannel}, nil
+}
+
+func noteNameToFreq(name string) (float64, error) {
+	note := notes.GetNote(name)
+	if note == nil {
+		return 0, fmt.Errorf("invalid note name: %s", name)
+	}
+	return note.Frequency, nil
 }
 
 func (a *App) SetGain(gain float64) {
@@ -303,25 +669,6 @@ func (a *App) SetGain(gain float64) {
 
 func (a *App) GetNotes() []string {
 	return notes.Names()
-}
-
-func (a *App) SetChord(noteNames []string, noteWeights []float64) {
-	gens := make([]generator.SampleGenerator, len(noteNames))
-	for i, noteName := range noteNames {
-		note := notes.GetNote(noteName)
-		if note == nil {
-			fmt.Println("unknown note", noteName)
-			return
-		}
-		gens[i] = sineHarmonizer(note.Frequency)
-	}
-
-	generatorSet := NewSampleGeneratorSet(gens, noteWeights)
-
-	a.mtx.Lock()
-	defer a.mtx.Unlock()
-
-	a.nextGenerator = generatorSet
 }
 
 type FreqInfo struct {

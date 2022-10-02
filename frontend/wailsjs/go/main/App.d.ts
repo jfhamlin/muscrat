@@ -6,6 +6,4 @@ export function GetNotes():Promise<Array<string>>;
 
 export function RegisterWaveformCallback(arg1:main.WaveformCallback):Promise<void>;
 
-export function SetChord(arg1:Array<string>,arg2:Array<number>):Promise<void>;
-
 export function SetGain(arg1:number):Promise<void>;

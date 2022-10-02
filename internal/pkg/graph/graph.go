@@ -56,12 +56,20 @@ func (n *SinkNode) Run(ctx context.Context, g *Graph, cfg generator.SampleConfig
 		inEdges := g.IncomingEdges(n.id)
 		inputSamples := make([][]float64, len(inEdges))
 		for i, e := range inEdges {
-			inputSamples[i] = <-e.Channel
+			select {
+			case <-ctx.Done():
+				return
+			case inputSamples[i] = <-e.Channel:
+			}
 		}
 		if len(inputSamples) == 0 {
 			continue
 		}
-		n.Output <- inputSamples[0]
+		select {
+		case n.Output <- inputSamples[0]:
+		case <-ctx.Done():
+			return
+		}
 	}
 }
 
@@ -139,13 +147,21 @@ func RunNode(ctx context.Context, node *GeneratorNode, g *Graph, cfg generator.S
 	inEdges := g.IncomingEdges(node.ID())
 	inputSamples := make([][]float64, len(inEdges))
 	for i, e := range inEdges {
-		inputSamples[i] = <-e.Channel
+		select {
+		case inputSamples[i] = <-e.Channel:
+		case <-ctx.Done():
+			return
+		}
 	}
 
 	cfg.InputSamples = inputSamples
 	outputSamples := node.Generator.GenerateSamples(ctx, cfg, numSamples)
 	outEdges := g.OutgoingEdges(node.ID())
 	for _, e := range outEdges {
-		e.Channel <- outputSamples
+		select {
+		case e.Channel <- outputSamples:
+		case <-ctx.Done():
+			return
+		}
 	}
 }
