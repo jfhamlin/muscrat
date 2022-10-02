@@ -206,71 +206,89 @@ func NewADSRGenerator(args map[string]value) generator.SampleGenerator {
 		release = 0.1
 	}
 
-	type state int
+	type adsrState int
 	const (
-		stateOff state = iota
-		stateAttackHi
-		stateAttackLo
-		stateDecayHi
-		stateDecayLo
+		stateOff adsrState = iota
+		stateAttack
+		stateDecay
 		stateSustain
 		stateRelease
 	)
-	// state :=
-
-	active := false
-	releasing := false
-	activeTime := 0.0
+	state := stateOff
+	stateTime := 0.0
 	return generator.SampleGeneratorFunc(func(ctx context.Context, cfg generator.SampleConfig, n int) []float64 {
 		samples := make([]float64, n)
 		in := cfg.InputSamples[0]
 
 		for i := 0; i < n; i++ {
-			if !active && in[i] > 0 {
-				active = true
-				releasing = false
-				activeTime = 0
-			}
-			if !active {
-				samples[i] = 0
-				continue
-			}
-			if releasing && in[i] > 0 {
-				// start the attack again from the current level
-				releasing = false
-				// compute the activeTime whose value at attack would equal
-				// the current level while releasing
-				//
-				// sustain - activeTime_release/release*sustain = activeTime_attack / attack
-				// Multiply both sides by attack
-				// attack * (sustain - activeTime_release/release*sustain) = activeTime_attac
-				activeTime = attack * (sustain - activeTime/release*sustain)
-			}
-
-			// TODO: handle release while still decaying
-
-			switch {
-			case !releasing && activeTime < attack: // attack
-				samples[i] = activeTime / attack
-			case !releasing && activeTime < attack+decay: // decay
-				samples[i] = 1 - (activeTime-attack)/decay*(1-sustain)
-			case in[i] > 0: // sustain
-				samples[i] = sustain
-			case in[i] <= 0: // release
-				if !releasing {
-					releasing = true
-					activeTime = 0
+			// first, handle state transitions
+			nextState := state
+			switch state {
+			case stateOff:
+				if in[i] > 0 {
+					nextState = stateAttack
 				}
-				if activeTime > release {
-					samples[i] = 0
-					active = false
-					continue
+			case stateAttack:
+				if stateTime >= attack {
+					nextState = stateDecay
+				}
+			case stateDecay:
+				if stateTime >= decay {
+					if in[i] > 0 {
+						nextState = stateSustain
+					} else {
+						nextState = stateRelease
+					}
+				}
+			case stateSustain:
+				if in[i] <= 0 {
+					nextState = stateRelease
+				}
+			case stateRelease:
+				switch {
+				case in[i] > 0:
+					nextState = stateAttack
+				case stateTime >= release:
+					nextState = stateOff
+				}
+			default:
+				panic("unreachable adsr state")
+			}
+			if nextState != state {
+				if state == stateRelease && nextState == stateAttack {
+					// if we're transitioning from release to attack, we need to
+					// set the stateTime to match the output level to start from
+					// the current amplitude.
+					//
+					// a little algebra, setting the output levels to be equal:
+					// out_attack = stateTime_a / attack
+					// out_release = sustain * (1 - stateTime_r/release)
+					// out_attack = out_release
+					// stateTime_a / attack = sustain * (1 - stateTime_r/release)
+					// stateTime_a = attack * sustain * (1 - stateTime_r/release)
+					//
+					// given that the current value of stateTime is stateTime_r:
+
+					stateTime = attack * sustain * (1 - stateTime/release)
 				} else {
-					samples[i] = sustain - activeTime/release*sustain
+					stateTime = 0
 				}
+				state = nextState
 			}
-
-			activeTime += 1.0 / float64(cfg.SampleRateHz)
+			// now, generate the sample
+			switch state {
+			case stateOff:
+				samples[i] = 0
+			case stateAttack:
+				samples[i] = stateTime / attack
+			case stateDecay:
+				samples[i] = 1 - (stateTime/decay)*(1-sustain)
+			case stateSustain:
+				samples[i] = sustain
+			case stateRelease:
+				samples[i] = sustain * (1 - stateTime/release)
+			}
+			stateTime += 1.0 / float64(cfg.SampleRateHz)
 		}
 
 		return samples
