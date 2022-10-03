@@ -8,7 +8,7 @@ type SampleConfig struct {
 	SampleRateHz int
 
 	// Input samples that can be used to generate the output samples.
-	InputSamples [][]float64
+	InputSamples map[string][]float64
 }
 
 // SampleGenerator is an abstract interface for generating samples.

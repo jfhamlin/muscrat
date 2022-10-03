@@ -8,6 +8,8 @@ Either:
 ** DONE Comment out lines in the text file
 ** DONE Choose oscillator for each note from the text file
 ** DONE Configure oscillator from the text file (e.g. square wave duty cycle)
+** DONE treat all parameters as signals
+** TODO syntactic sugar for positional arguments
 ** TODO Describe dynamic note changes in the text file
 *** DONE add support for an envelope signal generator
 ** TODO Describe a graph from the text file

@@ -147,31 +147,39 @@ func harmonizer(gengen func(hz float64) generator.SampleGenerator, rootHz float6
 	return NewSampleGeneratorSet(gens, weights)
 }
 
-func sineHarmonizer(rootHz float64) generator.SampleGenerator {
-	const numGens = 1
-	sines := make([]generator.SampleGenerator, numGens)
-	weights := make([]float64, numGens)
+// func sineHarmonizer(rootHz float64) generator.SampleGenerator {
+// 	const numGens = 1
+// 	sines := make([]generator.SampleGenerator, numGens)
+// 	weights := make([]float64, numGens)
 
-	sines[0] = sineGenerator(rootHz)
-	weights[0] = 1
-	for i := 1; i < numGens; i++ {
-		sines[i] = NewSampleScaler(sineGenerator(rootHz*float64(i+1)), 1.0/float64(i+1))
-		weights[i] = 1.0 / float64(i+1)
-	}
-	return NewSampleGeneratorSet(sines, weights)
+// 	sines[0] = sineGenerator()
+// 	weights[0] = 1
+// 	for i := 1; i < numGens; i++ {
+// 		sines[i] = NewSampleScaler(sineGenerator(rootHz*float64(i+1)), 1.0/float64(i+1))
+// 		weights[i] = 1.0 / float64(i+1)
+// 	}
+// 	return NewSampleGeneratorSet(sines, weights)
+// }
+
+func sineGenerator() generator.SampleGenerator {
+	return wavtabGenerator(wavtabs.Sin(1024))
 }
 
-func sineGenerator(hz float64) generator.SampleGenerator {
-	return wavtabGenerator(wavtabs.Sin(1024), hz)
-}
-
-func wavtabGenerator(wavtab wavtabs.Table, hz float64) generator.SampleGenerator {
+func wavtabGenerator(wavtab wavtabs.Table) generator.SampleGenerator {
+	fmt.Println("wavtab length:", len(wavtab))
 	phase := 0.0
 	return generator.SampleGeneratorFunc(func(ctx context.Context, cfg generator.SampleConfig, n int) []float64 {
+		ws := cfg.InputSamples["w"]
 		res := make([]float64, n)
+		// default frequency; use the last value if we run out of
+		// input samples
+		w := 0.0
 		for i := 0; i < n; i++ {
+			if i < len(ws) {
+				w = ws[i]
+			}
 			res[i] = wavtab.Lerp(phase)
-			phase += float64(hz) / float64(cfg.SampleRateHz)
+			phase += w / float64(cfg.SampleRateHz)
 			if phase > 1 {
 				phase -= 1
 			}
@@ -188,24 +196,7 @@ var Noise = generator.SampleGeneratorFunc(func(ctx context.Context, cfg generato
 	return res
 })
 
-func NewADSRGenerator(args map[string]value) generator.SampleGenerator {
-	attack, ok := args["a"].(float64)
-	if !ok {
-		attack = 0.1
-	}
-	decay, ok := args["d"].(float64)
-	if !ok {
-		decay = 0.1
-	}
-	sustain, ok := args["s"].(float64)
-	if !ok {
-		sustain = 0.5
-	}
-	release, ok := args["r"].(float64)
-	if !ok {
-		release = 0.1
-	}
-
+func NewADSRGenerator() generator.SampleGenerator {
 	type adsrState int
 	const (
 		stateOff adsrState = iota
@@ -218,14 +209,23 @@ func NewADSRGenerator(args map[string]value) generator.SampleGenerator {
 	stateTime := 0.0
 	return generator.SampleGeneratorFunc(func(ctx context.Context, cfg generator.SampleConfig, n int) []float64 {
 		samples := make([]float64, n)
-		in := cfg.InputSamples[0]
+		trigger := cfg.InputSamples["trigger"]
+		attacks := cfg.InputSamples["a"]
+		decays := cfg.InputSamples["d"]
+		sustains := cfg.InputSamples["s"]
+		releases := cfg.InputSamples["r"]
 
 		for i := 0; i < n; i++ {
+			attack := attacks[i]
+			decay := decays[i]
+			sustain := sustains[i]
+			release := releases[i]
+
 			// first, handle state transitions
 			nextState := state
 			switch state {
 			case stateOff:
-				if in[i] > 0 {
+				if trigger[i] > 0 {
 					nextState = stateAttack
 				}
 			case stateAttack:
@@ -234,19 +234,19 @@ func NewADSRGenerator(args map[string]value) generator.SampleGenerator {
 				}
 			case stateDecay:
 				if stateTime >= decay {
-					if in[i] > 0 {
+					if trigger[i] > 0 {
 						nextState = stateSustain
 					} else {
 						nextState = stateRelease
 					}
 				}
 			case stateSustain:
-				if in[i] <= 0 {
+				if trigger[i] <= 0 {
 					nextState = stateRelease
 				}
 			case stateRelease:
 				switch {
-				case in[i] > 0:
+				case trigger[i] > 0:
 					nextState = stateAttack
 				case stateTime >= release:
 					nextState = stateOff
@@ -305,6 +305,112 @@ func NewConstantGenerator(val float64) generator.SampleGenerator {
 			}
 		}
 		return buf[:n]
+	})
+}
+
+func NewMultiplyGenerator() generator.SampleGenerator {
+	return generator.SampleGeneratorFunc(func(ctx context.Context, cfg generator.SampleConfig, n int) []float64 {
+		res := make([]float64, n)
+		for i := range res {
+			res[i] = 1
+			for _, s := range cfg.InputSamples {
+				res[i] *= s[i]
+			}
+		}
+		return res
+	})
+}
+
+func NewAddGenerator() generator.SampleGenerator {
+	return generator.SampleGeneratorFunc(func(ctx context.Context, cfg generator.SampleConfig, n int) []float64 {
+		res := make([]float64, n)
+		for i := range res {
+			for _, s := range cfg.InputSamples {
+				res[i] += s[i]
+			}
+		}
+		return res
+	})
+}
+
+func NewDelayGenerator() generator.SampleGenerator {
+	// Simulate a tape delay by using a buffer of samples with a read
+	// and write pointer. If the delay is changed, we simulate a
+	// physical read/write head by maintaining a sample velocity for the
+	// read head. The write head is always at the end of the buffer. The
+	// read head can never move backwards, so if the delay is decreased,
+	// the read head will accelerate, and if the delay is increased, the
+	// read head will decelerate.
+	var tape []float64
+	var readHead float64
+	return generator.SampleGeneratorFunc(func(ctx context.Context, cfg generator.SampleConfig, n int) []float64 {
+		res := make([]float64, n)
+		in := cfg.InputSamples["$0"]
+
+		// var targetDelaySecs float64
+		// var targetDelaySamps float64
+		// var actualDelaySamps float64
+		for i := 0; i < n; i++ {
+			delaySeconds := cfg.InputSamples["delay"][i]
+			if delaySeconds < 0 {
+				delaySeconds = 0
+			}
+			delaySamples := delaySeconds * float64(cfg.SampleRateHz)
+			// handle the initialization case, where the tape hasn't been set up yet.
+			if tape == nil {
+				tape = make([]float64, int(delaySeconds*float64(cfg.SampleRateHz)))
+			}
+			actualDelaySamples := float64(len(tape)) - readHead
+
+			tape = append(tape, in[i])
+
+			if len(tape) == 1 {
+				res[i] = tape[0]
+			} else {
+				// read the sample from the tape at the read head with linear interpolation
+				// between the two adjacent samples.
+				readHeadInt := int(readHead)
+				readHeadFrac := readHead - float64(readHeadInt)
+				res[i] = tape[readHeadInt]*(1-readHeadFrac) + tape[readHeadInt+1]*readHeadFrac
+			}
+
+			const maxStep = 2
+			const minStep = 1 / maxStep
+
+			// update the read head position with max and min bounds to prevent
+			// the read head from moving backwards or infinitely forward.
+			if delaySamples == 0 && actualDelaySamples > 0 {
+				readHead += maxStep
+			} else if actualDelaySamples > maxStep*delaySamples {
+				readHead += maxStep
+			} else if actualDelaySamples < minStep*delaySamples {
+				readHead += minStep
+			} else {
+				vel := actualDelaySamples / delaySamples
+				if math.IsNaN(vel) {
+					readHead += maxStep
+				} else {
+					readHead += math.Max(minStep, math.Min(maxStep, vel))
+				}
+			}
+			if readHead >= float64(len(tape)) {
+				readHead = 0
+				tape = tape[:0]
+			}
+			// drop samples that have already been read from the tape.
+			if readHead > 1 {
+				tape = tape[int(readHead):]
+				readHead = readHead - math.Floor(readHead)
+			}
+
+			// targetDelaySecs = delaySeconds
+			// targetDelaySamps = delaySamples
+			// actualDelaySamps = actualDelaySamples
+		}
+
+		// fmt.Printf("sample diff: %v, target delay sec: %v, target delay samps: %v, actual delay samps: %v, read head: %v\n, ratio: %v\n", targetDelaySamps-actualDelaySamps, targetDelaySecs, targetDelaySamps, actualDelaySamps, readHead, actualDelaySamps/targetDelaySamps)
+
+		return res
 	})
 }
 
@@ -605,13 +711,7 @@ func parseCommand(cmd string) (command, error) {
 				return res, fmt.Errorf("invalid command: %s", cmd)
 			}
 			var val value
-			if key == "freq" {
-				var err error
-				val, err = parseFreq(fields[2])
-				if err != nil {
-					return res, fmt.Errorf("invalid command: %v", err)
-				}
-			} else if unicode.IsLetter([]rune(fields[2])[0]) {
+			if unicode.IsLetter([]rune(fields[2])[0]) {
 				// if the value is a reference to another signal, store it as a string
 				val = fields[2]
 			} else {
@@ -678,16 +778,39 @@ func scriptToGraph(synthDesc string) (g *graph.Graph, sinks []<-chan []float64, 
 			return nil, nil, cmdErr
 		}
 
-		freq, _ := command.sigArgs["freq"].(float64)
+		argGenerators := make(map[string]graph.NodeID)
+		for k, v := range command.sigArgs {
+			switch v := v.(type) {
+			case float64:
+				// if the argument is a float, add a constant node
+				argGenerators[k] = g.AddGeneratorNode(NewConstantGenerator(v), graph.WithLabel(fmt.Sprintf("%.3f", v)))
+			case string:
+				// if the argument is a string, it should be a reference to
+				// another signal or a note name. TODO: build midi note names
+				// into the language so that this is unambiguous.
+				if ref, ok := nodesByRef[v]; ok {
+					argGenerators[k] = ref
+				} else {
+					freq, err := parseFreq(v)
+					if err != nil {
+						return nil, nil, fmt.Errorf("invalid command, unknown frequency: %s", v)
+					}
+					argGenerators[k] = g.AddGeneratorNode(NewConstantGenerator(freq), graph.WithLabel(v))
+				}
+			}
+		}
+
 		var gen generator.SampleGenerator
 
-		var inEdges []graph.NodeID
-
 		switch command.sigName {
+		case "*":
+			gen = NewMultiplyGenerator()
+		case "+":
+			gen = NewAddGenerator()
 		case "sin":
-			gen = wavtabGenerator(wavtabs.Sin(1024), freq)
+			gen = wavtabGenerator(wavtabs.Sin(1024))
 		case "saw":
-			gen = wavtabGenerator(wavtabs.Saw(1024), freq)
+			gen = wavtabGenerator(wavtabs.Saw(1024))
 		case "sqr":
 			dutyCycle := 0.5
 			dutyCycleVal, ok := command.sigArgs["dc"]
@@ -698,28 +821,20 @@ func scriptToGraph(synthDesc string) (g *graph.Graph, sinks []<-chan []float64, 
 					return
 				}
 			}
-			gen = wavtabGenerator(wavtabs.Square(1024, dutyCycle), freq)
+			gen = wavtabGenerator(wavtabs.Square(1024, dutyCycle))
 		case "noise":
 			gen = Noise
 		case "env":
-			gen = NewADSRGenerator(command.sigArgs)
-			if trig, ok := command.sigArgs["trigger"]; ok {
-				if trigRef, ok := trig.(string); ok {
-					tid, ok := nodesByRef[trigRef]
-					if !ok {
-						err = fmt.Errorf("invalid trigger reference: %s", trigRef)
-						return
-					}
-					inEdges = append(inEdges, tid)
-				}
-			}
+			gen = NewADSRGenerator()
+		case "delay":
+			gen = NewDelayGenerator()
 		default:
 			err = fmt.Errorf("invalid signal generator: %s", command.sigName)
 			return
 		}
 		genID := g.AddGeneratorNode(gen, graph.WithLabel(command.String()))
-		for _, inEdge := range inEdges {
-			g.AddEdge(inEdge, genID)
+		for port, input := range argGenerators {
+			g.AddEdge(input, genID, port)
 		}
 
 		ampVal, ok := command.sigArgs["amp"]
@@ -748,12 +863,12 @@ func scriptToGraph(synthDesc string) (g *graph.Graph, sinks []<-chan []float64, 
 		ampID := g.AddGeneratorNode(generator.SampleGeneratorFunc(func(ctx context.Context, cfg generator.SampleConfig, n int) []float64 {
 			res := make([]float64, n)
 			for i := range res {
-				res[i] = cfg.InputSamples[0][i] * cfg.InputSamples[1][i]
+				res[i] = cfg.InputSamples["$0"][i] * cfg.InputSamples["$1"][i]
 			}
 			return res
 		}), graph.WithLabel("*"))
-		g.AddEdge(genID, ampID)
-		g.AddEdge(ampValNodeID, ampID)
+		g.AddEdge(genID, ampID, "$0")
+		g.AddEdge(ampValNodeID, ampID, "$1")
 
 		if command.ref != "" {
 			nodesByRef[command.ref] = ampID
@@ -770,9 +885,9 @@ func scriptToGraph(synthDesc string) (g *graph.Graph, sinks []<-chan []float64, 
 		}
 		return res
 	}), graph.WithLabel("mixer"))
-	g.AddEdge(mixerNodeID, sinkID)
-	for _, id := range oscNodeIDs {
-		g.AddEdge(id, mixerNodeID)
+	g.AddEdge(mixerNodeID, sinkID, "$0")
+	for i, id := range oscNodeIDs {
+		g.AddEdge(id, mixerNodeID, fmt.Sprintf("$%d", i))
 	}
 	fmt.Println(len(g.Nodes), "nodes")
 	for _, e := range g.Edges {

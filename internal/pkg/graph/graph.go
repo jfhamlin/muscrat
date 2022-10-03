@@ -58,6 +58,16 @@ func (n *GeneratorNode) Run(ctx context.Context, g *Graph, cfg generator.SampleC
 	}
 }
 
+func (n *GeneratorNode) GenerateSamples(ctx context.Context, cfg generator.SampleConfig, numSamples int) (outputSamples []float64) {
+	defer func() {
+		if r := recover(); r != nil {
+			// TODO: make the failure of this node visible to the user.
+			outputSamples = make([]float64, numSamples)
+		}
+	}()
+	return n.Generator.GenerateSamples(ctx, cfg, numSamples)
+}
+
 func (n *GeneratorNode) String() string {
 	if n.label != "" {
 		return n.label
@@ -113,6 +123,7 @@ func (n *SinkNode) String() string {
 type Edge struct {
 	From    NodeID
 	To      NodeID
+	ToPort  string
 	Channel chan []float64
 }
 
@@ -122,10 +133,11 @@ type Graph struct {
 	Edges []*Edge
 }
 
-func (g *Graph) AddEdge(from, to NodeID) {
+func (g *Graph) AddEdge(from, to NodeID, port string) {
 	g.Edges = append(g.Edges, &Edge{
 		From:    from,
 		To:      to,
+		ToPort:  port,
 		Channel: make(chan []float64),
 	})
 }
@@ -194,32 +206,19 @@ func RunGraph(ctx context.Context, g *Graph, cfg generator.SampleConfig) {
 
 func RunNode(ctx context.Context, node *GeneratorNode, g *Graph, cfg generator.SampleConfig, numSamples int) {
 	inEdges := g.IncomingEdges(node.ID())
-	inputSamples := make([][]float64, len(inEdges))
-	for i, e := range inEdges {
+	inputSamples := make(map[string][]float64)
+	for _, e := range inEdges {
 		select {
-		case inputSamples[i] = <-e.Channel:
+		case inputSamples[e.ToPort] = <-e.Channel:
 		case <-ctx.Done():
 			return
 		}
 	}
 
 	cfg.InputSamples = inputSamples
+	outputSamples := node.GenerateSamples(ctx, cfg, numSamples)
 
-	defer func() {
-		if r := recover(); r != nil {
-			// TODO: make the failure of this node visible to the user.
-			for _, e := range g.OutgoingEdges(node.ID()) {
-				select {
-				case e.Channel <- make([]float64, numSamples):
-				case <-ctx.Done():
-					return
-				}
-			}
-		}
-	}()
-	outputSamples := node.Generator.GenerateSamples(ctx, cfg, numSamples)
-	outEdges := g.OutgoingEdges(node.ID())
-	for _, e := range outEdges {
+	for _, e := range g.OutgoingEdges(node.ID()) {
 		select {
 		case e.Channel <- outputSamples:
 		case <-ctx.Done():
