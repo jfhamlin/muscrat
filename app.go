@@ -22,6 +22,8 @@ import (
 	"github.com/jfhamlin/muscrat/internal/pkg/notes"
 	"github.com/jfhamlin/muscrat/internal/pkg/wavtabs"
 
+	"github.com/jfhamlin/muscrat/pkg/freeverb"
+
 	"github.com/bspaans/bleep/audio"
 	"github.com/bspaans/bleep/sinks"
 
@@ -166,7 +168,6 @@ func sineGenerator() generator.SampleGenerator {
 }
 
 func wavtabGenerator(wavtab wavtabs.Table) generator.SampleGenerator {
-	fmt.Println("wavtab length:", len(wavtab))
 	phase := 0.0
 	return generator.SampleGeneratorFunc(func(ctx context.Context, cfg generator.SampleConfig, n int) []float64 {
 		ws := cfg.InputSamples["w"]
@@ -411,6 +412,35 @@ func NewDelayGenerator() generator.SampleGenerator {
 		// fmt.Printf("sample diff: %v, target delay sec: %v, target delay samps: %v, actual delay samps: %v, read head: %v\n, ratio: %v\n", targetDelaySamps-actualDelaySamps, targetDelaySecs, targetDelaySamps, actualDelaySamps, readHead, actualDelaySamps/targetDelaySamps)
 
 		return res
+	})
+}
+
+func NewFreeverbGenerator() generator.SampleGenerator {
+	revmod := freeverb.NewRevModel()
+	return generator.SampleGeneratorFunc(func(ctx context.Context, cfg generator.SampleConfig, n int) []float64 {
+		if wet := cfg.InputSamples["wet"]; len(wet) > 0 {
+			revmod.SetWet(float32(wet[0]))
+		}
+		if damp := cfg.InputSamples["damp"]; len(damp) > 0 {
+			revmod.SetDamp(float32(damp[0]))
+		}
+		if room := cfg.InputSamples["room"]; len(room) > 0 {
+			revmod.SetRoomSize(float32(room[0]))
+		}
+
+		input32 := make([]float32, n)
+		for i := 0; i < n; i++ {
+			input32[i] = float32(cfg.InputSamples["$0"][i])
+		}
+		outputLeft := make([]float32, n)
+		outputRight := make([]float32, n)
+		revmod.ProcessReplace(input32, input32, outputLeft, outputRight, n, 1)
+		output := make([]float64, n)
+		for i := 0; i < n; i++ {
+			output[i] = 0.5 * (float64(outputLeft[i]) + float64(outputRight[i]))
+		}
+
+		return output
 	})
 }
 
@@ -812,22 +842,44 @@ func scriptToGraph(synthDesc string) (g *graph.Graph, sinks []<-chan []float64, 
 		case "saw":
 			gen = wavtabGenerator(wavtabs.Saw(1024))
 		case "sqr":
-			dutyCycle := 0.5
-			dutyCycleVal, ok := command.sigArgs["dc"]
-			if ok {
-				dutyCycle, ok = dutyCycleVal.(float64)
-				if !ok {
-					err = fmt.Errorf("invalid duty cycle value: %v", dutyCycleVal)
-					return
-				}
+			_, ok := command.sigArgs["dc"]
+			if !ok {
+				command.sigArgs["dc"] = 0.5
+				argGenerators["dc"] = g.AddGeneratorNode(NewConstantGenerator(0.5), graph.WithLabel("0.5"))
 			}
-			gen = wavtabGenerator(wavtabs.Square(1024, dutyCycle))
+			phase := 0.0
+			gen = generator.SampleGeneratorFunc(func(ctx context.Context, cfg generator.SampleConfig, n int) []float64 {
+				dcs := cfg.InputSamples["dc"]
+				ws := cfg.InputSamples["w"]
+				res := make([]float64, n)
+
+				lastDC := dcs[0]
+				wavtab := wavtabs.Square(1024, lastDC)
+				w := 0.0
+				for i := 0; i < n; i++ {
+					if dcs[i] != lastDC {
+						lastDC = dcs[i]
+						wavtab = wavtabs.Square(1024, lastDC)
+					}
+					if i < len(ws) {
+						w = ws[i]
+					}
+					res[i] = wavtab.Lerp(phase)
+					phase += w / float64(cfg.SampleRateHz)
+					if phase > 1 {
+						phase -= 1
+					}
+				}
+				return res
+			})
 		case "noise":
 			gen = Noise
 		case "env":
 			gen = NewADSRGenerator()
 		case "delay":
 			gen = NewDelayGenerator()
+		case "freeverb":
+			gen = NewFreeverbGenerator()
 		default:
 			err = fmt.Errorf("invalid signal generator: %s", command.sigName)
 			return

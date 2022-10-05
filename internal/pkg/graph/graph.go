@@ -3,6 +3,7 @@ package graph
 import (
 	"context"
 	"fmt"
+	"runtime/debug"
 	"strconv"
 	"sync"
 
@@ -62,6 +63,9 @@ func (n *GeneratorNode) GenerateSamples(ctx context.Context, cfg generator.Sampl
 	defer func() {
 		if r := recover(); r != nil {
 			// TODO: make the failure of this node visible to the user.
+			//fmt.Printf("node %s failed: %v\n", n, r)
+			// print stack trace
+			fmt.Printf("stack trace: %s\n", debug.Stack())
 			outputSamples = make([]float64, numSamples)
 		}
 	}()
