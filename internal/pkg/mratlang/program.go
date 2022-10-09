@@ -16,10 +16,6 @@ type Program struct {
 	node *sexp.Node
 }
 
-func (p *Program) Graph() (*graph.Graph, []graph.SinkChan, error) {
-	return p.Eval()
-}
-
 type evalOptions struct {
 	stdout   io.Writer
 	loadPath []string
@@ -124,7 +120,6 @@ func (env *environment) resolveFile(filename string) (string, bool) {
 
 	for _, path := range env.loadPath {
 		fullPath := filepath.Join(path, filename)
-		fmt.Println("trying", fullPath)
 		if _, err := os.Stat(fullPath); err == nil {
 			return fullPath, true
 		}

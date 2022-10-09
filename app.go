@@ -9,6 +9,7 @@ import (
 	"log"
 	"math"
 	"math/rand"
+	"os"
 	"regexp"
 	"sort"
 	"strconv"
@@ -617,7 +618,11 @@ func (a *App) updateSignalGraphFromScriptFile(filename string) {
 		fmt.Println("error parsing script:", err)
 		return
 	}
-	g, sinkChannels, err := program.Graph()
+	pwd, err := os.Getwd()
+	if err != nil {
+		panic(err)
+	}
+	g, sinkChannels, err := program.Eval(mratlang.WithLoadPath([]string{pwd}))
 	if err != nil {
 		fmt.Println("error generating graph:", err)
 		return

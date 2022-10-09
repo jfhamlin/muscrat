@@ -7,6 +7,7 @@ import (
 	"math"
 	"math/rand"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	"github.com/jfhamlin/muscrat/internal/pkg/generator"
@@ -56,6 +57,7 @@ func init() {
 			Symbols: []*Symbol{
 				funcSymbol("sin", sinBuiltin),
 				funcSymbol("saw", sawBuiltin),
+				funcSymbol("sqr", sqrBuiltin),
 				funcSymbol("noise", noiseBuiltin),
 			},
 		},
@@ -66,6 +68,7 @@ func init() {
 				funcSymbol("clip", clipBuiltin),
 				funcSymbol("delay", delayBuiltin),
 				funcSymbol("mixer", mixerBuiltin),
+				funcSymbol("env", envBuiltin),
 			},
 		},
 	}
@@ -386,6 +389,65 @@ func sawBuiltin(env *environment, args []Value) (Value, error) {
 	}, nil
 }
 
+func NewSquareGenerator() generator.SampleGenerator {
+	phase := 0.0
+	return generator.SampleGeneratorFunc(func(ctx context.Context, cfg generator.SampleConfig, n int) []float64 {
+		dcs := cfg.InputSamples["dc"]
+		ws := cfg.InputSamples["w"]
+		res := make([]float64, n)
+
+		lastDC := dcs[0]
+		wavtab := wavtabs.Square(1024, lastDC)
+		w := 0.0
+		for i := 0; i < n; i++ {
+			if dcs[i] != lastDC {
+				lastDC = dcs[i]
+				wavtab = wavtabs.Square(1024, lastDC)
+			}
+			if i < len(ws) {
+				w = ws[i]
+			}
+			res[i] = wavtab.Lerp(phase)
+			phase += w / float64(cfg.SampleRateHz)
+			if phase > 1 {
+				phase -= 1
+			}
+		}
+		return res
+	})
+}
+
+func sqrBuiltin(env *environment, args []Value) (Value, error) {
+	var freq graph.NodeID
+	if len(args) == 0 {
+		freq = env.graph.AddGeneratorNode(generator.NewConstant(440), graph.WithLabel("440"))
+	} else {
+		gen, ok := asGen(env, args[0])
+		if !ok {
+			return nil, fmt.Errorf("invalid type for sin frequency: %v", args[0])
+		}
+		freq = gen.NodeID
+		args = args[1:]
+	}
+	var dutyCycle graph.NodeID
+	if len(args) == 0 {
+		dutyCycle = env.graph.AddGeneratorNode(generator.NewConstant(0.5), graph.WithLabel("0.5"))
+	} else {
+		gen, ok := asGen(env, args[0])
+		if !ok {
+			return nil, fmt.Errorf("invalid type for saw duty cycle: %v", args[0])
+		}
+		dutyCycle = gen.NodeID
+	}
+
+	nodeID := env.graph.AddGeneratorNode(NewSquareGenerator(), graph.WithLabel("sqr"))
+	env.graph.AddEdge(freq, nodeID, "w")
+	env.graph.AddEdge(dutyCycle, nodeID, "dc")
+	return &Gen{
+		NodeID: nodeID,
+	}, nil
+}
+
 func outBuiltin(env *environment, args []Value) (Value, error) {
 	sinks := env.sinks
 	if len(sinks.sinkNodeIDs) == 0 {
@@ -643,6 +705,163 @@ func noiseBuiltin(env *environment, args []Value) (Value, error) {
 	}, nil
 }
 
+func getSampleArrays(inputs map[string][]float64, name string) [][]float64 {
+	var numSamples int
+
+	prefix := name + "$"
+	var res [][]float64
+	for key, in := range inputs {
+		if strings.HasPrefix(key, prefix) {
+			idx, err := strconv.Atoi(key[len(prefix):])
+			if err != nil {
+				continue
+			}
+			for idx >= len(res) {
+				res = append(res, nil)
+			}
+			res[idx] = in
+			if numSamples == 0 {
+				numSamples = len(in)
+			}
+		}
+	}
+	// fill in any missing inputs with arrays of zeros.
+	for i, in := range res {
+		if len(in) == 0 {
+			res[i] = make([]float64, numSamples)
+		}
+	}
+	return res
+}
+
+func NewEnvelopeGenerator() generator.SampleGenerator {
+	// Behavior follows that of SuperCollider's Env/EnvGen
+	// https://doc.sccode.org/Classes/Env.html
+
+	fmt.Println("new envelope generator")
+
+	triggered := false
+	triggerTime := 0.0
+	lastGate := false
+	return generator.SampleGeneratorFunc(func(ctx context.Context, cfg generator.SampleConfig, n int) []float64 {
+		res := make([]float64, n)
+
+		levels := getSampleArrays(cfg.InputSamples, "level")
+		times := getSampleArrays(cfg.InputSamples, "time")
+		gate := cfg.InputSamples["trigger"]
+		if len(gate) == 0 {
+			gate = make([]float64, n)
+		}
+
+		for i := 0; i < n; i++ {
+			var envDur float64
+			for _, t := range times {
+				envDur += t[i]
+			}
+
+			if (!triggered || triggerTime > envDur) && gate[i] > 0 && !lastGate {
+				triggered = true
+				triggerTime = 0
+			}
+
+			lastGate = gate[i] > 0
+
+			if !triggered {
+				res[i] = levels[0][i]
+				continue
+			}
+			if triggerTime > envDur {
+				res[i] = levels[len(levels)-1][i]
+				continue
+			}
+
+			// interpolate between the two levels adjacent to the current
+			// time.
+			var timeSum float64
+			for j, t := range times {
+				timeSum += t[i]
+				if timeSum >= triggerTime {
+					// interpolate between levels[j] and levels[j+1]
+					// at time triggerTime
+					res[i] = levels[j][i] + (levels[j+1][i]-levels[j][i])*(triggerTime-(timeSum-t[i]))/t[i]
+					break
+				}
+			}
+			triggerTime += 1 / float64(cfg.SampleRateHz)
+		}
+		return res
+	})
+}
+
+func envBuiltin(env *environment, args []Value) (Value, error) {
+	// env takes three arguments:
+	//
+	// 1. a gating signal. when the signal is > 0, the envelope is triggered.
+	//
+	// 2. a list of levels, which are the values of the envelope at each
+	// point. these must be convertible to Gens.
+	//
+	// 3. a list of durations, which are the durations of each segment
+	// of the envelope. these must be convertible to Gens.
+
+	if len(args) != 3 {
+		return nil, fmt.Errorf("env expects 3 arguments, got %v", len(args))
+	}
+
+	// the first argument is the trigger signal.
+	trigger, ok := asGen(env, args[0])
+	if !ok {
+		return nil, fmt.Errorf("env expects a Gen as the first argument, got %v", args[0])
+	}
+
+	// the second argument is the list of levels.
+	levels, ok := asList(args[1])
+	if !ok {
+		return nil, fmt.Errorf("env expects a list as the second argument, got %v", args[1])
+	}
+	levelGens := make([]*Gen, len(levels))
+	for i, level := range levels {
+		gen, ok := asGen(env, level)
+		if !ok {
+			return nil, fmt.Errorf("env expects a Gen as the %vth element of the second argument, got %v", i, level)
+		}
+		levelGens[i] = gen
+	}
+
+	// the third argument is the list of durations.
+	durations, ok := asList(args[2])
+	if !ok {
+		return nil, fmt.Errorf("env expects a list as the third argument, got %v", args[2])
+	}
+	durationGens := make([]*Gen, len(durations))
+	for i, duration := range durations {
+		gen, ok := asGen(env, duration)
+		if !ok {
+			return nil, fmt.Errorf("env expects a Gen as the %vth element of the third argument, got %v", i, duration)
+		}
+		durationGens[i] = gen
+	}
+
+	if len(levelGens) != len(durationGens)+1 {
+		return nil, fmt.Errorf("env expects the number of levels to be one more than the number of durations, got %v levels and %v durations", len(levelGens), len(durationGens))
+	}
+
+	// create the envelope generator.
+	nodeID := env.graph.AddGeneratorNode(NewEnvelopeGenerator(), graph.WithLabel("env"))
+	// nodeID := env.graph.AddGeneratorNode(generator.NewConstant(1), graph.WithLabel("env"))
+	env.graph.AddEdge(trigger.NodeID, nodeID, "trigger")
+	for i, gen := range levelGens {
+		env.graph.AddEdge(gen.NodeID, nodeID, fmt.Sprintf("level$%v", i))
+	}
+	for i, gen := range durationGens {
+		env.graph.AddEdge(gen.NodeID, nodeID, fmt.Sprintf("time$%v", i))
+	}
+
+	return &Gen{
+		NodeID: nodeID,
+	}, nil
+}
+
 func asGen(env *environment, v Value) (*Gen, bool) {
 	// asGen converts a Value to a Gen, if possible.
 	switch v := v.(type) {
@@ -653,6 +872,16 @@ func asGen(env *environment, v Value) (*Gen, bool) {
 		return &Gen{
 			NodeID: id,
 		}, true
+	default:
+		return nil, false
+	}
+}
+
+func asList(v Value) ([]Value, bool) {
+	// asList converts a Value to a list, if possible.
+	switch v := v.(type) {
+	case *List:
+		return v.Values, true
 	default:
 		return nil, false
 	}

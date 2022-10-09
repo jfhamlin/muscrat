@@ -11,6 +11,7 @@ Either:
 ** DONE treat all parameters as signals
 ** DONE Describe a graph from the text file
 ** TODO Add proper envelope to lisp
+** TODO infrastructure to make it easier to export functions to lisp
 ** TODO Support including other script files
 ** TODO Describe dynamic note changes in the text file
 *** DONE add support for an envelope signal generator
