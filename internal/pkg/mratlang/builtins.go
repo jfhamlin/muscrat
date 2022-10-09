@@ -53,6 +53,12 @@ func init() {
 			},
 		},
 		&Package{
+			Name: "mrat.math.rand",
+			Symbols: []*Symbol{
+				funcSymbol("trand", trandBuiltin),
+			},
+		},
+		&Package{
 			Name: "mrat.osc",
 			Symbols: []*Symbol{
 				funcSymbol("sin", sinBuiltin),
@@ -345,6 +351,85 @@ func printBuiltin(env *environment, args []Value) (Value, error) {
 	}
 	env.stdout.Write([]byte("\n"))
 	return nil, nil
+}
+
+func linRand(min, max float64) float64 {
+	return min + rand.Float64()*(max-min)
+}
+
+func expRand(min, max float64) float64 {
+	return min * math.Pow(max/min, rand.Float64())
+}
+
+func NewTrandGenerator(pick func(min, max float64) float64) generator.SampleGenerator {
+	triggered := false
+	value := make([]float64, 0, 1)
+	return generator.SampleGeneratorFunc(func(ctx context.Context, cfg generator.SampleConfig, n int) []float64 {
+		trigger := cfg.InputSamples["trigger"]
+		min := cfg.InputSamples["min"]
+		max := cfg.InputSamples["max"]
+
+		if len(value) == 0 {
+			value = append(value, pick(min[0], max[0]))
+		}
+
+		res := make([]float64, n)
+		for i := 0; i < n; i++ {
+			if !triggered && trigger[i] > 0 {
+				triggered = true
+				value[0] = pick(min[i], max[i])
+			}
+			if triggered && trigger[i] <= 0 {
+				triggered = false
+			}
+
+			res[i] = value[0]
+		}
+		return res
+	})
+}
+
+func trandBuiltin(env *environment, args []Value) (Value, error) {
+	// trand takes three required arguments: a generator that triggers
+	// random number selection and two generators that produce the min
+	// and max values for the random number selection.
+	//
+	// trand also takes an optional argument that specifies the random
+	// number selection function. The default is linear.
+	if len(args) < 3 || len(args) > 4 {
+		return nil, fmt.Errorf("trand expects 3 or 4 arguments, got %v", len(args))
+	}
+	gens := make([]*Gen, 3)
+	for i, arg := range args[:3] {
+		gen, ok := asGen(env, arg)
+		if !ok {
+			return nil, fmt.Errorf("trand expects generators as arguments, got %v", arg)
+		}
+		gens[i] = gen
+	}
+	randFn := linRand
+	if len(args) == 4 {
+		kw, ok := args[3].(*Keyword)
+		if !ok {
+			return nil, fmt.Errorf("trand expects a keyword as the fourth argument, got %v", args[3])
+		}
+		switch kw.Value {
+		case ":lin":
+			randFn = linRand
+		case ":exp":
+			randFn = expRand
+		default:
+			return nil, fmt.Errorf("trand does not recognize the keyword %v", kw.Value)
+		}
+	}
+
+	nodeID := env.graph.AddGeneratorNode(NewTrandGenerator(randFn), graph.WithLabel("trand"))
+	env.graph.AddEdge(gens[0].NodeID, nodeID, "trigger")
+	env.graph.AddEdge(gens[1].NodeID, nodeID, "min")
+	env.graph.AddEdge(gens[2].NodeID, nodeID, "max")
+	return &Gen{
+		NodeID: nodeID,
+	}, nil
 }
 
 func sinBuiltin(env *environment, args []Value) (Value, error) {
@@ -734,7 +819,7 @@ func getSampleArrays(inputs map[string][]float64, name string) [][]float64 {
 	return res
 }
 
-func NewEnvelopeGenerator() generator.SampleGenerator {
+func NewEnvelopeGenerator(interpolation string) generator.SampleGenerator {
 	// Behavior follows that of SuperCollider's Env/EnvGen
 	// https://doc.sccode.org/Classes/Env.html
 
@@ -781,9 +866,16 @@ func NewEnvelopeGenerator() generator.SampleGenerator {
 			for j, t := range times {
 				timeSum += t[i]
 				if timeSum >= triggerTime {
+					level1 := levels[j][i]
+					level2 := levels[j+1][i]
 					// interpolate between levels[j] and levels[j+1]
 					// at time triggerTime
-					res[i] = levels[j][i] + (levels[j+1][i]-levels[j][i])*(triggerTime-(timeSum-t[i]))/t[i]
+					switch interpolation {
+					case ":lin":
+						res[i] = level1 + (level2-level1)*(triggerTime-(timeSum-t[i]))/t[i]
+					case ":exp":
+						res[i] = level1 * math.Pow(level2/level1, (triggerTime-(timeSum-t[i]))/t[i])
+					}
 					break
 				}
 			}
@@ -804,8 +896,8 @@ func envBuiltin(env *environment, args []Value) (Value, error) {
 	// 3. a list of durations, which are the durations of each segment
 	// of the envelope. these must be convertible to Gens.
 
-	if len(args) != 3 {
-		return nil, fmt.Errorf("env expects 3 arguments, got %v", len(args))
+	if len(args) < 3 || len(args) > 4 {
+		return nil, fmt.Errorf("env expects 3 or 4 arguments, got %v", len(args))
 	}
 
 	// the first argument is the trigger signal.
@@ -846,8 +938,21 @@ func envBuiltin(env *environment, args []Value) (Value, error) {
 		return nil, fmt.Errorf("env expects the number of levels to be one more than the number of durations, got %v levels and %v durations", len(levelGens), len(durationGens))
 	}
 
+	// the optional fourth argument is the type of interpolation to use.
+	interpolation := ":lin"
+	if len(args) == 4 {
+		interpKey, ok := args[3].(*Keyword)
+		if !ok {
+			return nil, fmt.Errorf("env expects a keyword as the fourth argument, got %v", args[3])
+		}
+		interpolation = interpKey.Value
+		if interpolation != ":lin" && interpolation != ":exp" {
+			return nil, fmt.Errorf("env expects the fourth argument to be either :lin or :exp, got %v", interpolation)
+		}
+	}
+
 	// create the envelope generator.
-	nodeID := env.graph.AddGeneratorNode(NewEnvelopeGenerator(), graph.WithLabel("env"))
+	nodeID := env.graph.AddGeneratorNode(NewEnvelopeGenerator(interpolation), graph.WithLabel("env"))
 	// nodeID := env.graph.AddGeneratorNode(generator.NewConstant(1), graph.WithLabel("env"))
 	env.graph.AddEdge(trigger.NodeID, nodeID, "trigger")
 	for i, gen := range levelGens {

@@ -10,11 +10,14 @@ Either:
 ** DONE Configure oscillator from the text file (e.g. square wave duty cycle)
 ** DONE treat all parameters as signals
 ** DONE Describe a graph from the text file
-** TODO Add proper envelope to lisp
+** DONE Add proper envelope to lisp
+** DONE Add support for custom interpolation types to the envelope effect
+** DONE Support including other script files
 ** TODO infrastructure to make it easier to export functions to lisp
-** TODO Support including other script files
 ** TODO Describe dynamic note changes in the text file
 *** DONE add support for an envelope signal generator
+*** TODO tools for sequencer
+** TODO music theory libraries
 ** TODO Refactor code out of app.go
 ** TODO Transition between graphs by mutating the graph and fading between altered nodes
 ** TODO Todos from GPT-3
@@ -49,4 +52,8 @@ Either:
 *** TODO Add a high-shelf resonant filter effect
 *** TODO Add a band-shelf resonant filter effect
 *** TODO Add a parametric resonant filter effect
-** TODO syntactic sugar for positional arguments
+** TODO features for adoption and usability
+*** TODO discoverability of capabilities
+*** TODO usability of capabilities
+*** TODO instrumentation of live usage
+** TODO model for namespaces and packages

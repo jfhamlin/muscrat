@@ -120,6 +120,24 @@ func (s *Str) Equal(v Value) bool {
 	return s.Value == other.Value
 }
 
+// Keyword represents a keyword. Syyntactically, a keyword is a symbol
+// that starts with a colon and evaluates to itself.
+type Keyword struct {
+	Value string
+}
+
+func (k *Keyword) String() string {
+	return k.Value
+}
+
+func (k *Keyword) Equal(v Value) bool {
+	other, ok := v.(*Keyword)
+	if !ok {
+		return false
+	}
+	return k.Value == other.Value
+}
+
 // Func is a function.
 type Func struct {
 	lambdaName string
@@ -163,7 +181,15 @@ func (f *Func) Apply(env *environment, args []Value) (Value, error) {
 		}
 	}
 
-	return fnEnv.evalNode(f.node)
+	var res Value
+	for cur := f.node; cur != nil; cur = cur.Next {
+		v, err := fnEnv.evalNode(cur)
+		if err != nil {
+			return nil, err
+		}
+		res = v
+	}
+	return res, nil
 }
 
 // BuiltinFunc is a builtin function.

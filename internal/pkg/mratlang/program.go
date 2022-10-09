@@ -188,6 +188,10 @@ func (env *environment) evalScalar(n *sexp.Node) (Value, error) {
 		return &Str{Value: n.Value[1:]}, nil
 	}
 
+	if firstRune == ':' {
+		return &Keyword{Value: n.Value}, nil
+	}
+
 	switch n.Value {
 	case "#t":
 		return &Bool{Value: true}, nil
@@ -229,7 +233,7 @@ func (na *nopApplyer) Apply(env *environment, args []Value) (Value, error) {
 }
 
 func (env *environment) evalDef(n *sexp.Node) (Value, error) {
-	if nodeLen(n) != 2 {
+	if nodeLen(n) < 2 {
 		return nil, fmt.Errorf("invalid def: %v", n.Location)
 	}
 	if nodeIsList(n) {

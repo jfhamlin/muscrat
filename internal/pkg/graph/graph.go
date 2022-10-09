@@ -242,13 +242,8 @@ func (g *Graph) Dot() string {
 		dot += fmt.Sprintf("\t%q [label=%q];\n", node.ID().String(), node.String())
 	}
 	for _, e := range g.Edges {
-		// add an edge from e.From to e.To, using the node's ID as the
-		// label.
-		dot += "\t"
-		dot += g.Nodes[e.From].ID().String()
-		dot += " -> "
-		dot += g.Nodes[e.To].ID().String()
-		dot += "\n"
+		// add an edge from e.From to e.To, using e.ToPort as label
+		dot += fmt.Sprintf("\t%q -> %q [label=%q];\n", e.From.String(), e.To.String(), e.ToPort)
 	}
 	dot += "}\n"
 	return dot

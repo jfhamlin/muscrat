@@ -581,11 +581,12 @@ func (a *App) startup(ctx context.Context) {
 
 		for {
 			select {
-			case _, ok := <-watcher.Events:
+			case evt, ok := <-watcher.Events:
 				if !ok {
 					return
 				}
 				a.updateSignalGraphFromScriptFile(a.synthFileName)
+				fmt.Println("event:", evt)
 			case err, ok := <-watcher.Errors:
 				if !ok {
 					return
