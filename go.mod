@@ -6,6 +6,7 @@ require (
 	github.com/bspaans/bleep v0.0.0-20220414232837-486f92844ed7
 	github.com/fsnotify/fsnotify v1.5.4
 	github.com/mjibson/go-dsp v0.0.0-20180508042940-11479a337f12
+	github.com/nsf/sexp v0.0.0-20130620094510-d3d2f2591f1d
 	github.com/wailsapp/wails/v2 v2.0.0
 )
 

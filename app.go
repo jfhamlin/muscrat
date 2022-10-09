@@ -1,7 +1,9 @@
 package main
 
 import (
+	"bytes"
 	"context"
+	"crypto/sha256"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -19,6 +21,7 @@ import (
 
 	"github.com/jfhamlin/muscrat/internal/pkg/generator"
 	"github.com/jfhamlin/muscrat/internal/pkg/graph"
+	"github.com/jfhamlin/muscrat/internal/pkg/mratlang"
 	"github.com/jfhamlin/muscrat/internal/pkg/notes"
 	"github.com/jfhamlin/muscrat/internal/pkg/wavtabs"
 
@@ -59,9 +62,10 @@ type App struct {
 	synthFileName string
 	sampleRate    int
 
-	cancelGraph func()
-	cancelSink  func()
-	graph       *graph.Graph
+	cancelGraph       func()
+	cancelSink        func()
+	graph             *graph.Graph
+	lastSynthFileHash [32]byte
 
 	mtx sync.Mutex
 }
@@ -576,13 +580,11 @@ func (a *App) startup(ctx context.Context) {
 
 		for {
 			select {
-			case event, ok := <-watcher.Events:
+			case _, ok := <-watcher.Events:
 				if !ok {
 					return
 				}
-				if event.Op == fsnotify.Write {
-					a.updateSignalGraphFromScriptFile(a.synthFileName)
-				}
+				a.updateSignalGraphFromScriptFile(a.synthFileName)
 			case err, ok := <-watcher.Errors:
 				if !ok {
 					return
@@ -602,9 +604,22 @@ func (a *App) updateSignalGraphFromScriptFile(filename string) {
 	if err != nil {
 		panic(err)
 	}
-	g, sinkChannels, err := scriptToGraph(string(synthFile))
+	// hash the file contents
+	hash := sha256.Sum256(synthFile)
+	// if the hash is the same as the last time we loaded the file, don't do anything
+	if bytes.Equal(hash[:], a.lastSynthFileHash[:]) {
+		return
+	}
+	a.lastSynthFileHash = hash
+
+	program, err := mratlang.Parse(strings.NewReader(string(synthFile)))
 	if err != nil {
 		fmt.Println("error parsing script:", err)
+		return
+	}
+	g, sinkChannels, err := program.Graph()
+	if err != nil {
+		fmt.Println("error generating graph:", err)
 		return
 	}
 	if len(sinkChannels) == 0 {

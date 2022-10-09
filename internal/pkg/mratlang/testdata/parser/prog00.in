@@ -1,0 +1,6 @@
+(def (mulTwo a b) (* a b))
+
+(mrat.core.io.print (mulTwo 2 3))
+
+(def (weirdosc)
+    (* (mrat.osc.sin 261.625565) 0.5))

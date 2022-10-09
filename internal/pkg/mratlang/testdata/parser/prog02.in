@@ -1,0 +1,26 @@
+(def print mrat.core.io.print)
+
+(def table
+    ;; condition, ifval, elseval
+    ( list
+     (list 1 1 0)
+     (list #t 1 0)
+     (list #f 1 0)
+     (list 0 1 0)
+     ))
+
+(def (testTable tbl)
+    (if (eq? tbl (list))
+        #t ;; done
+        (list
+         (runTest (first tbl))
+         (testTable (rest tbl)))))
+
+(def (runTest test)
+    (print
+     (first test)
+     (if (first test)
+         (first (rest test))
+         (first (rest (rest test))))))
+
+(testTable table)

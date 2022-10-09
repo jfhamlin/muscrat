@@ -1,0 +1,11 @@
+(def (map func lst)
+    (if (not-empty? lst)
+        (concat (list (func (first lst))) (map func (rest lst)))
+        (list)))
+
+(def (reduce func lst acc)
+    (if (not-empty? lst)
+        (reduce func (rest lst) (func acc (first lst)))
+        acc))
+
+(def (sum lst) (apply + lst))

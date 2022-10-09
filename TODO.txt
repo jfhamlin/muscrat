@@ -9,15 +9,16 @@ Either:
 ** DONE Choose oscillator for each note from the text file
 ** DONE Configure oscillator from the text file (e.g. square wave duty cycle)
 ** DONE treat all parameters as signals
-** TODO syntactic sugar for positional arguments
+** DONE Describe a graph from the text file
+** TODO Add proper envelope to lisp
+** TODO Support including other script files
 ** TODO Describe dynamic note changes in the text file
 *** DONE add support for an envelope signal generator
-** TODO Describe a graph from the text file
 ** TODO Refactor code out of app.go
 ** TODO Transition between graphs by mutating the graph and fading between altered nodes
 ** TODO Todos from GPT-3
-*** TODO Add a delay effect
-*** TODO Add a reverb effect
+*** DONE Add a delay effect
+*** DONE Add a reverb effect
 *** TODO Add a chorus effect
 *** TODO Add a flanger effect
 *** TODO Add a phaser effect
@@ -47,3 +48,4 @@ Either:
 *** TODO Add a high-shelf resonant filter effect
 *** TODO Add a band-shelf resonant filter effect
 *** TODO Add a parametric resonant filter effect
+** TODO syntactic sugar for positional arguments

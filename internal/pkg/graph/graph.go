@@ -16,6 +16,8 @@ func (id NodeID) String() string {
 	return strconv.Itoa(int(id))
 }
 
+type SinkChan <-chan []float64
+
 type Node interface {
 	ID() NodeID
 	Run(ctx context.Context, g *Graph, cfg generator.SampleConfig, numSamples int)
@@ -161,7 +163,7 @@ func (g *Graph) AddGeneratorNode(gen generator.SampleGenerator, opts ...NodeOpti
 	return node.id
 }
 
-func (g *Graph) AddSinkNode(opts ...NodeOption) (NodeID, <-chan []float64) {
+func (g *Graph) AddSinkNode(opts ...NodeOption) (NodeID, SinkChan) {
 	var options nodeOptions
 	for _, opt := range opts {
 		opt(&options)
