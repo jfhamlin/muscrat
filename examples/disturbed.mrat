@@ -1,0 +1,70 @@
+(load-file './examples/functional.mrat)
+(load-file './examples/bell.mrat)
+
+(def sin mrat.osc.sin)
+(def saw mrat.osc.saw)
+(def sqr mrat.osc.sqr)
+(def noise mrat.osc.noise)
+
+(def print mrat.core.io.print)
+(def freeverb mrat.effects.freeverb)
+(def delay mrat.effects.delay)
+(def clip mrat.effects.clip)
+(def mixer mrat.effects.mixer)
+
+(def trand mrat.math.rand.trand)
+
+;; create the concrete instrument and output
+
+;; (def bellFreqs (list (+ 261.63 (* 100 (sin 5)))))
+;; ;; (def bellFreqs (list 261.63))
+;; (def bells (sum (map bell bellFreqs)))
+
+;; ;; low-frequency oscillator
+;; (def lfo (* 10 (mrat.effects.clip (+ -0.9 (mrat.osc.sin 2)) 0 1)))
+
+;; (def dryBell (* lfo bells))
+;; (def wetBell (freeverb dryBell))
+
+;; (def dryNoise (* 0.05 lfo (mrat.osc.noise)))
+;; (def wetNoise (freeverb dryNoise))
+
+;; (def mixedOld
+;;     (mixer dryBell
+;;            dryNoise
+;;            (delay (+ wetNoise wetBell) 0.2)
+;;            ))
+
+(def gate (sqr 4))
+
+(def envelope (mrat.effects.env gate (list 0 1 1 0) (list 0.01 0.05 0.02)))
+
+(def g2 (sqr 10))
+
+(def w (trand (sqr 2) 263 1500 :exp) )
+
+;; (def note (sum (map sin (map (fn (r) (* r w)) bellRatios))))
+
+(def env mrat.effects.env)
+
+(def note
+    (sqr w
+         (env gate (list 0.01 0.5) (list 0.05))))
+
+(def playedNote (* envelope note))
+(def noteRounds
+    (mixer playedNote
+           (delay playedNote 5)
+           (delay playedNote 10)
+           (delay playedNote 15)
+           (* (env g2 (list 0.001 0.5 1 2) (list 10 20 30) :exp) (noise))
+           ))
+
+(def mixed
+    (mixer noteRounds
+           (freeverb noteRounds)
+           ))
+
+(def gain 0.1)
+
+(mrat.core.io.out (* gain mixed))

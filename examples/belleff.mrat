@@ -1,0 +1,97 @@
+(def sin mrat.osc.sin)
+(def saw mrat.osc.saw)
+(def noise mrat.osc.noise)
+
+(def print mrat.core.io.print)
+(def freeverb mrat.effects.freeverb)
+(def delay mrat.effects.delay)
+(def clip mrat.effects.clip)
+(def mixer mrat.effects.mixer)
+
+(load-file './functional.mrat)
+
+;; bell relative frequencies
+;; from https://en.wikipedia.org/wiki/Strike_tone
+(def bellRatios
+    (list
+     0.500
+     1.000
+     1.183
+     1.506
+     2.000
+     2.514
+     2.662
+     3.011
+     4.166
+     5.433
+     6.796
+     8.215))
+
+(def (bell freq)
+    ;; by default, mixer will sum all inputs with equal weights,
+    ;; summing to q. avoids clipping.
+    (apply mixer (map sin (map (lambda (r) (* r freq)) bellRatios))))
+
+;; create the concrete instrument and output
+
+(def bellFreqs (list (+ 261.63 (* 100 (sin 5)))))
+;; (def bellFreqs (list 261.63))
+(def bells (sum (map bell bellFreqs)))
+
+;; low-frequency oscillator
+(def lfo (* 10 (mrat.effects.clip (+ -0.9 (mrat.osc.sin 2)) 0 1)))
+
+(def dryBell (* lfo bells))
+(def wetBell (freeverb dryBell))
+
+(def dryNoise (* 0.05 lfo (mrat.osc.noise)))
+(def wetNoise (freeverb dryNoise))
+
+(def mixed
+    (mixer dryBell
+           dryNoise
+           (delay (+ wetNoise wetBell) 0.2)
+           ))
+
+(def gain 0)
+
+(mrat.core.io.out (* gain mixed))
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+;; the frequencies for a major C triad
+;; (def cMajor (list 261.63 329.63 392.00))
+
+;; the frequencies for a gothic church organ chord
+;; (def churchChord (list 261.63 329.63 392.00 523.25 659.25 783.99 1046.50))
+
+;; the frequencies for an 80s synth pad chord
+;;(def synthChord (list 261.63 329.63 392.00 523.25 659.25 783.99 1046.50))
+
+;;(def instruments (map (lambda (freq) (saw freq)) synthChord))
+
+;; (mrat.core.io.out (clip (* 2 (sin 440)) -0.5 0.5))
+
+;; (def bells (apply mixer (map bell churchChord)))
+
+;; (def bellOut bells
+
+;; (def mixed
+;;     (mixer bells
+;;            (delay (freeverb bells) 0.2)
+;;        ))
+
+;; (mrat.core.io.out (* 0.25 mixed))

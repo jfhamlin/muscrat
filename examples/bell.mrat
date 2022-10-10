@@ -1,0 +1,21 @@
+;; bell relative frequencies
+;; from https://en.wikipedia.org/wiki/Strike_tone
+(def bellRatios
+    (list
+     0.500
+     1.000
+     1.183
+     1.506
+     2.000
+     2.514
+     2.662
+     3.011
+     4.166
+     5.433
+     6.796
+     8.215))
+
+(def (bell freq)
+    ;; by default, mixer will sum all inputs with equal weights,
+    ;; summing to q. avoids clipping.
+    (apply mixer (map sin (map (fn (r) (* r freq)) bellRatios))))
