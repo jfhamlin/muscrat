@@ -37,9 +37,10 @@ function App() {
   return (
     <div id="App">
       <h2>Synthesizer</h2>
+      <label>Output Gain</label>
       <FloatInput onValueChange={handleGainChange} />
       <div>
-        {graphDot && <Graphviz options={{width: 800}} dot={graphDot} />}
+        {graphDot && <Graphviz options={{width: 1000}} dot={graphDot} />}
       </div>
     </div>
   )
