@@ -2,6 +2,7 @@ package wavtabs
 
 import (
 	"context"
+	"math"
 
 	"github.com/jfhamlin/muscrat/internal/pkg/generator"
 )
@@ -20,9 +21,8 @@ func Generator(wavtab Table) generator.SampleGenerator {
 			}
 			res[i] = wavtab.Lerp(phase)
 			phase += w / float64(cfg.SampleRateHz)
-			if phase > 1 {
-				phase -= 1
-			}
+			// keep phase in [0, 1)
+			phase -= math.Floor(phase)
 		}
 		return res
 	})
