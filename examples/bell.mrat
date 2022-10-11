@@ -17,5 +17,5 @@
 
 (def (bell freq)
     ;; by default, mixer will sum all inputs with equal weights,
-    ;; summing to q. avoids clipping.
+    ;; summing to 1. avoids clipping.
     (apply mixer (map sin (map (fn (r) (* r freq)) bellRatios))))

@@ -414,9 +414,9 @@ func trandBuiltin(env *environment, args []Value) (Value, error) {
 			return nil, fmt.Errorf("trand expects a keyword as the fourth argument, got %v", args[3])
 		}
 		switch kw.Value {
-		case ":lin":
+		case "lin":
 			randFn = linRand
-		case ":exp":
+		case "exp":
 			randFn = expRand
 		default:
 			return nil, fmt.Errorf("trand does not recognize the keyword %v", kw.Value)
@@ -871,9 +871,9 @@ func NewEnvelopeGenerator(interpolation string) generator.SampleGenerator {
 					// interpolate between levels[j] and levels[j+1]
 					// at time triggerTime
 					switch interpolation {
-					case ":lin":
+					case "lin":
 						res[i] = level1 + (level2-level1)*(triggerTime-(timeSum-t[i]))/t[i]
-					case ":exp":
+					case "exp":
 						res[i] = level1 * math.Pow(level2/level1, (triggerTime-(timeSum-t[i]))/t[i])
 					}
 					break
@@ -939,14 +939,14 @@ func envBuiltin(env *environment, args []Value) (Value, error) {
 	}
 
 	// the optional fourth argument is the type of interpolation to use.
-	interpolation := ":lin"
+	interpolation := "lin"
 	if len(args) == 4 {
 		interpKey, ok := args[3].(*Keyword)
 		if !ok {
 			return nil, fmt.Errorf("env expects a keyword as the fourth argument, got %v", args[3])
 		}
 		interpolation = interpKey.Value
-		if interpolation != ":lin" && interpolation != ":exp" {
+		if interpolation != "lin" && interpolation != "exp" {
 			return nil, fmt.Errorf("env expects the fourth argument to be either :lin or :exp, got %v", interpolation)
 		}
 	}
