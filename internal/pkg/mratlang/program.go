@@ -5,15 +5,13 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"strconv"
-	"unicode"
 
 	"github.com/jfhamlin/muscrat/internal/pkg/graph"
-	"github.com/nsf/sexp"
+	"github.com/jfhamlin/muscrat/internal/pkg/mratlang/ast"
 )
 
 type Program struct {
-	node *sexp.Node
+	nodes []ast.Node
 }
 
 type evalOptions struct {
@@ -56,8 +54,8 @@ func (p *Program) Eval(opts ...EvalOption) (*graph.Graph, []graph.SinkChan, erro
 		env.loadPath = options.loadPath
 	}
 
-	for cur := p.node.Children; cur != nil; cur = cur.Next {
-		_, err := env.evalNode(cur)
+	for _, node := range p.nodes {
+		_, err := env.evalNode(node)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -127,37 +125,39 @@ func (env *environment) resolveFile(filename string) (string, bool) {
 	return "", false
 }
 
-func (env *environment) evalNode(n *sexp.Node) (Value, error) {
-	if nodeIsList(n) {
-		return env.evalList(n)
+func (env *environment) evalNode(n ast.Node) (Value, error) {
+	switch v := n.(type) {
+	case *ast.List:
+		return env.evalList(v)
+	default:
+		return env.evalScalar(n)
 	}
-
-	return env.evalScalar(n)
 }
 
-func (env *environment) evalList(n *sexp.Node) (Value, error) {
-	if n.NumChildren() == 0 {
+func (env *environment) evalList(n *ast.List) (Value, error) {
+	if len(n.Items) == 0 {
 		return nil, nil
 	}
 
-	first := n.Children
-
-	// handle special forms
-	switch first.Value {
-	case "def":
-		return env.evalDef(first.Next)
-	case "if":
-		return env.evalIf(first.Next)
-	case "lambda":
-		return env.evalLambda(first.Next)
-	case "fn":
-		return env.evalFn(first.Next)
+	first := n.Items[0]
+	if sym, ok := first.(*ast.Symbol); ok {
+		// handle special forms
+		switch sym.Value {
+		case "def":
+			return env.evalDef(n)
+		case "if":
+			return env.evalIf(n)
+		case "lambda":
+			return env.evalLambda(n)
+		case "fn":
+			return env.evalFn(n)
+		}
 	}
 
 	// otherwise, handle a function call
 	var res []Value
-	for cur := first; cur != nil; cur = cur.Next {
-		v, err := env.evalNode(cur)
+	for _, item := range n.Items {
+		v, err := env.evalNode(item)
 		if err != nil {
 			return nil, err
 		}
@@ -166,44 +166,27 @@ func (env *environment) evalList(n *sexp.Node) (Value, error) {
 	return env.applyFunc(res[0], res[1:])
 }
 
-func (env *environment) evalScalar(n *sexp.Node) (Value, error) {
-	valueRunes := []rune(n.Value)
-	if len(valueRunes) == 0 {
-		fmt.Println("empty scalar", n.Value)
-	}
-	firstRune := valueRunes[0]
-	if unicode.IsDigit(firstRune) || firstRune == '-' || firstRune == '.' {
-		f, err := strconv.ParseFloat(n.Value, 64)
-		if err != nil {
-			return nil, err
+func (env *environment) evalScalar(n ast.Node) (Value, error) {
+	switch v := n.(type) {
+	case *ast.Number:
+		return &Num{v.Value}, nil
+	case *ast.Quote:
+		panic("unimplemented")
+	case *ast.Symbol:
+		if val, ok := env.lookup(v.Value); ok {
+			return val, nil
 		}
-		return &Num{Value: f}, nil
+		fmt.Println("unbound symbol:", n)
+		return nil, fmt.Errorf("XXX undefined symbol: %s", v.Value)
+	case *ast.Keyword:
+		return &Keyword{Value: v.Value}, nil
+	case *ast.String:
+		return &Str{Value: v.Value}, nil
+	case *ast.Bool:
+		return &Bool{Value: v.Value}, nil
+	default:
+		return nil, fmt.Errorf("unhandled scalar type: %T", n)
 	}
-
-	// The output of the s-expression parser being used can't
-	// disambiguate between identifiers and double-quoted strings. For
-	// now we just support strings with no spaces, prefixed by a single
-	// quote.
-	if firstRune == '\'' {
-		return &Str{Value: n.Value[1:]}, nil
-	}
-
-	if firstRune == ':' {
-		return &Keyword{Value: n.Value}, nil
-	}
-
-	switch n.Value {
-	case "#t":
-		return &Bool{Value: true}, nil
-	case "#f":
-		return &Bool{Value: false}, nil
-	}
-
-	// else, it's a symbol
-	if v, ok := env.lookup(n.Value); ok {
-		return v, nil
-	}
-	return nil, fmt.Errorf("undefined symbol: %s", n.Value)
 }
 
 func (env *environment) applyFunc(f Value, args []Value) (Value, error) {
@@ -232,87 +215,109 @@ func (na *nopApplyer) Apply(env *environment, args []Value) (Value, error) {
 	return nil, nil
 }
 
-func (env *environment) evalDef(n *sexp.Node) (Value, error) {
-	if nodeLen(n) < 2 {
-		return nil, fmt.Errorf("invalid def: %v", n.Location)
+func (env *environment) evalDef(n *ast.List) (Value, error) {
+	if len(n.Items) < 3 {
+		return nil, fmt.Errorf("invalid def: %v", n.Pos())
 	}
-	if nodeIsList(n) {
-		argNames, err := nodeAsStringList(n.Children.Next)
+
+	switch v := n.Items[1].(type) {
+	case *ast.Symbol:
+		if len(n.Items) != 3 {
+			return nil, fmt.Errorf("invalid def: %v", n.Pos())
+		}
+		val, err := env.evalNode(n.Items[2])
 		if err != nil {
 			return nil, err
 		}
-		env.define(n.Children.Value, &Func{
+		env.define(v.Value, val)
+		return nil, nil
+	case *ast.List:
+		if len(v.Items) == 0 {
+			return nil, fmt.Errorf("invalid def: %v", n.Pos())
+		}
+		sym, ok := v.Items[0].(*ast.Symbol)
+		if !ok {
+			return nil, fmt.Errorf("invalid def: %v", n.Pos())
+		}
+		argNames := make([]string, 0, len(v.Items)-1)
+		for _, item := range v.Items[1:] {
+			argSym, ok := item.(*ast.Symbol)
+			if !ok {
+				return nil, fmt.Errorf("invalid def: %v", n.Pos())
+			}
+			argNames = append(argNames, argSym.Value)
+		}
+		env.define(sym.Value, &Func{
 			argNames: argNames,
-			node:     n.Next,
+			node:     ast.NewList(n.Items[2:], ast.Section{StartPos: n.Pos(), EndPos: n.End()}),
 			env:      env,
 		})
 		return nil, nil
 	}
 
-	name := n.Value
-	val, err := env.evalNode(n.Next)
-	if err != nil {
-		return nil, err
-	}
-	env.define(name, val)
-	return nil, nil
+	return nil, fmt.Errorf("invalid def: %v", n.Pos())
 }
 
-func (env *environment) evalLambda(n *sexp.Node) (Value, error) {
-	if nodeLen(n) != 2 {
-		return nil, fmt.Errorf("invalid lambda, need args and body: %v", n.Location)
+func (env *environment) evalLambda(n *ast.List) (Value, error) {
+	if len(n.Items) < 3 {
+		return nil, fmt.Errorf("invalid lambda, need args and body: %v", n)
 	}
-	if !nodeIsList(n) {
-		return nil, fmt.Errorf("invalid lambda, args must be a list: %v", n.Location)
+	args, ok := n.Items[1].(*ast.List)
+	if !ok {
+		return nil, fmt.Errorf("invalid lambda, args must be a list: %v", n)
 	}
-	argNames, err := nodeAsStringList(n.Children)
+
+	argNames, err := nodeAsStringList(args)
 	if err != nil {
 		return nil, err
 	}
 	return &Func{
 		argNames: argNames,
-		node:     n.Next,
+		node:     ast.NewList(n.Items[2:], ast.Section{StartPos: n.Pos(), EndPos: n.End()}),
 		env:      env,
 	}, nil
 }
 
-func (env *environment) evalFn(n *sexp.Node) (Value, error) {
-	if nodeLen(n) < 2 {
-		return nil, fmt.Errorf("invalid fn expression, need args and body: %v", n.Location)
+func (env *environment) evalFn(n *ast.List) (Value, error) {
+	if len(n.Items) < 3 {
+		return nil, fmt.Errorf("invalid fn expression, need args and body: %v", n)
 	}
+
+	items := n.Items[1:]
 
 	var fnName string
-	if !nodeIsList(n) {
+	if sym, ok := items[0].(*ast.Symbol); ok {
 		// if the first child is not a list, it's the name of the
 		// function. this can be used for recursion.
-		fnName = n.Value
-		n = n.Next
+		fnName = sym.Value
+		items = items[1:]
 	}
 
-	if nodeLen(n) < 2 {
-		return nil, fmt.Errorf("invalid fn expression, need args and body: %v", n.Location)
+	if len(items) < 2 {
+		return nil, fmt.Errorf("invalid fn expression, need args and body: %v", n)
 	}
 
-	if !nodeIsList(n) {
-		return nil, fmt.Errorf("invalid fn expression, args must be a list: %v", n.Location)
+	args, ok := items[0].(*ast.List)
+	if !ok {
+		return nil, fmt.Errorf("invalid fn expression, args must be a list: %v", n)
 	}
-	argNames, err := nodeAsStringList(n.Children)
+	argNames, err := nodeAsStringList(args)
 	if err != nil {
 		return nil, err
 	}
 	return &Func{
 		lambdaName: fnName,
 		argNames:   argNames,
-		node:       n.Next,
+		node:       ast.NewList(items[1:], ast.Section{StartPos: n.Pos(), EndPos: n.End()}),
 		env:        env,
 	}, nil
 }
 
-func (env *environment) evalIf(n *sexp.Node) (Value, error) {
-	if nodeLen(n) < 2 || nodeLen(n) > 3 {
-		return nil, fmt.Errorf("invalid if, need `cond ifExp [elseExp]`: %v", n.Location)
+func (env *environment) evalIf(n *ast.List) (Value, error) {
+	if len(n.Items) < 3 || len(n.Items) > 4 {
+		return nil, fmt.Errorf("invalid if, need `cond ifExp [elseExp]`: %v", n)
 	}
-	cond, err := env.evalNode(n)
+	cond, err := env.evalNode(n.Items[1])
 	if err != nil {
 		return nil, err
 	}
@@ -320,35 +325,24 @@ func (env *environment) evalIf(n *sexp.Node) (Value, error) {
 	b, ok := cond.(*Bool)
 	if !ok || b.Value {
 		// non-bool is always true
-		return env.evalNode(n.Next)
+		return env.evalNode(n.Items[2])
 	}
-	if n.Next.Next != nil {
-		return env.evalNode(n.Next.Next)
+	if len(n.Items) == 4 {
+		return env.evalNode(n.Items[3])
 	}
 	return nil, nil
 }
 
 // Helpers
 
-func nodeLen(n *sexp.Node) int {
-	var i int
-	for cur := n; cur != nil; cur = cur.Next {
-		i++
-	}
-	return i
-}
-
-func nodeAsStringList(n *sexp.Node) ([]string, error) {
+func nodeAsStringList(n *ast.List) ([]string, error) {
 	var res []string
-	for cur := n; cur != nil; cur = cur.Next {
-		if cur.IsList() {
-			return nil, fmt.Errorf("invalid argument list: %v", n.Location)
+	for _, item := range n.Items {
+		sym, ok := item.(*ast.Symbol)
+		if !ok {
+			return nil, fmt.Errorf("invalid argument list: %v", n)
 		}
-		res = append(res, cur.Value)
+		res = append(res, sym.Value)
 	}
 	return res, nil
-}
-
-func nodeIsList(n *sexp.Node) bool {
-	return n.Children != nil || n.Value == ""
 }

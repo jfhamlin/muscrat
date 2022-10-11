@@ -5,9 +5,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/nsf/sexp"
-
 	"github.com/jfhamlin/muscrat/internal/pkg/graph"
+	"github.com/jfhamlin/muscrat/internal/pkg/mratlang/ast"
 )
 
 type Value interface {
@@ -144,7 +143,7 @@ type Func struct {
 	variadic   bool
 	argNames   []string
 	env        *environment
-	node       *sexp.Node
+	node       *ast.List
 }
 
 func (f *Func) String() string {
@@ -182,8 +181,8 @@ func (f *Func) Apply(env *environment, args []Value) (Value, error) {
 	}
 
 	var res Value
-	for cur := f.node; cur != nil; cur = cur.Next {
-		v, err := fnEnv.evalNode(cur)
+	for _, node := range f.node.Items {
+		v, err := fnEnv.evalNode(node)
 		if err != nil {
 			return nil, err
 		}
