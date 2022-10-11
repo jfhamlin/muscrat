@@ -14,16 +14,22 @@ Either:
 ** DONE Add support for custom interpolation types to the envelope effect
 ** DONE Support including other script files
 ** TODO infrastructure to make it easier to export functions to lisp
-** TODO custom s-expression read+eval
-*** TODO skeleton for parser
-*** TODO define and implement a basic type system
+** DONE custom s-expression read+eval
+*** DONE skeleton for parser
+*** DONE define and implement a basic type system
 ** TODO Transition between graphs by mutating the graph and fading between altered nodes
 ** TODO implement a REPL mode, making live changes to the graph rather than replacing it
 ** TODO Describe dynamic note changes in the text file
 *** DONE add support for an envelope signal generator
 *** TODO tools for sequencer
 ** TODO music theory libraries
+** TODO lisp language improvements
 ** TODO Refactor code out of app.go
+** TODO features for adoption and usability
+*** TODO discoverability of capabilities
+*** TODO usability of capabilities
+*** TODO instrumentation of live usage
+** TODO model for namespaces and packages
 ** TODO Todos from GPT-3
 *** DONE Add a delay effect
 *** DONE Add a reverb effect
@@ -56,8 +62,3 @@ Either:
 *** TODO Add a high-shelf resonant filter effect
 *** TODO Add a band-shelf resonant filter effect
 *** TODO Add a parametric resonant filter effect
-** TODO features for adoption and usability
-*** TODO discoverability of capabilities
-*** TODO usability of capabilities
-*** TODO instrumentation of live usage
-** TODO model for namespaces and packages
