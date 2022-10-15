@@ -22,7 +22,7 @@ func FromAST(node ast.Node) Value {
 		for _, item := range node.Items {
 			items = append(items, FromAST(item))
 		}
-		return NewList(items)
+		return NewList(items, WithSection(node.Section))
 	case *ast.Symbol:
 		return NewSymbol(node.Value)
 	default:

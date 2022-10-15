@@ -19,13 +19,37 @@ type Value interface {
 	Pos() ast.Pos
 }
 
+type options struct {
+	// where the value was defined
+	section ast.Section
+}
+
+// Option represents an option that can be passed to Value
+// constructors.
+type Option func(*options)
+
+// WithSection returns an Option that sets the section of the value.
+func WithSection(s ast.Section) Option {
+	return func(o *options) {
+		o.section = s
+	}
+}
+
 // List is a list of values.
 type List struct {
+	ast.Section
 	Items []Value
 }
 
-func NewList(values []Value) *List {
-	return &List{Items: values}
+func NewList(values []Value, opts ...Option) *List {
+	var o options
+	for _, opt := range opts {
+		opt(&o)
+	}
+	return &List{
+		Section: o.section,
+		Items:   values,
+	}
 }
 
 func (l *List) String() string {
@@ -66,10 +90,6 @@ func (l *List) Equal(v Value) bool {
 		}
 	}
 	return true
-}
-
-func (l *List) Pos() ast.Pos {
-	return ast.Pos{}
 }
 
 // Gen is a generator.

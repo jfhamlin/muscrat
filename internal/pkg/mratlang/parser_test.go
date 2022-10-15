@@ -44,7 +44,7 @@ func TestParse(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			prog, err := Parse(strings.NewReader(tc.input))
+			prog, err := Parse(strings.NewReader(tc.input), WithFilename(tc.name))
 			if err != nil {
 				t.Fatal(err)
 			}

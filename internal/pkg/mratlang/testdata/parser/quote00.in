@@ -1,0 +1,13 @@
+(load-file "./testtab.mrat")
+(def print mrat.core.io.print)
+
+(def table
+  (list
+    '()
+    '(1 2 3)
+    '(sym)
+    '("foo" '(1 2 3) sym)
+    )
+  )
+
+(testTable table print)

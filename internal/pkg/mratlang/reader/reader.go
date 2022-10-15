@@ -21,10 +21,13 @@ type trackingRuneScanner struct {
 	history []ast.Pos
 }
 
-func newTrackingRuneScanner(rs io.RuneScanner) *trackingRuneScanner {
+func newTrackingRuneScanner(rs io.RuneScanner, filename string) *trackingRuneScanner {
+	if filename == "" {
+		filename = "<unknown-file>"
+	}
 	return &trackingRuneScanner{
 		rs:             rs,
-		filename:       "<unknown-file>",
+		filename:       filename,
 		nextRuneLine:   1,
 		nextRuneColumn: 1,
 		history:        make([]ast.Pos, 0, 2),
@@ -87,9 +90,27 @@ type Reader struct {
 	posStack []ast.Pos
 }
 
-func New(r io.RuneScanner) *Reader {
+type options struct {
+	filename string
+}
+
+// Option represents an option that can be passed to New.
+type Option func(*options)
+
+// WithFilename sets the filename to be associated with the input.
+func WithFilename(filename string) Option {
+	return func(o *options) {
+		o.filename = filename
+	}
+}
+
+func New(r io.RuneScanner, opts ...Option) *Reader {
+	var o options
+	for _, opt := range opts {
+		opt(&o)
+	}
 	return &Reader{
-		rs: newTrackingRuneScanner(r),
+		rs: newTrackingRuneScanner(r, o.filename),
 	}
 }
 

@@ -1,0 +1,6 @@
+(def (testTable tbl func)
+  (if (eq? tbl '())
+    #t ;; done
+    (list
+     (func (first tbl))
+     (testTable (rest tbl) func))))

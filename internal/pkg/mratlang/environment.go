@@ -101,6 +101,8 @@ func (env *environment) evalList(n *value.List) (value.Value, error) {
 			return env.evalLambda(n)
 		case "fn":
 			return env.evalFn(n)
+		case "quote":
+			return env.evalQuote(n)
 		}
 	}
 
@@ -269,6 +271,14 @@ func (env *environment) evalIf(n *value.List) (value.Value, error) {
 		return env.evalNode(n.Items[3])
 	}
 	return nil, nil
+}
+
+func (env *environment) evalQuote(n *value.List) (value.Value, error) {
+	if len(n.Items) != 2 {
+		return nil, fmt.Errorf("invalid quote, need 1 argument: %v", n)
+	}
+
+	return n.Items[1], nil
 }
 
 // Helpers
