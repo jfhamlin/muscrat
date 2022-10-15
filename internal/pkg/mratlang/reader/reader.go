@@ -69,7 +69,7 @@ func (r *trackingRuneScanner) UnreadRune() error {
 	return nil
 }
 
-// pos returns the position of the last rune read.
+// pos returns the position of the next rune that will be read.
 func (r *trackingRuneScanner) pos() ast.Pos {
 	if len(r.history) == 0 {
 		return ast.Pos{
@@ -262,7 +262,12 @@ func (r *Reader) readQuote() (ast.Node, error) {
 	if err != nil {
 		return nil, err
 	}
-	return ast.NewQuote(node, r.popSection()), nil
+	section := r.popSection()
+	items := []ast.Node{
+		ast.NewSymbol("quote", ast.Section{StartPos: section.StartPos, EndPos: node.Pos()}),
+		node,
+	}
+	return ast.NewList(items, section), nil
 }
 
 func (r *Reader) readDispatch() (ast.Node, error) {

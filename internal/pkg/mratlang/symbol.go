@@ -1,5 +1,7 @@
 package mratlang
 
+import "github.com/jfhamlin/muscrat/internal/pkg/mratlang/value"
+
 type Location struct {
 }
 
@@ -9,7 +11,7 @@ type Symbol struct {
 	// where the symbol is defined
 	// if nil, it is a builtin
 	DefLocation *Location
-	Value       Value
+	Value       value.Value
 }
 
 type Package struct {

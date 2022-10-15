@@ -12,6 +12,7 @@ import (
 
 	"github.com/jfhamlin/muscrat/internal/pkg/generator"
 	"github.com/jfhamlin/muscrat/internal/pkg/graph"
+	"github.com/jfhamlin/muscrat/internal/pkg/mratlang/value"
 	"github.com/jfhamlin/muscrat/internal/pkg/wavtabs"
 	"github.com/jfhamlin/muscrat/pkg/freeverb"
 )
@@ -88,23 +89,23 @@ func addBuiltins(env *environment) {
 				// core symbols are available in the global namespace.
 				name = sym.Name
 			}
-			env.define(name, sym.Value)
+			env.Define(name, sym.Value)
 		}
 	}
 }
 
-func funcSymbol(name string, fn func(*environment, []Value) (Value, error)) *Symbol {
+func funcSymbol(name string, fn func(value.Environment, []value.Value) (value.Value, error)) *Symbol {
 	return &Symbol{
 		Name: name,
-		Value: &BuiltinFunc{
-			applyer: applyerFunc(fn),
-			name:    name,
+		Value: &value.BuiltinFunc{
+			Applyer: value.ApplyerFunc(fn),
+			Name:    name,
 		},
 	}
 }
 
-func loadFile(env *environment, filename string) error {
-	absFile, ok := env.resolveFile(filename)
+func loadFile(env value.Environment, filename string) error {
+	absFile, ok := env.ResolveFile(filename)
 	if !ok {
 		return fmt.Errorf("could not resolve file %v", filename)
 	}
@@ -119,7 +120,7 @@ func loadFile(env *environment, filename string) error {
 		return fmt.Errorf("error parsing file %v: %w", filename, err)
 	}
 
-	loadEnv := env.pushLoadPaths([]string{filepath.Dir(absFile)})
+	loadEnv := env.PushLoadPaths([]string{filepath.Dir(absFile)})
 	_, _, err = prog.Eval(withEnv(loadEnv))
 	if err != nil {
 		return fmt.Errorf("error evaluating file %v: %w", filename, err)
@@ -128,122 +129,122 @@ func loadFile(env *environment, filename string) error {
 	return nil
 }
 
-func loadFileBuiltin(env *environment, args []Value) (Value, error) {
+func loadFileBuiltin(env value.Environment, args []value.Value) (value.Value, error) {
 	if len(args) != 1 {
 		return nil, fmt.Errorf("load-file expects 1 argument, got %v", len(args))
 	}
-	filename, ok := args[0].(*Str)
+	filename, ok := args[0].(*value.Str)
 	if !ok {
 		return nil, fmt.Errorf("load-file expects a string, got %v", args[0])
 	}
 	return nil, loadFile(env, filename.Value)
 }
 
-func listBuiltin(env *environment, args []Value) (Value, error) {
-	return &List{Values: args}, nil
+func listBuiltin(env value.Environment, args []value.Value) (value.Value, error) {
+	return value.NewList(args), nil
 }
 
-func lengthBuiltin(env *environment, args []Value) (Value, error) {
+func lengthBuiltin(env value.Environment, args []value.Value) (value.Value, error) {
 	if len(args) != 1 {
 		return nil, fmt.Errorf("length expects 1 argument, got %v", len(args))
 	}
 	switch arg := args[0].(type) {
-	case *List:
-		return &Num{Value: float64(len(arg.Values))}, nil
+	case *value.List:
+		return value.NewNum(float64(len(arg.Items))), nil
 	default:
 		return nil, fmt.Errorf("length expects a list, got %v", arg)
 	}
 }
 
-func concatBuiltin(env *environment, args []Value) (Value, error) {
-	var res []Value
+func concatBuiltin(env value.Environment, args []value.Value) (value.Value, error) {
+	var res []value.Value
 	for _, arg := range args {
 		switch arg := arg.(type) {
-		case *List:
-			res = append(res, arg.Values...)
+		case *value.List:
+			res = append(res, arg.Items...)
 		default:
 			return nil, fmt.Errorf("invalid type for concat: %v", arg)
 		}
 	}
-	return &List{Values: res}, nil
+	return value.NewList(res), nil
 }
 
-func firstBuiltin(env *environment, args []Value) (Value, error) {
+func firstBuiltin(env value.Environment, args []value.Value) (value.Value, error) {
 	if len(args) != 1 {
 		return nil, fmt.Errorf("first expects 1 argument, got %v", len(args))
 	}
-	list, ok := args[0].(*List)
+	list, ok := args[0].(*value.List)
 	if !ok {
 		return nil, fmt.Errorf("first expects a list, got %v", args[0])
 	}
-	if len(list.Values) == 0 {
+	if len(list.Items) == 0 {
 		return nil, fmt.Errorf("first expects a non-empty list, got %v", list)
 	}
-	return list.Values[0], nil
+	return list.Items[0], nil
 }
 
-func restBuiltin(env *environment, args []Value) (Value, error) {
+func restBuiltin(env value.Environment, args []value.Value) (value.Value, error) {
 	if len(args) != 1 {
 		return nil, fmt.Errorf("rest expects 1 argument, got %v", len(args))
 	}
-	list, ok := args[0].(*List)
+	list, ok := args[0].(*value.List)
 	if !ok {
 		return nil, fmt.Errorf("rest expects a list, got %v", args[0])
 	}
-	if len(list.Values) == 0 {
+	if len(list.Items) == 0 {
 		return list, nil
 	}
-	return &List{Values: list.Values[1:]}, nil
+	return value.NewList(list.Items[1:]), nil
 }
 
-func notBuiltin(env *environment, args []Value) (Value, error) {
+func notBuiltin(env value.Environment, args []value.Value) (value.Value, error) {
 	if len(args) != 1 {
 		return nil, fmt.Errorf("not expects 1 argument, got %v", len(args))
 	}
 	switch arg := args[0].(type) {
-	case *Bool:
-		return &Bool{Value: !arg.Value}, nil
+	case *value.Bool:
+		return value.NewBool(!arg.Value), nil
 	default:
 		return nil, fmt.Errorf("not expects a boolean, got %v", arg)
 	}
 }
 
-func eqBuiltin(env *environment, args []Value) (Value, error) {
+func eqBuiltin(env value.Environment, args []value.Value) (value.Value, error) {
 	if len(args) != 2 {
 		return nil, fmt.Errorf("eq? expects 2 arguments, got %v", len(args))
 	}
-	return &Bool{Value: args[0].Equal(args[1])}, nil
+	return value.NewBool(args[0].Equal(args[1])), nil
 }
 
-func emptyBuiltin(env *environment, args []Value) (Value, error) {
+func emptyBuiltin(env value.Environment, args []value.Value) (value.Value, error) {
 	if len(args) != 1 {
 		return nil, fmt.Errorf("empty? expects 1 argument, got %v", len(args))
 	}
-	list, ok := args[0].(*List)
+	list, ok := args[0].(*value.List)
 	if !ok {
 		return nil, fmt.Errorf("empty? expects a list, got %v", args[0])
 	}
-	return &Bool{Value: len(list.Values) == 0}, nil
+	return value.NewBool(len(list.Items) == 0), nil
 }
 
-func notEmptyBuiltin(env *environment, args []Value) (Value, error) {
+func notEmptyBuiltin(env value.Environment, args []value.Value) (value.Value, error) {
 	v, err := emptyBuiltin(env, args)
 	if err != nil {
 		return nil, err
 	}
-	return notBuiltin(env, []Value{v})
+	return notBuiltin(env, []value.Value{v})
 }
 
-func mulBuiltin(env *environment, args []Value) (Value, error) {
+func mulBuiltin(env value.Environment, args []value.Value) (value.Value, error) {
 	var coeff float64 = 1
-	gens := []*Gen{}
+	gens := []*value.Gen{}
 
 	// multiply all number arguments together
 	for _, arg := range args {
 		switch arg := arg.(type) {
-		case *Num:
+		case *value.Num:
 			coeff *= arg.Value
-		case *Gen:
+		case *value.Gen:
 			gens = append(gens, arg)
 		default:
 			return nil, fmt.Errorf("invalid type for *: %v", arg)
@@ -251,49 +252,49 @@ func mulBuiltin(env *environment, args []Value) (Value, error) {
 	}
 	// if there are no generators, return the result of multiplying all the numbers
 	if len(gens) == 0 {
-		return &Num{Value: coeff}, nil
+		return value.NewNum(coeff), nil
 	}
 
 	// otherwise, create a new constant generator node for the coefficient
-	constNodeID := env.graph.AddGeneratorNode(generator.NewConstant(coeff), graph.WithLabel(fmt.Sprintf("%v", coeff)))
-	gens = append(gens, &Gen{NodeID: constNodeID})
+	constNodeID := env.Graph().AddGeneratorNode(generator.NewConstant(coeff), graph.WithLabel(fmt.Sprintf("%v", coeff)))
+	gens = append(gens, &value.Gen{NodeID: constNodeID})
 
 	// create a new generator node for the product
-	nodeID := env.graph.AddGeneratorNode(generator.NewProduct(), graph.WithLabel("*"))
+	nodeID := env.Graph().AddGeneratorNode(generator.NewProduct(), graph.WithLabel("*"))
 	for i, gen := range gens {
-		env.graph.AddEdge(gen.NodeID, nodeID, fmt.Sprintf("$%d", i))
+		env.Graph().AddEdge(gen.NodeID, nodeID, fmt.Sprintf("$%d", i))
 	}
-	return &Gen{
+	return &value.Gen{
 		NodeID: nodeID,
 	}, nil
 }
 
-func divBuiltin(env *environment, args []Value) (Value, error) {
+func divBuiltin(env value.Environment, args []value.Value) (value.Value, error) {
 	if len(args) != 2 {
 		return nil, fmt.Errorf("div expects 2 arguments, got %v", len(args))
 	}
-	num, ok := args[0].(*Num)
+	num, ok := args[0].(*value.Num)
 	if !ok {
 		return nil, fmt.Errorf("div expects a number as the first argument, got %v", args[0])
 	}
-	denom, ok := args[1].(*Num)
+	denom, ok := args[1].(*value.Num)
 	if !ok {
 		return nil, fmt.Errorf("div expects a number as the second argument, got %v", args[1])
 	}
 	// TODO: handle generators
-	return &Num{Value: num.Value / denom.Value}, nil
+	return value.NewNum(num.Value / denom.Value), nil
 }
 
-func addBuiltin(env *environment, args []Value) (Value, error) {
+func addBuiltin(env value.Environment, args []value.Value) (value.Value, error) {
 	var sum float64 = 0
-	gens := []*Gen{}
+	gens := []*value.Gen{}
 
 	// sum all number arguments together
 	for _, arg := range args {
 		switch arg := arg.(type) {
-		case *Num:
+		case *value.Num:
 			sum += arg.Value
-		case *Gen:
+		case *value.Gen:
 			gens = append(gens, arg)
 		default:
 			return nil, fmt.Errorf("invalid type for +: %v", arg)
@@ -301,55 +302,55 @@ func addBuiltin(env *environment, args []Value) (Value, error) {
 	}
 	// if there are no generators, return the result of summing all the numbers
 	if len(gens) == 0 {
-		return &Num{Value: sum}, nil
+		return value.NewNum(sum), nil
 	}
 
 	// otherwise, if the sum is not zero, create a new constant
 	// generator node for the sum
 	if sum != 0 {
-		constNodeID := env.graph.AddGeneratorNode(generator.NewConstant(sum), graph.WithLabel(fmt.Sprintf("%v", sum)))
-		gens = append(gens, &Gen{NodeID: constNodeID})
+		constNodeID := env.Graph().AddGeneratorNode(generator.NewConstant(sum), graph.WithLabel(fmt.Sprintf("%v", sum)))
+		gens = append(gens, &value.Gen{NodeID: constNodeID})
 	}
 
 	// create a new generator node for the sum
-	nodeID := env.graph.AddGeneratorNode(generator.NewSum(), graph.WithLabel("+"))
+	nodeID := env.Graph().AddGeneratorNode(generator.NewSum(), graph.WithLabel("+"))
 	for i, gen := range gens {
-		env.graph.AddEdge(gen.NodeID, nodeID, fmt.Sprintf("$%d", i))
+		env.Graph().AddEdge(gen.NodeID, nodeID, fmt.Sprintf("$%d", i))
 	}
-	return &Gen{
+	return &value.Gen{
 		NodeID: nodeID,
 	}, nil
 }
 
-func applyBuiltin(env *environment, args []Value) (Value, error) {
+func applyBuiltin(env value.Environment, args []value.Value) (value.Value, error) {
 	if len(args) != 2 {
 		return nil, fmt.Errorf("apply expects 2 arguments, got %v", len(args))
 	}
 	// the first argument should be an applyer, the second a list
-	applyer, ok := args[0].(applyer)
+	applyer, ok := args[0].(value.Applyer)
 	if !ok {
 		return nil, fmt.Errorf("apply expects a function as the first argument, got %v", args[0])
 	}
-	list, ok := args[1].(*List)
+	list, ok := args[1].(*value.List)
 	if !ok {
 		return nil, fmt.Errorf("apply expects a list as the second argument, got %v", args[1])
 	}
-	return applyer.Apply(env, list.Values)
+	return applyer.Apply(env, list.Items)
 }
 
-func printBuiltin(env *environment, args []Value) (Value, error) {
+func printBuiltin(env value.Environment, args []value.Value) (value.Value, error) {
 	for i, arg := range args {
 		if arg == nil {
 			// TODO: add nil to the type system
-			env.stdout.Write([]byte("nil"))
+			env.Stdout().Write([]byte("nil"))
 		} else {
-			env.stdout.Write([]byte(arg.String()))
+			env.Stdout().Write([]byte(arg.String()))
 		}
 		if i < len(args)-1 {
-			env.stdout.Write([]byte(" "))
+			env.Stdout().Write([]byte(" "))
 		}
 	}
-	env.stdout.Write([]byte("\n"))
+	env.Stdout().Write([]byte("\n"))
 	return nil, nil
 }
 
@@ -389,7 +390,7 @@ func NewTrandGenerator(pick func(min, max float64) float64) generator.SampleGene
 	})
 }
 
-func trandBuiltin(env *environment, args []Value) (Value, error) {
+func trandBuiltin(env value.Environment, args []value.Value) (value.Value, error) {
 	// trand takes three required arguments: a generator that triggers
 	// random number selection and two generators that produce the min
 	// and max values for the random number selection.
@@ -399,7 +400,7 @@ func trandBuiltin(env *environment, args []Value) (Value, error) {
 	if len(args) < 3 || len(args) > 4 {
 		return nil, fmt.Errorf("trand expects 3 or 4 arguments, got %v", len(args))
 	}
-	gens := make([]*Gen, 3)
+	gens := make([]*value.Gen, 3)
 	for i, arg := range args[:3] {
 		gen, ok := asGen(env, arg)
 		if !ok {
@@ -409,7 +410,7 @@ func trandBuiltin(env *environment, args []Value) (Value, error) {
 	}
 	randFn := linRand
 	if len(args) == 4 {
-		kw, ok := args[3].(*Keyword)
+		kw, ok := args[3].(*value.Keyword)
 		if !ok {
 			return nil, fmt.Errorf("trand expects a keyword as the fourth argument, got %v", args[3])
 		}
@@ -423,53 +424,53 @@ func trandBuiltin(env *environment, args []Value) (Value, error) {
 		}
 	}
 
-	nodeID := env.graph.AddGeneratorNode(NewTrandGenerator(randFn), graph.WithLabel("trand"))
-	env.graph.AddEdge(gens[0].NodeID, nodeID, "trigger")
-	env.graph.AddEdge(gens[1].NodeID, nodeID, "min")
-	env.graph.AddEdge(gens[2].NodeID, nodeID, "max")
-	return &Gen{
+	nodeID := env.Graph().AddGeneratorNode(NewTrandGenerator(randFn), graph.WithLabel("trand"))
+	env.Graph().AddEdge(gens[0].NodeID, nodeID, "trigger")
+	env.Graph().AddEdge(gens[1].NodeID, nodeID, "min")
+	env.Graph().AddEdge(gens[2].NodeID, nodeID, "max")
+	return &value.Gen{
 		NodeID: nodeID,
 	}, nil
 }
 
-func sinBuiltin(env *environment, args []Value) (Value, error) {
+func sinBuiltin(env value.Environment, args []value.Value) (value.Value, error) {
 	var freq graph.NodeID
 	if len(args) == 0 {
-		freq = env.graph.AddGeneratorNode(generator.NewConstant(440), graph.WithLabel("440"))
+		freq = env.Graph().AddGeneratorNode(generator.NewConstant(440), graph.WithLabel("440"))
 	} else {
 		switch arg := args[0].(type) {
-		case *Num:
-			freq = env.graph.AddGeneratorNode(generator.NewConstant(arg.Value), graph.WithLabel(fmt.Sprintf("%v", arg.Value)))
-		case *Gen:
+		case *value.Num:
+			freq = env.Graph().AddGeneratorNode(generator.NewConstant(arg.Value), graph.WithLabel(fmt.Sprintf("%v", arg.Value)))
+		case *value.Gen:
 			freq = arg.NodeID
 		default:
 			return nil, fmt.Errorf("invalid type for sin frequency: %v", arg)
 		}
 	}
-	nodeID := env.graph.AddGeneratorNode(wavtabs.Generator(wavtabs.Sin(1024)), graph.WithLabel("sin"))
-	env.graph.AddEdge(freq, nodeID, "w")
-	return &Gen{
+	nodeID := env.Graph().AddGeneratorNode(wavtabs.Generator(wavtabs.Sin(1024)), graph.WithLabel("sin"))
+	env.Graph().AddEdge(freq, nodeID, "w")
+	return &value.Gen{
 		NodeID: nodeID,
 	}, nil
 }
 
-func sawBuiltin(env *environment, args []Value) (Value, error) {
+func sawBuiltin(env value.Environment, args []value.Value) (value.Value, error) {
 	var freq graph.NodeID
 	if len(args) == 0 {
-		freq = env.graph.AddGeneratorNode(generator.NewConstant(440), graph.WithLabel("440"))
+		freq = env.Graph().AddGeneratorNode(generator.NewConstant(440), graph.WithLabel("440"))
 	} else {
 		switch arg := args[0].(type) {
-		case *Num:
-			freq = env.graph.AddGeneratorNode(generator.NewConstant(arg.Value), graph.WithLabel(fmt.Sprintf("%v", arg.Value)))
-		case *Gen:
+		case *value.Num:
+			freq = env.Graph().AddGeneratorNode(generator.NewConstant(arg.Value), graph.WithLabel(fmt.Sprintf("%v", arg.Value)))
+		case *value.Gen:
 			freq = arg.NodeID
 		default:
 			return nil, fmt.Errorf("invalid type for sin frequency: %v", arg)
 		}
 	}
-	nodeID := env.graph.AddGeneratorNode(wavtabs.Generator(wavtabs.Saw(1024)), graph.WithLabel("saw"))
-	env.graph.AddEdge(freq, nodeID, "w")
-	return &Gen{
+	nodeID := env.Graph().AddGeneratorNode(wavtabs.Generator(wavtabs.Saw(1024)), graph.WithLabel("saw"))
+	env.Graph().AddEdge(freq, nodeID, "w")
+	return &value.Gen{
 		NodeID: nodeID,
 	}, nil
 }
@@ -502,10 +503,10 @@ func NewSquareGenerator() generator.SampleGenerator {
 	})
 }
 
-func sqrBuiltin(env *environment, args []Value) (Value, error) {
+func sqrBuiltin(env value.Environment, args []value.Value) (value.Value, error) {
 	var freq graph.NodeID
 	if len(args) == 0 {
-		freq = env.graph.AddGeneratorNode(generator.NewConstant(440), graph.WithLabel("440"))
+		freq = env.Graph().AddGeneratorNode(generator.NewConstant(440), graph.WithLabel("440"))
 	} else {
 		gen, ok := asGen(env, args[0])
 		if !ok {
@@ -516,7 +517,7 @@ func sqrBuiltin(env *environment, args []Value) (Value, error) {
 	}
 	var dutyCycle graph.NodeID
 	if len(args) == 0 {
-		dutyCycle = env.graph.AddGeneratorNode(generator.NewConstant(0.5), graph.WithLabel("0.5"))
+		dutyCycle = env.Graph().AddGeneratorNode(generator.NewConstant(0.5), graph.WithLabel("0.5"))
 	} else {
 		gen, ok := asGen(env, args[0])
 		if !ok {
@@ -525,26 +526,24 @@ func sqrBuiltin(env *environment, args []Value) (Value, error) {
 		dutyCycle = gen.NodeID
 	}
 
-	nodeID := env.graph.AddGeneratorNode(NewSquareGenerator(), graph.WithLabel("sqr"))
-	env.graph.AddEdge(freq, nodeID, "w")
-	env.graph.AddEdge(dutyCycle, nodeID, "dc")
-	return &Gen{
+	nodeID := env.Graph().AddGeneratorNode(NewSquareGenerator(), graph.WithLabel("sqr"))
+	env.Graph().AddEdge(freq, nodeID, "w")
+	env.Graph().AddEdge(dutyCycle, nodeID, "dc")
+	return &value.Gen{
 		NodeID: nodeID,
 	}, nil
 }
 
-func outBuiltin(env *environment, args []Value) (Value, error) {
-	sinks := env.sinks
-	if len(sinks.sinkNodeIDs) == 0 {
-		id, ch := env.graph.AddSinkNode(graph.WithLabel("out"))
-		sinks.sinkNodeIDs = append(sinks.sinkNodeIDs, id)
-		sinks.sinkChannels = append(sinks.sinkChannels, ch)
+func outBuiltin(env value.Environment, args []value.Value) (value.Value, error) {
+	sinks := env.Graph().Sinks()
+	if len(sinks) == 0 {
+		sinks = append(sinks, env.Graph().AddSinkNode(graph.WithLabel("out")))
 	}
 	for _, arg := range args {
 		switch arg := arg.(type) {
-		case *Gen:
-			for _, id := range sinks.sinkNodeIDs {
-				env.graph.AddEdge(arg.NodeID, id, arg.String())
+		case *value.Gen:
+			for _, sink := range sinks {
+				env.Graph().AddEdge(arg.NodeID, sink.ID(), arg.String())
 			}
 		default:
 			return nil, fmt.Errorf("invalid type for out: %v", arg)
@@ -582,18 +581,18 @@ func NewFreeverbGenerator() generator.SampleGenerator {
 	})
 }
 
-func freeverbBuiltin(env *environment, args []Value) (Value, error) {
+func freeverbBuiltin(env value.Environment, args []value.Value) (value.Value, error) {
 	// take a single argument, which should be a Gen
 	if len(args) != 1 {
 		return nil, fmt.Errorf("freeverb expects 1 argument, got %v", len(args))
 	}
-	gen, ok := args[0].(*Gen)
+	gen, ok := args[0].(*value.Gen)
 	if !ok {
 		return nil, fmt.Errorf("freeverb expects a Gen as the first argument, got %v", args[0])
 	}
-	nodeID := env.graph.AddGeneratorNode(NewFreeverbGenerator(), graph.WithLabel("freeverb"))
-	env.graph.AddEdge(gen.NodeID, nodeID, "$0")
-	return &Gen{
+	nodeID := env.Graph().AddGeneratorNode(NewFreeverbGenerator(), graph.WithLabel("freeverb"))
+	env.Graph().AddEdge(gen.NodeID, nodeID, "$0")
+	return &value.Gen{
 		NodeID: nodeID,
 	}, nil
 }
@@ -610,26 +609,26 @@ func NewClipGenerator(min, max float64) generator.SampleGenerator {
 	})
 }
 
-func clipBuiltin(env *environment, args []Value) (Value, error) {
+func clipBuiltin(env value.Environment, args []value.Value) (value.Value, error) {
 	// clip takes three arguments: a Gen, a min, and a max
 	if len(args) != 3 {
 		return nil, fmt.Errorf("clip expects 3 arguments, got %v", len(args))
 	}
-	gen, ok := args[0].(*Gen)
+	gen, ok := args[0].(*value.Gen)
 	if !ok {
 		return nil, fmt.Errorf("clip expects a Gen as the first argument, got %v", args[0])
 	}
-	min, ok := args[1].(*Num)
+	min, ok := args[1].(*value.Num)
 	if !ok {
 		return nil, fmt.Errorf("clip expects a Num as the second argument, got %v", args[1])
 	}
-	max, ok := args[2].(*Num)
+	max, ok := args[2].(*value.Num)
 	if !ok {
 		return nil, fmt.Errorf("clip expects a Num as the third argument, got %v", args[2])
 	}
-	nodeID := env.graph.AddGeneratorNode(NewClipGenerator(min.Value, max.Value), graph.WithLabel("clip"))
-	env.graph.AddEdge(gen.NodeID, nodeID, "$0")
-	return &Gen{
+	nodeID := env.Graph().AddGeneratorNode(NewClipGenerator(min.Value, max.Value), graph.WithLabel("clip"))
+	env.Graph().AddEdge(gen.NodeID, nodeID, "$0")
+	return &value.Gen{
 		NodeID: nodeID,
 	}, nil
 }
@@ -715,7 +714,7 @@ func NewDelayGenerator() generator.SampleGenerator {
 	})
 }
 
-func delayBuiltin(env *environment, args []Value) (Value, error) {
+func delayBuiltin(env value.Environment, args []value.Value) (value.Value, error) {
 	// delay takes two arguments that can be converted to generators.
 	// it then creates a delay generator, sending the first argument to
 	// $0 and the second argument to "delay".
@@ -730,10 +729,10 @@ func delayBuiltin(env *environment, args []Value) (Value, error) {
 	if !ok {
 		return nil, fmt.Errorf("delay expects a Gen as the second argument, got %v", args[1])
 	}
-	nodeID := env.graph.AddGeneratorNode(NewDelayGenerator(), graph.WithLabel("delay"))
-	env.graph.AddEdge(gen.NodeID, nodeID, "$0")
-	env.graph.AddEdge(delay.NodeID, nodeID, "delay")
-	return &Gen{
+	nodeID := env.Graph().AddGeneratorNode(NewDelayGenerator(), graph.WithLabel("delay"))
+	env.Graph().AddEdge(gen.NodeID, nodeID, "$0")
+	env.Graph().AddEdge(delay.NodeID, nodeID, "delay")
+	return &value.Gen{
 		NodeID: nodeID,
 	}, nil
 }
@@ -752,10 +751,10 @@ func NewMixerGenerator() generator.SampleGenerator {
 	})
 }
 
-func mixerBuiltin(env *environment, args []Value) (Value, error) {
+func mixerBuiltin(env value.Environment, args []value.Value) (value.Value, error) {
 	// mixer takes a variable number of arguments that can be converted to generators
 	// and mixes them together.
-	gens := make([]*Gen, len(args))
+	gens := make([]*value.Gen, len(args))
 	for i, arg := range args {
 		gen, ok := asGen(env, arg)
 		if !ok {
@@ -763,11 +762,11 @@ func mixerBuiltin(env *environment, args []Value) (Value, error) {
 		}
 		gens[i] = gen
 	}
-	nodeID := env.graph.AddGeneratorNode(NewMixerGenerator(), graph.WithLabel("mixer"))
+	nodeID := env.Graph().AddGeneratorNode(NewMixerGenerator(), graph.WithLabel("mixer"))
 	for i, gen := range gens {
-		env.graph.AddEdge(gen.NodeID, nodeID, fmt.Sprintf("$%v", i))
+		env.Graph().AddEdge(gen.NodeID, nodeID, fmt.Sprintf("$%v", i))
 	}
-	return &Gen{
+	return &value.Gen{
 		NodeID: nodeID,
 	}, nil
 }
@@ -780,12 +779,12 @@ var Noise = generator.SampleGeneratorFunc(func(ctx context.Context, cfg generato
 	return res
 })
 
-func noiseBuiltin(env *environment, args []Value) (Value, error) {
+func noiseBuiltin(env value.Environment, args []value.Value) (value.Value, error) {
 	if len(args) != 0 {
 		return nil, fmt.Errorf("noise expects 0 arguments, got %v", len(args))
 	}
-	nodeID := env.graph.AddGeneratorNode(Noise, graph.WithLabel("noise"))
-	return &Gen{
+	nodeID := env.Graph().AddGeneratorNode(Noise, graph.WithLabel("noise"))
+	return &value.Gen{
 		NodeID: nodeID,
 	}, nil
 }
@@ -885,7 +884,7 @@ func NewEnvelopeGenerator(interpolation string) generator.SampleGenerator {
 	})
 }
 
-func envBuiltin(env *environment, args []Value) (Value, error) {
+func envBuiltin(env value.Environment, args []value.Value) (value.Value, error) {
 	// env takes three arguments:
 	//
 	// 1. a gating signal. when the signal is > 0, the envelope is triggered.
@@ -911,7 +910,7 @@ func envBuiltin(env *environment, args []Value) (Value, error) {
 	if !ok {
 		return nil, fmt.Errorf("env expects a list as the second argument, got %v", args[1])
 	}
-	levelGens := make([]*Gen, len(levels))
+	levelGens := make([]*value.Gen, len(levels))
 	for i, level := range levels {
 		gen, ok := asGen(env, level)
 		if !ok {
@@ -925,7 +924,7 @@ func envBuiltin(env *environment, args []Value) (Value, error) {
 	if !ok {
 		return nil, fmt.Errorf("env expects a list as the third argument, got %v", args[2])
 	}
-	durationGens := make([]*Gen, len(durations))
+	durationGens := make([]*value.Gen, len(durations))
 	for i, duration := range durations {
 		gen, ok := asGen(env, duration)
 		if !ok {
@@ -941,7 +940,7 @@ func envBuiltin(env *environment, args []Value) (Value, error) {
 	// the optional fourth argument is the type of interpolation to use.
 	interpolation := "lin"
 	if len(args) == 4 {
-		interpKey, ok := args[3].(*Keyword)
+		interpKey, ok := args[3].(*value.Keyword)
 		if !ok {
 			return nil, fmt.Errorf("env expects a keyword as the fourth argument, got %v", args[3])
 		}
@@ -952,29 +951,29 @@ func envBuiltin(env *environment, args []Value) (Value, error) {
 	}
 
 	// create the envelope generator.
-	nodeID := env.graph.AddGeneratorNode(NewEnvelopeGenerator(interpolation), graph.WithLabel("env"))
-	// nodeID := env.graph.AddGeneratorNode(generator.NewConstant(1), graph.WithLabel("env"))
-	env.graph.AddEdge(trigger.NodeID, nodeID, "trigger")
+	nodeID := env.Graph().AddGeneratorNode(NewEnvelopeGenerator(interpolation), graph.WithLabel("env"))
+	// nodeID := env.Graph().AddGeneratorNode(generator.NewConstant(1), graph.WithLabel("env"))
+	env.Graph().AddEdge(trigger.NodeID, nodeID, "trigger")
 	for i, gen := range levelGens {
-		env.graph.AddEdge(gen.NodeID, nodeID, fmt.Sprintf("level$%v", i))
+		env.Graph().AddEdge(gen.NodeID, nodeID, fmt.Sprintf("level$%v", i))
 	}
 	for i, gen := range durationGens {
-		env.graph.AddEdge(gen.NodeID, nodeID, fmt.Sprintf("time$%v", i))
+		env.Graph().AddEdge(gen.NodeID, nodeID, fmt.Sprintf("time$%v", i))
 	}
 
-	return &Gen{
+	return &value.Gen{
 		NodeID: nodeID,
 	}, nil
 }
 
-func asGen(env *environment, v Value) (*Gen, bool) {
+func asGen(env value.Environment, v value.Value) (*value.Gen, bool) {
 	// asGen converts a Value to a Gen, if possible.
 	switch v := v.(type) {
-	case *Gen:
+	case *value.Gen:
 		return v, true
-	case *Num:
-		id := env.graph.AddGeneratorNode(generator.NewConstant(v.Value), graph.WithLabel(fmt.Sprintf("%v", v.Value)))
-		return &Gen{
+	case *value.Num:
+		id := env.Graph().AddGeneratorNode(generator.NewConstant(v.Value), graph.WithLabel(fmt.Sprintf("%v", v.Value)))
+		return &value.Gen{
 			NodeID: id,
 		}, true
 	default:
@@ -982,11 +981,11 @@ func asGen(env *environment, v Value) (*Gen, bool) {
 	}
 }
 
-func asList(v Value) ([]Value, bool) {
+func asList(v value.Value) ([]value.Value, bool) {
 	// asList converts a Value to a list, if possible.
 	switch v := v.(type) {
-	case *List:
-		return v.Values, true
+	case *value.List:
+		return v.Items, true
 	default:
 		return nil, false
 	}

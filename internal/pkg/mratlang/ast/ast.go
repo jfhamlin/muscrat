@@ -40,6 +40,19 @@ func NewList(items []Node, pos Section) *List {
 
 func (l *List) String() string {
 	var b strings.Builder
+
+	// special case for quoted values
+	if len(l.Items) == 2 {
+		// it's only possible for both the list and the second item to end
+		// at the same position if the value used the quote shorthand in
+		// the input.
+		if sym, ok := l.Items[0].(*Symbol); ok && sym.Value == "quote" && l.End() == l.Items[1].End() {
+			b.WriteString("'")
+			b.WriteString(l.Items[1].String())
+			return b.String()
+		}
+	}
+
 	b.WriteString("(")
 	for i, item := range l.Items {
 		if i > 0 {
@@ -68,21 +81,6 @@ func (s *String) String() string {
 }
 
 func (s *String) private() {}
-
-type Quote struct {
-	Section
-	Value Node
-}
-
-func NewQuote(value Node, pos Section) *Quote {
-	return &Quote{Section: pos, Value: value}
-}
-
-func (q *Quote) String() string {
-	return "'" + q.Value.String()
-}
-
-func (q *Quote) private() {}
 
 type Bool struct {
 	Section

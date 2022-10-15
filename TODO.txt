@@ -13,10 +13,10 @@ Either:
 ** DONE Add proper envelope to lisp
 ** DONE Add support for custom interpolation types to the envelope effect
 ** DONE Support including other script files
-** TODO infrastructure to make it easier to export functions to lisp
 ** DONE custom s-expression read+eval
 *** DONE skeleton for parser
 *** DONE define and implement a basic type system
+** TODO infrastructure to make it easier to export functions to lisp
 ** TODO Transition between graphs by mutating the graph and fading between altered nodes
 ** TODO implement a REPL mode, making live changes to the graph rather than replacing it
 ** TODO Describe dynamic note changes in the text file
@@ -24,6 +24,9 @@ Either:
 *** TODO tools for sequencer
 ** TODO music theory libraries
 ** TODO lisp language improvements
+*** TODO include whitespace and comment information in output from reader
+This allows us to modify the AST programmatically and output a file
+retaining comments and formatting.
 ** TODO Refactor code out of app.go
 ** TODO features for adoption and usability
 *** TODO discoverability of capabilities

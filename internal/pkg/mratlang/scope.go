@@ -1,23 +1,25 @@
 package mratlang
 
+import "github.com/jfhamlin/muscrat/internal/pkg/mratlang/value"
+
 type scope struct {
 	parent *scope
-	syms   map[string]Value
+	syms   map[string]value.Value
 }
 
 func newScope() *scope {
-	return &scope{syms: make(map[string]Value)}
+	return &scope{syms: make(map[string]value.Value)}
 }
 
-func (s *scope) define(name string, val Value) {
+func (s *scope) define(name string, val value.Value) {
 	s.syms[name] = val
 }
 
 func (s *scope) push() *scope {
-	return &scope{parent: s, syms: make(map[string]Value)}
+	return &scope{parent: s, syms: make(map[string]value.Value)}
 }
 
-func (s *scope) lookup(name string) (Value, bool) {
+func (s *scope) lookup(name string) (value.Value, bool) {
 	if v, ok := s.syms[name]; ok {
 		return v, true
 	}

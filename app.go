@@ -819,7 +819,8 @@ func scriptToGraph(synthDesc string) (g *graph.Graph, sinks []<-chan []float64, 
 	}
 
 	g = &graph.Graph{}
-	sinkID, graphOutputChannel := g.AddSinkNode(graph.WithLabel("output"))
+	sink := g.AddSinkNode(graph.WithLabel("output"))
+	sinkID, graphOutputChannel := sink.ID(), sink.Chan()
 	var oscNodeIDs []graph.NodeID
 
 	nodesByRef := make(map[string]graph.NodeID)

@@ -196,6 +196,15 @@ func printExprAtPosition(ra *runeArray2D, n ast.Node) {
 	switch v := n.(type) {
 	case *ast.List:
 		start, end := v.Pos(), v.End()
+		// special case for quoted values
+		if len(v.Items) == 2 {
+			if sym, ok := v.Items[0].(*ast.Symbol); ok && sym.Value == "quote" && v.End() == v.Items[1].End() {
+				ra.Set(start.Line-1, start.Column-1, '\'')
+				printExprAtPosition(ra, v.Items[1])
+				return
+			}
+		}
+
 		ra.Set(start.Line-1, start.Column-1, '(')
 		ra.Set(end.Line-1, end.Column-1, ')')
 		for _, item := range v.Items {
@@ -209,9 +218,6 @@ func printExprAtPosition(ra *runeArray2D, n ast.Node) {
 		ra.SetString(v.Pos().Line-1, v.Pos().Column-1, v.String())
 	case *ast.Keyword:
 		ra.SetString(v.Pos().Line-1, v.Pos().Column-1, v.String())
-	case *ast.Quote:
-		ra.Set(v.Pos().Line-1, v.Pos().Column-1, '\'')
-		printExprAtPosition(ra, v.Value)
 	case *ast.Number:
 		// the exact formatting of the number is not retained, so any test
 		// cases that do anything more interesting than integers may fail.

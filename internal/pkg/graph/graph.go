@@ -83,12 +83,16 @@ func (n *GeneratorNode) String() string {
 
 type SinkNode struct {
 	id     NodeID
-	Output chan []float64
+	output chan []float64
 	label  string
 }
 
 func (n *SinkNode) ID() NodeID {
 	return n.id
+}
+
+func (n *SinkNode) Chan() SinkChan {
+	return n.output
 }
 
 func (n *SinkNode) Run(ctx context.Context, g *Graph, cfg generator.SampleConfig, numSamples int) {
@@ -112,7 +116,7 @@ func (n *SinkNode) Run(ctx context.Context, g *Graph, cfg generator.SampleConfig
 			continue
 		}
 		select {
-		case n.Output <- inputSamples[0]:
+		case n.output <- inputSamples[0]:
 		case <-ctx.Done():
 			return
 		}
@@ -163,7 +167,7 @@ func (g *Graph) AddGeneratorNode(gen generator.SampleGenerator, opts ...NodeOpti
 	return node.id
 }
 
-func (g *Graph) AddSinkNode(opts ...NodeOption) (NodeID, SinkChan) {
+func (g *Graph) AddSinkNode(opts ...NodeOption) *SinkNode {
 	var options nodeOptions
 	for _, opt := range opts {
 		opt(&options)
@@ -171,11 +175,21 @@ func (g *Graph) AddSinkNode(opts ...NodeOption) (NodeID, SinkChan) {
 
 	node := &SinkNode{
 		id:     NodeID(len(g.Nodes)),
-		Output: make(chan []float64),
+		output: make(chan []float64),
 		label:  options.label,
 	}
 	g.Nodes = append(g.Nodes, node)
-	return node.id, node.Output
+	return node
+}
+
+func (g *Graph) Sinks() []*SinkNode {
+	var sinks []*SinkNode
+	for _, node := range g.Nodes {
+		if sink, ok := node.(*SinkNode); ok {
+			sinks = append(sinks, sink)
+		}
+	}
+	return sinks
 }
 
 func (g *Graph) IncomingEdges(id NodeID) []*Edge {
