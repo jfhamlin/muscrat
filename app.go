@@ -491,12 +491,24 @@ func scaleSamples(buf []float64, gain float64) []float64 {
 var (
 	lastSpectrumCheck time.Time
 	grayscaleASCII    = []byte(" .:-=+*#%@")
-	//grayscaleASCII    = []byte("$@B%8&WM#*oahkbdpqwmZO0QLCJUYXzcvunxrjft/\\|()1{}[]?-_+~<>i!lI;:,\"^`'. ")
+	grayscaleASCII70  = []byte(" .'`^\",:;Il!i><~+_-?][}{1)(|\\/tfjrxnuvczXYUJCLQ0OZmwqpdbkhao*#MW&8%B@$")
+
+	fftOn    = false
+	timingOn = false
 )
 
 func (a *App) getSamples(cfg *audio.AudioConfig, n int) []int {
+	if timingOn {
+		start := time.Now()
+		defer func() {
+			dur := time.Since(start)
+			budget := time.Second * time.Duration(n) / time.Duration(cfg.SampleRate)
+			fmt.Printf("[getSamples] duration=%v budget overage=%v\n", dur, dur-budget)
+		}()
+	}
+
 	samples := <-a.outputChannel
-	if time.Since(lastSpectrumCheck) > time.Second/60 {
+	if fftOn && time.Since(lastSpectrumCheck) > time.Second/60 {
 		go func() {
 			lastSpectrumCheck = time.Now()
 			x := fft.FFTReal(samples)
@@ -519,7 +531,7 @@ func (a *App) getSamples(cfg *audio.AudioConfig, n int) []int {
 				if val < 0.1 {
 					val = 0
 				}
-				builder.WriteByte(grayscaleASCII[int((val/maxVal)*float64(len(grayscaleASCII)-1))])
+				builder.WriteByte(grayscaleASCII70[int((val/maxVal)*float64(len(grayscaleASCII70)-1))])
 			}
 			builder.WriteRune('|')
 			fmt.Println(builder.String())

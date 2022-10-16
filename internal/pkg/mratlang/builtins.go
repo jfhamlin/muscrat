@@ -579,29 +579,32 @@ func sawBuiltin(env value.Environment, args []value.Value) (value.Value, error) 
 	}, nil
 }
 
+func squareWaveSample(dutyCycle, phase float64) float64 {
+	phase = phase - math.Floor(phase)
+	if phase < dutyCycle {
+		return 1
+	}
+	return -1
+}
+
 func NewSquareGenerator() generator.SampleGenerator {
 	phase := 0.0
 	return generator.SampleGeneratorFunc(func(ctx context.Context, cfg generator.SampleConfig, n int) []float64 {
 		dcs := cfg.InputSamples["dc"]
 		ws := cfg.InputSamples["w"]
 		res := make([]float64, n)
-
-		lastDC := dcs[0]
-		wavtab := wavtabs.Square(1024, lastDC)
-		w := 0.0
 		for i := 0; i < n; i++ {
-			if dcs[i] != lastDC {
-				lastDC = dcs[i]
-				wavtab = wavtabs.Square(1024, lastDC)
-			}
+			w := 440.0
+			dc := 0.5
 			if i < len(ws) {
 				w = ws[i]
 			}
-			res[i] = wavtab.Lerp(phase)
-			phase += w / float64(cfg.SampleRateHz)
-			if phase > 1 {
-				phase -= 1
+			if i < len(dcs) {
+				dc = dcs[i]
 			}
+			res[i] = squareWaveSample(dc, phase)
+			phase += w / float64(cfg.SampleRateHz)
+			phase -= math.Floor(phase)
 		}
 		return res
 	})
