@@ -3,6 +3,7 @@ package mratlang
 import (
 	"fmt"
 	"io"
+	"math/rand"
 	"os"
 	"path/filepath"
 
@@ -120,16 +121,18 @@ func (env *environment) evalList(n *value.List) (value.Value, error) {
 			return env.evalDef(n)
 		case "if":
 			return env.evalIf(n)
+		case "and":
+			return env.evalAnd(n)
+		case "or":
+			return env.evalOr(n)
 		case "lambda":
 			return env.evalLambda(n)
 		case "fn":
 			return env.evalFn(n)
 		case "quote":
 			return env.evalQuote(n)
-		case "and":
-			return env.evalAnd(n)
-		case "or":
-			return env.evalOr(n)
+		case "let":
+			return env.evalLet(n)
 		}
 	}
 
@@ -221,11 +224,11 @@ func (env *environment) evalDef(n *value.List) (value.Value, error) {
 
 func (env *environment) evalLambda(n *value.List) (value.Value, error) {
 	if len(n.Items) < 3 {
-		return nil, fmt.Errorf("invalid lambda, need args and body: %v", n)
+		return nil, env.errorf(n, "invalid lambda, need args and body")
 	}
 	args, ok := n.Items[1].(*value.List)
 	if !ok {
-		return nil, fmt.Errorf("invalid lambda, args must be a list: %v", n)
+		return nil, env.errorf(n, "invalid lambda, args must be a list")
 	}
 
 	argNames, err := nodeAsStringList(args)
@@ -241,7 +244,7 @@ func (env *environment) evalLambda(n *value.List) (value.Value, error) {
 
 func (env *environment) evalFn(n *value.List) (value.Value, error) {
 	if len(n.Items) < 3 {
-		return nil, fmt.Errorf("invalid fn expression, need args and body: %v", n)
+		return nil, env.errorf(n, "invalid fn expression, need args and body")
 	}
 
 	items := n.Items[1:]
@@ -255,12 +258,12 @@ func (env *environment) evalFn(n *value.List) (value.Value, error) {
 	}
 
 	if len(items) < 2 {
-		return nil, fmt.Errorf("invalid fn expression, need args and body: %v", n)
+		return nil, env.errorf(n, "invalid fn expression, need args and body")
 	}
 
 	args, ok := items[0].(*value.List)
 	if !ok {
-		return nil, fmt.Errorf("invalid fn expression, args must be a list: %v", n)
+		return nil, env.errorf(n, "invalid fn expression, args must be a list")
 	}
 	argNames, err := nodeAsStringList(args)
 	if err != nil {
@@ -276,7 +279,7 @@ func (env *environment) evalFn(n *value.List) (value.Value, error) {
 
 func (env *environment) evalIf(n *value.List) (value.Value, error) {
 	if len(n.Items) < 3 || len(n.Items) > 4 {
-		return nil, fmt.Errorf("invalid if, need `cond ifExp [elseExp]`: %v", n)
+		return nil, env.errorf(n, "invalid if, need `cond ifExp [elseExp]`")
 	}
 	cond, err := env.Eval(n.Items[1])
 	if err != nil {
@@ -298,7 +301,7 @@ func (env *environment) evalIf(n *value.List) (value.Value, error) {
 
 func (env *environment) evalAnd(n *value.List) (value.Value, error) {
 	if len(n.Items) < 2 {
-		return nil, fmt.Errorf("invalid and, need at least one arg: %v", n)
+		return nil, env.errorf(n, "invalid and, need at least one arg")
 	}
 	for _, item := range n.Items[1:] {
 		res, err := env.Eval(item)
@@ -318,7 +321,7 @@ func (env *environment) evalAnd(n *value.List) (value.Value, error) {
 
 func (env *environment) evalOr(n *value.List) (value.Value, error) {
 	if len(n.Items) < 2 {
-		return nil, fmt.Errorf("invalid or, need at least one arg: %v", n)
+		return nil, env.errorf(n, "invalid or, need at least one arg")
 	}
 
 	for _, item := range n.Items[1:] {
@@ -336,10 +339,82 @@ func (env *environment) evalOr(n *value.List) (value.Value, error) {
 
 func (env *environment) evalQuote(n *value.List) (value.Value, error) {
 	if len(n.Items) != 2 {
-		return nil, fmt.Errorf("invalid quote, need 1 argument: %v", n)
+		return nil, env.errorf(n, "invalid quote, need 1 argument")
 	}
 
 	return n.Items[1], nil
+}
+
+// essential syntax: let <bindings> <body>
+//
+// Syntax: <Bindings> should have the form
+//
+// ((<variable 1> <init 1>) ...),
+//
+// where each <init> is an expression, and <body> should be a sequence
+// of one or more expressions. It is an error for a <variable> to
+// appear more than once in the list of variables being bound.
+//
+// Semantics: The <init>s are evaluated in the current environment (in
+// some unspecified order), the <variable>s are bound to fresh
+// locations holding the results, the <body> is evaluated in the
+// extended environment, and the value of the last expression of
+// <body> is returned. Each binding of a <variable> has <body> as its
+// region.
+func (env *environment) evalLet(n *value.List) (value.Value, error) {
+	if len(n.Items) < 3 {
+		return nil, env.errorf(n, "invalid let, need bindings and body")
+	}
+
+	bindings, ok := n.Items[1].(*value.List)
+	if !ok {
+		return nil, env.errorf(n.Items[1], "invalid let, bindings must be a list")
+	}
+
+	// shuffle the bindings to evaluate them in a random order. this
+	// prevents users from relying on the order of evaluation.
+	shuffled := make([]*value.List, len(bindings.Items))
+	for i, j := range rand.Perm(len(bindings.Items)) {
+		item, ok := bindings.Items[i].(*value.List)
+		if !ok || len(item.Items) != 2 {
+			return nil, env.errorf(bindings.Items[i], "invalid let, bindings must be a list of lists of length 2")
+		}
+		shuffled[j] = item
+	}
+
+	// evaluate the bindings in a random order
+	bindingsMap := make(map[string]value.Value)
+	for _, binding := range shuffled {
+		name, ok := binding.Items[0].(*value.Symbol)
+		if !ok {
+			return nil, env.errorf(binding.Items[0], "invalid let, binding name must be a symbol")
+		}
+		if _, ok := bindingsMap[name.Value]; ok {
+			return nil, env.errorf(binding.Items[0], "invalid let, duplicate binding name")
+		}
+		val, err := env.Eval(binding.Items[1])
+		if err != nil {
+			return nil, err
+		}
+		bindingsMap[name.Value] = val
+	}
+
+	// create a new environment with the bindings
+	newEnv := env.PushScope()
+	for name, val := range bindingsMap {
+		newEnv.Define(name, val)
+	}
+
+	// evaluate the body
+	var res value.Value
+	var err error
+	for _, item := range n.Items[2:] {
+		res, err = newEnv.Eval(item)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return res, nil
 }
 
 // Helpers
