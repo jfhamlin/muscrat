@@ -1,0 +1,26 @@
+(load-file "./testtab.mrat")
+(load-file "./functional00.in")
+
+(def print mrat.core.io.print)
+
+(def tbl
+  '((#t #t)
+    (#t #f)
+    (#f #t)
+    (#f #f)))
+
+(def (pret val)
+  ;; print val then return it
+  (print "eval" val)
+  val)
+
+(def (testAnd bools)
+  (if (empty? bools)
+    #t
+    (and (pret (first bools))
+         (testAnd (rest bools)))))
+
+(testTable tbl
+           (fn (bools)
+             (print bools "=>" (testAnd bools))))
+

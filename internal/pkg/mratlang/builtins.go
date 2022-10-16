@@ -46,6 +46,8 @@ func init() {
 				funcSymbol("eq?", eqBuiltin),
 				funcSymbol("empty?", emptyBuiltin),
 				funcSymbol("not-empty?", notEmptyBuiltin),
+				// boolean functions
+				funcSymbol("not", notBuiltin),
 				// plumbing
 				funcSymbol("~pipe", pipeBuiltin),
 				funcSymbol("pipeset", pipesetBuiltin),

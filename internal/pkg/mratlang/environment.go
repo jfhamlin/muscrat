@@ -126,6 +126,8 @@ func (env *environment) evalList(n *value.List) (value.Value, error) {
 			return env.evalFn(n)
 		case "quote":
 			return env.evalQuote(n)
+		case "and":
+			return env.evalAnd(n)
 		}
 	}
 
@@ -290,6 +292,26 @@ func (env *environment) evalIf(n *value.List) (value.Value, error) {
 		return env.Eval(n.Items[3])
 	}
 	return nil, nil
+}
+
+func (env *environment) evalAnd(n *value.List) (value.Value, error) {
+	if len(n.Items) < 2 {
+		return nil, fmt.Errorf("invalid and, need at least one arg: %v", n)
+	}
+	for _, item := range n.Items[1:] {
+		res, err := env.Eval(item)
+		if err != nil {
+			return nil, err
+		}
+		b, ok := res.(*value.Bool)
+		if !ok || !b.Value {
+			if b == nil {
+				return value.NewBool(false), nil
+			}
+			return b, nil
+		}
+	}
+	return &value.Bool{Value: true}, nil
 }
 
 func (env *environment) evalQuote(n *value.List) (value.Value, error) {

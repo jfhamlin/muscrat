@@ -1,0 +1,10 @@
+eval #t
+eval #t
+(#t #t) => #t
+eval #t
+eval #f
+(#t #f) => #f
+eval #f
+(#f #t) => #f
+eval #f
+(#f #f) => #f
