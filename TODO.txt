@@ -16,7 +16,7 @@ Either:
 ** DONE custom s-expression read+eval
 *** DONE skeleton for parser
 *** DONE define and implement a basic type system
-** TODO add support for feedback
+** DONE add support for feedback
 ** TODO add a file picker to the UI
 ** TODO infrastructure to make it easier to export functions to lisp
 ** TODO Transition between graphs by mutating the graph and fading between altered nodes

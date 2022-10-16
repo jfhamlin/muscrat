@@ -10,6 +10,10 @@ import (
 	"github.com/jfhamlin/muscrat/internal/pkg/generator"
 )
 
+const (
+	bufferSize = 1024
+)
+
 type NodeID int
 
 func (id NodeID) String() string {
@@ -148,7 +152,7 @@ func (g *Graph) AddEdge(from, to NodeID, port string) {
 		From:    from,
 		To:      to,
 		ToPort:  port,
-		Channel: make(chan []float64),
+		Channel: make(chan []float64, 1),
 	})
 }
 
@@ -220,15 +224,102 @@ func (g *Graph) OutgoingEdges(id NodeID) []*Edge {
 }
 
 func RunGraph(ctx context.Context, g *Graph, cfg generator.SampleConfig) {
+	bootstrapCycles(ctx, g, cfg)
+
 	var wg sync.WaitGroup
 	for _, node := range g.Nodes {
 		wg.Add(1)
 		go func(n Node) {
-			n.Run(ctx, g, cfg, 1024)
+			n.Run(ctx, g, cfg, bufferSize)
 			wg.Done()
 		}(node)
 	}
 	wg.Wait()
+}
+
+func bootstrapCycles(ctx context.Context, g *Graph, cfg generator.SampleConfig) {
+	// initialize any channels required to bootstrap cycles, preventing
+	// deadlock.
+
+	queue := make([]NodeID, 0, len(g.Nodes))
+	blocked := map[NodeID]struct{}{}
+	for _, node := range g.Nodes {
+		if _, ok := node.(*SinkNode); ok {
+			continue
+		}
+		if len(g.IncomingEdges(node.ID())) == 0 {
+			queue = append(queue, node.ID())
+		} else {
+			blocked[node.ID()] = struct{}{}
+		}
+	}
+
+	satisfiedNodes := make(map[NodeID]struct{})
+	for len(queue) > 0 || len(blocked) > 0 {
+		if len(queue) == 0 {
+			fmt.Printf("blocked nodes: %v\n", blocked)
+			// all nodes are blocked. pick an unsatisfied dependency of the
+			// node with the most satisfied dependencies, and treat it as
+			// "satisfied," generating a buffer of zero samples for it.
+			maxSatisfied := -1
+			var choice NodeID = -1
+
+			for id := range blocked {
+				satisfiedDeps := 0
+				var unsatisfiedDep NodeID
+				for _, e := range g.IncomingEdges(id) {
+					if _, ok := satisfiedNodes[e.From]; ok {
+						fmt.Println("satisfied", e.From)
+						satisfiedDeps++
+					} else {
+						fmt.Println("unsatisfied dep", e.From)
+						unsatisfiedDep = e.From
+					}
+				}
+				if satisfiedDeps > maxSatisfied {
+					maxSatisfied = satisfiedDeps
+					choice = unsatisfiedDep
+				}
+			}
+
+			queue = append(queue, choice)
+			delete(blocked, choice)
+			zeros := make([]float64, bufferSize)
+			fmt.Println("chosen", choice)
+			for _, e := range g.OutgoingEdges(choice) {
+				fmt.Printf("bootstrap: %s(%s) -> %s\n", choice, g.Node(choice), e.To)
+				select {
+				case <-ctx.Done():
+					return
+				case e.Channel <- zeros:
+				}
+			}
+			fmt.Println("queue", queue)
+		}
+
+		var nodeID NodeID
+		nodeID, queue = queue[0], queue[1:]
+
+		satisfiedNodes[nodeID] = struct{}{}
+		// check for any unblocked nodes
+		for _, e := range g.OutgoingEdges(nodeID) {
+			if _, ok := satisfiedNodes[e.To]; ok {
+				continue
+			}
+			satisfied := true
+			for _, inEdge := range g.IncomingEdges(e.To) {
+				if _, ok := satisfiedNodes[inEdge.From]; !ok {
+					satisfied = false
+					break
+				}
+			}
+			if !satisfied {
+				continue
+			}
+			delete(blocked, e.To)
+			queue = append(queue, e.To)
+		}
+	}
 }
 
 func RunNode(ctx context.Context, node *GeneratorNode, g *Graph, cfg generator.SampleConfig, numSamples int) {

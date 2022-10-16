@@ -261,8 +261,10 @@ func mulBuiltin(env value.Environment, args []value.Value) (value.Value, error) 
 	}
 
 	// otherwise, create a new constant generator node for the coefficient
-	constNodeID := env.Graph().AddGeneratorNode(generator.NewConstant(coeff), graph.WithLabel(fmt.Sprintf("%v", coeff)))
-	gens = append(gens, &value.Gen{NodeID: constNodeID})
+	if coeff != 1 {
+		constNodeID := env.Graph().AddGeneratorNode(generator.NewConstant(coeff), graph.WithLabel(fmt.Sprintf("%v", coeff)))
+		gens = append(gens, &value.Gen{NodeID: constNodeID})
+	}
 
 	// create a new generator node for the product
 	nodeID := env.Graph().AddGeneratorNode(generator.NewProduct(), graph.WithLabel("*"))

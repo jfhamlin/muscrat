@@ -222,7 +222,7 @@ func (r *Reader) readExpr() (ast.Node, error) {
 func (r *Reader) readList() (ast.Node, error) {
 	var nodes []ast.Node
 	for {
-		rune, _, err := r.rs.ReadRune()
+		rune, err := r.next()
 		if err != nil {
 			return nil, err
 		}
