@@ -192,6 +192,13 @@ func (g *Graph) Sinks() []*SinkNode {
 	return sinks
 }
 
+func (g *Graph) Node(id NodeID) Node {
+	if int(id) >= len(g.Nodes) {
+		return nil
+	}
+	return g.Nodes[id]
+}
+
 func (g *Graph) IncomingEdges(id NodeID) []*Edge {
 	var edges []*Edge
 	for _, e := range g.Edges {

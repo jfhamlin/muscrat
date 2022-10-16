@@ -28,3 +28,14 @@ func (s *scope) lookup(name string) (value.Value, bool) {
 	}
 	return s.parent.lookup(name)
 }
+
+func (s *scope) printIndented(indent string) string {
+	str := ""
+	for k, v := range s.syms {
+		str += indent + k + ": " + v.String() + "\n"
+	}
+	if s.parent != nil {
+		str += s.parent.printIndented(indent + "  ")
+	}
+	return str
+}

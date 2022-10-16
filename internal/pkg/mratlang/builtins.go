@@ -38,12 +38,17 @@ func init() {
 				funcSymbol("*", mulBuiltin),
 				funcSymbol("/", divBuiltin),
 				funcSymbol("+", addBuiltin),
+				funcSymbol("-", subBuiltin),
+				funcSymbol("<", ltBuiltin),
 				// function application
 				funcSymbol("apply", applyBuiltin),
 				// test predicates
 				funcSymbol("eq?", eqBuiltin),
 				funcSymbol("empty?", emptyBuiltin),
 				funcSymbol("not-empty?", notEmptyBuiltin),
+				// plumbing
+				funcSymbol("~pipe", pipeBuiltin),
+				funcSymbol("pipeset", pipesetBuiltin),
 			},
 		},
 		&Package{
@@ -322,6 +327,98 @@ func addBuiltin(env value.Environment, args []value.Value) (value.Value, error) 
 	}, nil
 }
 
+func subBuiltin(env value.Environment, args []value.Value) (value.Value, error) {
+	if len(args) != 2 {
+		return nil, fmt.Errorf("sub expects 2 arguments, got %v", len(args))
+	}
+	a, ok := args[0].(*value.Num)
+	if !ok {
+		return nil, fmt.Errorf("sub expects a number as the first argument, got %v", args[0])
+	}
+	b, ok := args[1].(*value.Num)
+	if !ok {
+		return nil, fmt.Errorf("sub expects a number as the second argument, got %v", args[1])
+	}
+
+	// TODO: handle generators
+	return value.NewNum(a.Value - b.Value), nil
+}
+
+func ltBuiltin(env value.Environment, args []value.Value) (value.Value, error) {
+	if len(args) != 2 {
+		return nil, fmt.Errorf("< expects 2 arguments, got %v", len(args))
+	}
+	a, ok := args[0].(*value.Num)
+	if !ok {
+		return nil, fmt.Errorf("< expects a number as the first argument, got %v", args[0])
+	}
+	b, ok := args[1].(*value.Num)
+	if !ok {
+		return nil, fmt.Errorf("< expects a number as the second argument, got %v", args[1])
+	}
+
+	return value.NewBool(a.Value < b.Value), nil
+}
+
+type pipe struct {
+	inputSet bool
+}
+
+func (p *pipe) GenerateSamples(ctx context.Context, cfg generator.SampleConfig, n int) []float64 {
+	if in, ok := cfg.InputSamples["in"]; ok {
+		return in
+	}
+	return make([]float64, n)
+}
+
+func pipeBuiltin(env value.Environment, args []value.Value) (value.Value, error) {
+	if len(args) != 0 {
+		return nil, fmt.Errorf("pipe expects 0 arguments, got %v", len(args))
+	}
+	nodeID := env.Graph().AddGeneratorNode(&pipe{}, graph.WithLabel("~pipe"))
+	return &value.Gen{
+		NodeID: nodeID,
+	}, nil
+}
+
+func pipesetBuiltin(env value.Environment, args []value.Value) (value.Value, error) {
+	if len(args) != 2 {
+		return nil, fmt.Errorf("pipeset expects 2 arguments, got %v", len(args))
+	}
+
+	// get the generator
+	gen, ok := args[0].(*value.Gen)
+	if !ok {
+		return nil, fmt.Errorf("pipeset expects a pipe generator as the first argument, got %v", args[0])
+	}
+	node := env.Graph().Node(gen.NodeID)
+	if node == nil {
+		return nil, fmt.Errorf("invalid generator node: %v", gen.NodeID)
+	}
+	genNode, ok := node.(*graph.GeneratorNode)
+	if !ok {
+		return nil, fmt.Errorf("pipeset expects a pipe generator as the first argument, got %v", args[0])
+	}
+	pipeGen, ok := genNode.Generator.(*pipe)
+	if !ok {
+		return nil, fmt.Errorf("pipeset expects a pipe generator as the first argument, got %v", args[0])
+	}
+
+	if pipeGen.inputSet {
+		return nil, fmt.Errorf("pipeset called twice on the same pipe")
+	}
+	pipeGen.inputSet = true
+
+	input, ok := asGen(env, args[1])
+	if !ok {
+		return nil, fmt.Errorf("pipeset expects a generator as the second argument, got %v", args[1])
+	}
+
+	// add an edge from the input generator to the pipe generator
+	env.Graph().AddEdge(input.NodeID, gen.NodeID, "in")
+	return nil, nil
+}
+
 func applyBuiltin(env value.Environment, args []value.Value) (value.Value, error) {
 	if len(args) != 2 {
 		return nil, fmt.Errorf("apply expects 2 arguments, got %v", len(args))
@@ -344,7 +441,12 @@ func printBuiltin(env value.Environment, args []value.Value) (value.Value, error
 			// TODO: add nil to the type system
 			env.Stdout().Write([]byte("nil"))
 		} else {
-			env.Stdout().Write([]byte(arg.String()))
+			str, ok := arg.(*value.Str)
+			if !ok {
+				env.Stdout().Write([]byte(arg.String()))
+			} else {
+				env.Stdout().Write([]byte(str.Value))
+			}
 		}
 		if i < len(args)-1 {
 			env.Stdout().Write([]byte(" "))
@@ -821,8 +923,6 @@ func getSampleArrays(inputs map[string][]float64, name string) [][]float64 {
 func NewEnvelopeGenerator(interpolation string) generator.SampleGenerator {
 	// Behavior follows that of SuperCollider's Env/EnvGen
 	// https://doc.sccode.org/Classes/Env.html
-
-	fmt.Println("new envelope generator")
 
 	triggered := false
 	triggerTime := 0.0

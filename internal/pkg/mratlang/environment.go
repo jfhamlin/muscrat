@@ -30,6 +30,10 @@ func newEnvironment(stdout io.Writer) *environment {
 	return e
 }
 
+func (env *environment) String() string {
+	return fmt.Sprintf("environment:\nScope:\n%v", env.scope.printIndented("  "))
+}
+
 func (env *environment) Define(name string, value value.Value) {
 	env.scope.define(name, value)
 }
@@ -39,7 +43,8 @@ func (env *environment) lookup(name string) (value.Value, bool) {
 }
 
 func (env *environment) PushScope() value.Environment {
-	newEnv := &(*env)
+	wrappedEnv := *env
+	newEnv := &wrappedEnv
 	newEnv.scope = newEnv.scope.push()
 	return newEnv
 }
@@ -156,7 +161,7 @@ func (env *environment) applyFunc(f value.Value, args []value.Value) (value.Valu
 		// the location at which the function value was defined.
 		return nil, env.errorf(f, "value is not a function: %v", f)
 	}
-	return fn.Apply(env.PushScope(), args)
+	return fn.Apply(env, args)
 }
 
 // Special forms
@@ -276,9 +281,11 @@ func (env *environment) evalIf(n *value.List) (value.Value, error) {
 
 	b, ok := cond.(*value.Bool)
 	if !ok || b.Value {
+		res, err := env.Eval(n.Items[2])
 		// non-bool is always true
-		return env.Eval(n.Items[2])
+		return res, err //env.Eval(n.Items[2])
 	}
+
 	if len(n.Items) == 4 {
 		return env.Eval(n.Items[3])
 	}
