@@ -17,6 +17,12 @@ Either:
 *** DONE skeleton for parser
 *** DONE define and implement a basic type system
 ** DONE add support for feedback
+** TODO Support building instruments from Welsh's Synthesizer Cookbook
+*** TODO Low-pass Filter with cutoff and resonance parameters
+*** TODO Envelope for LPF
+** TODO quality of life special forms
+*** TODO and/or
+*** TODO let
 ** TODO add a file picker to the UI
 ** TODO infrastructure to make it easier to export functions to lisp
 ** TODO Transition between graphs by mutating the graph and fading between altered nodes
