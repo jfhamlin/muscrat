@@ -128,6 +128,8 @@ func (env *environment) evalList(n *value.List) (value.Value, error) {
 			return env.evalQuote(n)
 		case "and":
 			return env.evalAnd(n)
+		case "or":
+			return env.evalOr(n)
 		}
 	}
 
@@ -312,6 +314,24 @@ func (env *environment) evalAnd(n *value.List) (value.Value, error) {
 		}
 	}
 	return &value.Bool{Value: true}, nil
+}
+
+func (env *environment) evalOr(n *value.List) (value.Value, error) {
+	if len(n.Items) < 2 {
+		return nil, fmt.Errorf("invalid or, need at least one arg: %v", n)
+	}
+
+	for _, item := range n.Items[1:] {
+		res, err := env.Eval(item)
+		if err != nil {
+			return nil, err
+		}
+		b, ok := res.(*value.Bool)
+		if ok && b.Value {
+			return b, nil
+		}
+	}
+	return &value.Bool{Value: false}, nil
 }
 
 func (env *environment) evalQuote(n *value.List) (value.Value, error) {

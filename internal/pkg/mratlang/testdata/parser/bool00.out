@@ -1,3 +1,4 @@
+### AND
 eval #t
 eval #t
 (#t #t) => #t
@@ -6,5 +7,17 @@ eval #f
 (#t #f) => #f
 eval #f
 (#f #t) => #f
+eval #f
+(#f #f) => #f
+
+### OR
+eval #t
+(#t #t) => #t
+eval #t
+(#t #f) => #t
+eval #f
+eval #t
+(#f #t) => #t
+eval #f
 eval #f
 (#f #f) => #f

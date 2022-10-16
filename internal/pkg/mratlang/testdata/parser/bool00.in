@@ -14,13 +14,30 @@
   (print "eval" val)
   val)
 
+;;; AND
+
 (def (testAnd bools)
   (if (empty? bools)
     #t
     (and (pret (first bools))
          (testAnd (rest bools)))))
 
+(print "### AND")
 (testTable tbl
            (fn (bools)
              (print bools "=>" (testAnd bools))))
+
+;;; OR
+
+(def (testOr bools)
+  (if (empty? bools)
+    #f
+    (or (pret (first bools))
+         (testOr (rest bools)))))
+
+(print)
+(print "### OR")
+(testTable tbl
+           (fn (bools)
+             (print bools "=>" (testOr bools))))
 
