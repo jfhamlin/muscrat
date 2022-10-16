@@ -115,7 +115,7 @@ func loadFile(env value.Environment, filename string) error {
 		return fmt.Errorf("error reading file %v: %w", filename, err)
 	}
 
-	prog, err := Parse(strings.NewReader(string(buf)))
+	prog, err := Parse(strings.NewReader(string(buf)), WithFilename(absFile))
 	if err != nil {
 		return fmt.Errorf("error parsing file %v: %w", filename, err)
 	}

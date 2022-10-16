@@ -10,13 +10,13 @@ import (
 func FromAST(node ast.Node) Value {
 	switch node := node.(type) {
 	case *ast.Number:
-		return NewNum(node.Value)
+		return NewNum(node.Value, WithSection(node.Section))
 	case *ast.String:
-		return NewStr(node.Value)
+		return NewStr(node.Value, WithSection(node.Section))
 	case *ast.Bool:
-		return NewBool(node.Value)
+		return NewBool(node.Value, WithSection(node.Section))
 	case *ast.Keyword:
-		return NewKeyword(node.Value)
+		return NewKeyword(node.Value, WithSection(node.Section))
 	case *ast.List:
 		var items []Value
 		for _, item := range node.Items {
@@ -24,7 +24,7 @@ func FromAST(node ast.Node) Value {
 		}
 		return NewList(items, WithSection(node.Section))
 	case *ast.Symbol:
-		return NewSymbol(node.Value)
+		return NewSymbol(node.Value, WithSection(node.Section))
 	default:
 		panic(fmt.Sprintf("unhandled node type: %T", node))
 	}

@@ -614,7 +614,7 @@ func (a *App) updateSignalGraphFromScriptFile(filename string) {
 	}
 	a.lastSynthFileHash = hash
 
-	program, err := mratlang.Parse(strings.NewReader(string(synthFile)))
+	program, err := mratlang.Parse(strings.NewReader(string(synthFile)), mratlang.WithFilename(filename))
 	if err != nil {
 		fmt.Println("error parsing script:", err)
 		return

@@ -94,6 +94,7 @@ func (l *List) Equal(v Value) bool {
 
 // Gen is a generator.
 type Gen struct {
+	ast.Section
 	NodeID graph.NodeID
 }
 
@@ -109,17 +110,21 @@ func (g *Gen) Equal(v Value) bool {
 	return g.NodeID == other.NodeID
 }
 
-func (g *Gen) Pos() ast.Pos {
-	return ast.Pos{}
-}
-
 // Bool is a boolean value.
 type Bool struct {
+	ast.Section
 	Value bool
 }
 
-func NewBool(b bool) *Bool {
-	return &Bool{b}
+func NewBool(b bool, opts ...Option) *Bool {
+	var o options
+	for _, opt := range opts {
+		opt(&o)
+	}
+	return &Bool{
+		Section: o.section,
+		Value:   b,
+	}
 }
 
 func (b *Bool) String() string {
@@ -137,17 +142,21 @@ func (b *Bool) Equal(v Value) bool {
 	return b.Value == other.Value
 }
 
-func (b *Bool) Pos() ast.Pos {
-	return ast.Pos{}
-}
-
 // Num is a number.
 type Num struct {
+	ast.Section
 	Value float64
 }
 
-func NewNum(v float64) *Num {
-	return &Num{Value: v}
+func NewNum(n float64, opts ...Option) *Num {
+	var o options
+	for _, opt := range opts {
+		opt(&o)
+	}
+	return &Num{
+		Section: o.section,
+		Value:   n,
+	}
 }
 
 func (n *Num) String() string {
@@ -162,17 +171,21 @@ func (n *Num) Equal(v Value) bool {
 	return n.Value == other.Value
 }
 
-func (n *Num) Pos() ast.Pos {
-	return ast.Pos{}
-}
-
 // Str is a string.
 type Str struct {
+	ast.Section
 	Value string
 }
 
-func NewStr(s string) *Str {
-	return &Str{Value: s}
+func NewStr(s string, opts ...Option) *Str {
+	var o options
+	for _, opt := range opts {
+		opt(&o)
+	}
+	return &Str{
+		Section: o.section,
+		Value:   s,
+	}
 }
 
 func (s *Str) String() string {
@@ -187,18 +200,22 @@ func (s *Str) Equal(v Value) bool {
 	return s.Value == other.Value
 }
 
-func (s *Str) Pos() ast.Pos {
-	return ast.Pos{}
-}
-
 // Keyword represents a keyword. Syyntactically, a keyword is a symbol
 // that starts with a colon and evaluates to itself.
 type Keyword struct {
+	ast.Section
 	Value string
 }
 
-func NewKeyword(s string) *Keyword {
-	return &Keyword{Value: s}
+func NewKeyword(s string, opts ...Option) *Keyword {
+	var o options
+	for _, opt := range opts {
+		opt(&o)
+	}
+	return &Keyword{
+		Section: o.section,
+		Value:   s,
+	}
 }
 
 func (k *Keyword) String() string {
@@ -213,12 +230,9 @@ func (k *Keyword) Equal(v Value) bool {
 	return k.Value == other.Value
 }
 
-func (k *Keyword) Pos() ast.Pos {
-	return ast.Pos{}
-}
-
 // Func is a function.
 type Func struct {
+	ast.Section
 	LambdaName string
 	Variadic   bool
 	ArgNames   []string
@@ -236,10 +250,6 @@ func (f *Func) Equal(v Value) bool {
 		return false
 	}
 	return f.Exprs == other.Exprs
-}
-
-func (f *Func) Pos() ast.Pos {
-	return ast.Pos{}
 }
 
 func (f *Func) Apply(env Environment, args []Value) (Value, error) {
@@ -275,6 +285,7 @@ func (f *Func) Apply(env Environment, args []Value) (Value, error) {
 
 // BuiltinFunc is a builtin function.
 type BuiltinFunc struct {
+	ast.Section
 	Applyer
 	Name     string
 	variadic bool
@@ -293,16 +304,20 @@ func (f *BuiltinFunc) Equal(v Value) bool {
 	return f == other
 }
 
-func (f *BuiltinFunc) Pos() ast.Pos {
-	return ast.Pos{}
-}
-
 type Symbol struct {
+	ast.Section
 	Value string
 }
 
-func NewSymbol(s string) *Symbol {
-	return &Symbol{Value: s}
+func NewSymbol(s string, opts ...Option) *Symbol {
+	var o options
+	for _, opt := range opts {
+		opt(&o)
+	}
+	return &Symbol{
+		Section: o.section,
+		Value:   s,
+	}
 }
 
 func (s *Symbol) String() string {
@@ -315,8 +330,4 @@ func (s *Symbol) Equal(v Value) bool {
 		return false
 	}
 	return s.Value == other.Value
-}
-
-func (s *Symbol) Pos() ast.Pos {
-	return ast.Pos{}
 }

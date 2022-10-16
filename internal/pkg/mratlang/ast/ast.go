@@ -21,6 +21,10 @@ type Pos struct {
 	Column   int
 }
 
+func (p Pos) Valid() bool {
+	return p.Line != 0 && p.Column != 0
+}
+
 type Section struct {
 	StartPos, EndPos Pos
 	// TODO: consider adding information about whitespace and comments.

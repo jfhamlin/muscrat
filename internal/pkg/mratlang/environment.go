@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 
 	"github.com/jfhamlin/muscrat/internal/pkg/graph"
+	"github.com/jfhamlin/muscrat/internal/pkg/mratlang/ast"
 	"github.com/jfhamlin/muscrat/internal/pkg/mratlang/value"
 )
 
@@ -71,11 +72,28 @@ func (env *environment) ResolveFile(filename string) (string, bool) {
 	return "", false
 }
 
-func (env *environment) Eval(v value.Value) (value.Value, error) {
-	return env.evalNode(v)
+type poser interface {
+	Pos() ast.Pos
 }
 
-func (env *environment) evalNode(n value.Value) (value.Value, error) {
+func (env *environment) errorf(n poser, format string, args ...interface{}) error {
+	pos := n.Pos()
+	filename := "?"
+	line := "?"
+	col := "?"
+	if pos.Valid() {
+		if pos.Filename != "" {
+			filename = pos.Filename
+		}
+		line = fmt.Sprintf("%d", pos.Line)
+		col = fmt.Sprintf("%d", pos.Column)
+	}
+	location := fmt.Sprintf("%s:%s:%s", filename, line, col)
+
+	return fmt.Errorf("%s: %s", location, fmt.Sprintf(format, args...))
+}
+
+func (env *environment) Eval(n value.Value) (value.Value, error) {
 	switch v := n.(type) {
 	case *value.List:
 		return env.evalList(v)
@@ -109,7 +127,7 @@ func (env *environment) evalList(n *value.List) (value.Value, error) {
 	// otherwise, handle a function call
 	var res []value.Value
 	for _, item := range n.Items {
-		v, err := env.evalNode(item)
+		v, err := env.Eval(item)
 		if err != nil {
 			return nil, err
 		}
@@ -120,29 +138,23 @@ func (env *environment) evalList(n *value.List) (value.Value, error) {
 
 func (env *environment) evalScalar(n value.Value) (value.Value, error) {
 	switch v := n.(type) {
-	case *value.Num:
-		return &value.Num{v.Value}, nil
 	case *value.Symbol:
 		if val, ok := env.lookup(v.Value); ok {
 			return val, nil
 		}
-		fmt.Println("unbound symbol:", n)
-		return nil, fmt.Errorf("XXX undefined symbol: %s", v.Value)
-	case *value.Keyword:
-		return &value.Keyword{Value: v.Value}, nil
-	case *value.Str:
-		return &value.Str{Value: v.Value}, nil
-	case *value.Bool:
-		return &value.Bool{Value: v.Value}, nil
+		return nil, env.errorf(n, "undefined symbol: %s", v.Value)
 	default:
-		return nil, fmt.Errorf("unhandled scalar type: %T", n)
+		// else, it's a literal
+		return v, nil
 	}
 }
 
 func (env *environment) applyFunc(f value.Value, args []value.Value) (value.Value, error) {
 	fn, ok := f.(value.Applyer)
 	if !ok {
-		return nil, fmt.Errorf("not a function: %v", f)
+		// TODO: the error's location should indicate the call site, not
+		// the location at which the function value was defined.
+		return nil, env.errorf(f, "value is not a function: %v", f)
 	}
 	return fn.Apply(env.PushScope(), args)
 }
@@ -157,15 +169,15 @@ func (na *nopApplyer) Apply(env *environment, args []value.Value) (value.Value, 
 
 func (env *environment) evalDef(n *value.List) (value.Value, error) {
 	if len(n.Items) < 3 {
-		return nil, fmt.Errorf("invalid def: %v", n.Pos())
+		return nil, env.errorf(n, "invalid definition, too few items")
 	}
 
 	switch v := n.Items[1].(type) {
 	case *value.Symbol:
 		if len(n.Items) != 3 {
-			return nil, fmt.Errorf("invalid def: %v", n.Pos())
+			return nil, env.errorf(n, "invalid definition, too many items")
 		}
-		val, err := env.evalNode(n.Items[2])
+		val, err := env.Eval(n.Items[2])
 		if err != nil {
 			return nil, err
 		}
@@ -173,17 +185,17 @@ func (env *environment) evalDef(n *value.List) (value.Value, error) {
 		return nil, nil
 	case *value.List:
 		if len(v.Items) == 0 {
-			return nil, fmt.Errorf("invalid def: %v", n.Pos())
+			return nil, env.errorf(n, "invalid function definition, no name")
 		}
 		sym, ok := v.Items[0].(*value.Symbol)
 		if !ok {
-			return nil, fmt.Errorf("invalid def: %v", n.Pos())
+			return nil, env.errorf(n, "invalid function definition, name is not a symbol")
 		}
 		argNames := make([]string, 0, len(v.Items)-1)
 		for _, item := range v.Items[1:] {
 			argSym, ok := item.(*value.Symbol)
 			if !ok {
-				return nil, fmt.Errorf("invalid def: %v", n.Pos())
+				return nil, env.errorf(n, "invalid function definition, argument is not a symbol")
 			}
 			argNames = append(argNames, argSym.Value)
 		}
@@ -195,7 +207,7 @@ func (env *environment) evalDef(n *value.List) (value.Value, error) {
 		return nil, nil
 	}
 
-	return nil, fmt.Errorf("invalid def: %v", n.Pos())
+	return nil, env.errorf(n, "invalid definition, first item is not a symbol")
 }
 
 func (env *environment) evalLambda(n *value.List) (value.Value, error) {
@@ -257,7 +269,7 @@ func (env *environment) evalIf(n *value.List) (value.Value, error) {
 	if len(n.Items) < 3 || len(n.Items) > 4 {
 		return nil, fmt.Errorf("invalid if, need `cond ifExp [elseExp]`: %v", n)
 	}
-	cond, err := env.evalNode(n.Items[1])
+	cond, err := env.Eval(n.Items[1])
 	if err != nil {
 		return nil, err
 	}
@@ -265,10 +277,10 @@ func (env *environment) evalIf(n *value.List) (value.Value, error) {
 	b, ok := cond.(*value.Bool)
 	if !ok || b.Value {
 		// non-bool is always true
-		return env.evalNode(n.Items[2])
+		return env.Eval(n.Items[2])
 	}
 	if len(n.Items) == 4 {
-		return env.evalNode(n.Items[3])
+		return env.Eval(n.Items[3])
 	}
 	return nil, nil
 }
