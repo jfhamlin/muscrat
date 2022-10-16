@@ -8,10 +8,10 @@ import (
 	"io/ioutil"
 	"log"
 	"math"
+	"math/cmplx"
 	"math/rand"
 	"os"
 	"regexp"
-	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -19,6 +19,7 @@ import (
 	"unicode"
 
 	"github.com/fsnotify/fsnotify"
+	"github.com/mjibson/go-dsp/fft"
 
 	"github.com/jfhamlin/muscrat/internal/pkg/generator"
 	"github.com/jfhamlin/muscrat/internal/pkg/graph"
@@ -30,8 +31,6 @@ import (
 
 	"github.com/bspaans/bleep/audio"
 	"github.com/bspaans/bleep/sinks"
-
-	"github.com/mjibson/go-dsp/spectral"
 
 	"net/http"
 	_ "net/http/pprof"
@@ -491,66 +490,44 @@ func scaleSamples(buf []float64, gain float64) []float64 {
 
 var (
 	lastSpectrumCheck time.Time
+	grayscaleASCII    = []byte(" .:-=+*#%@")
+	//grayscaleASCII    = []byte("$@B%8&WM#*oahkbdpqwmZO0QLCJUYXzcvunxrjft/\\|()1{}[]?-_+~<>i!lI;:,\"^`'. ")
 )
 
 func (a *App) getSamples(cfg *audio.AudioConfig, n int) []int {
 	samples := <-a.outputChannel
+	if time.Since(lastSpectrumCheck) > time.Second/60 {
+		go func() {
+			lastSpectrumCheck = time.Now()
+			x := fft.FFTReal(samples)
+			abs := make([]float64, len(x)/4)
+
+			// group pairs of bins. ignore the top half of the spectrum.
+			for i := 0; i < len(x)/4; i++ {
+				abs[i] = cmplx.Abs(x[2*i]) + cmplx.Abs(x[2*i+1])
+			}
+			maxVal := 0.0
+			for i := 0; i < len(abs); i++ {
+				maxVal = math.Max(maxVal, abs[i])
+			}
+			const lines = 10
+
+			builder := strings.Builder{}
+			builder.WriteRune('|')
+			for i := 0; i < len(abs); i++ {
+				val := abs[i]
+				if val < 0.1 {
+					val = 0
+				}
+				builder.WriteByte(grayscaleASCII[int((val/maxVal)*float64(len(grayscaleASCII)-1))])
+			}
+			builder.WriteRune('|')
+			fmt.Println(builder.String())
+		}()
+	}
+
 	samples = scaleSamples(samples, a.gain)
 	return transformSampleBuffer(cfg, samples)
-}
-
-func (a *App) getSamplesOld(cfg *audio.AudioConfig, n int) []int {
-	a.mtx.Lock()
-	defer a.mtx.Unlock()
-
-	var samps []float64
-	if a.generator != nil {
-		samps = a.generator.GenerateSamples(context.Background(), generator.SampleConfig{SampleRateHz: cfg.SampleRate}, n)
-	} else {
-		samps = make([]float64, n)
-	}
-
-	if a.nextGenerator != nil {
-		const fadeDuration = 0.2
-		nextSamps := a.nextGenerator.GenerateSamples(context.Background(), generator.SampleConfig{SampleRateHz: cfg.SampleRate}, n)
-		// fade between the two generators until fade is 1
-		for i := 0; i < n; i++ {
-			samps[i] = samps[i]*(1-a.fade) + nextSamps[i]*a.fade
-			a.fade += 1.0 / (fadeDuration * float64(cfg.SampleRate))
-			if a.fade >= 1 {
-				a.fade = 1
-			}
-		}
-		if a.fade >= 1 {
-			a.generator = a.nextGenerator
-			a.nextGenerator = nil
-			a.fade = 0
-		}
-	}
-
-	samps = scaleSamples(samps, a.gain)
-
-	a.fftBuffer = append(a.fftBuffer, samps...)
-	if len(a.fftBuffer) > 1024*4 {
-		a.fftBuffer = a.fftBuffer[len(a.fftBuffer)-1024*4:]
-	}
-	if time.Since(lastSpectrumCheck) > 2*time.Second {
-		pow, freqs := spectral.Pwelch(samps, float64(cfg.SampleRate), &spectral.PwelchOptions{})
-		res := make([]struct{ Freq, Power float64 }, len(pow))
-		var powerSum float64
-		for i := range pow {
-			res[i] = struct{ Freq, Power float64 }{freqs[i], pow[i]}
-			powerSum += pow[i]
-		}
-		sort.Slice(res, func(i, j int) bool {
-			return res[i].Power > res[j].Power
-		})
-
-		lastSpectrumCheck = time.Now()
-		a.fftBuffer = a.fftBuffer[:0]
-	}
-
-	return transformSampleBuffer(cfg, samps)
 }
 
 // startup is called when the app starts. The context is saved
@@ -581,12 +558,11 @@ func (a *App) startup(ctx context.Context) {
 
 		for {
 			select {
-			case evt, ok := <-watcher.Events:
+			case _, ok := <-watcher.Events:
 				if !ok {
 					return
 				}
 				a.updateSignalGraphFromScriptFile(a.synthFileName)
-				fmt.Println("event:", evt)
 			case err, ok := <-watcher.Errors:
 				if !ok {
 					return
@@ -668,7 +644,6 @@ func (a *App) updateSignalGraphFromScriptFile(filename string) {
 			}
 			a.outputChannel <- samplesMixed
 		}
-		fmt.Println("finished fade")
 
 		// stop the old graph and wait for it to finish
 		a.cancelGraph()
@@ -679,7 +654,6 @@ func (a *App) updateSignalGraphFromScriptFile(filename string) {
 		for {
 			select {
 			case <-sinkCtx.Done():
-				fmt.Println("sink context done")
 				return
 			case samples, ok := <-a.graphOutputChannel:
 				if !ok {
