@@ -104,6 +104,14 @@
                :sin (sin w)
                :noise (noise))))))
 
+(def (lfofreq lfoinfo w)
+  (let ((lfocfg (getval lfoinfo :cfg)))
+    (if (nil? (getval lfocfg :freq))
+        w
+        (let ((~lfo (getval lfoinfo :lfo))
+              (depth (getval lfocfg :depth)))
+          (+ (* depth ~lfo) w)))))
+
 ;;; Make a sound generator from a configuration. Configuration
 ;;; structure is defined in Fred Welsh's "Welsh's Synthesizer
 ;;; Cookbook."
@@ -118,7 +126,7 @@
           (~lfo (mklfo lfocfg)))
       (fn (w gate)
         (let ((lfoinfo (list :lfo (~lfo) :cfg lfocfg)))
-          (* (~amp gate) (~lpf (~osc w lfoinfo)))
+          (* (~amp gate) (~lpf (~osc (lfofreq lfoinfo w) lfoinfo)))
           )
         )
       )
@@ -180,7 +188,7 @@
         :lfo (list :route '(:osc1 :duty :osc2 :duty)
                    :wave :sin
                    :freq 4
-                   :depth 0.45)
+                   :depth 0.45) ;; TODO: confirm that we're interpreting this correctly for the duty cycle
         :lpf (list :cutoff 300
                    :res 0)
         :amp (list :attack 0.0001
@@ -188,3 +196,46 @@
                    :sustain 0.7
                    :release 6.35)))
 (def darkCity (mkwelsh darkCityConfig))
+
+(def vocalFemaleConfig
+  (list :osc (list (list :key :osc1
+                         :wave :sqr
+                         :duty 0.05
+                         :mix 1)
+                   (list :key :osc2
+                         :wave :sqr
+                         :duty 0.25
+                         :mix 0.65))
+        :lfo (list :route '(:freq :freq)
+                   :wave :tri
+                   :freq 2.4
+                   :depth (cents 20))
+        :lpf (list :cutoff 1200
+                   :res 0.5)
+        :amp (list :attack 0.32
+                   :decay  1 ;; author suggestion is max?
+                   :sustain 1
+                   :release 0.93)))
+(def vocalFemale (mkwelsh vocalFemaleConfig))
+
+(def vocalMaleConfig
+  (list :osc (list (list :key :osc1
+                         :wave :sqr
+                         :duty 0.15
+                         :detune (octaves -1)
+                         :mix 1)
+                   (list :key :osc2
+                         :wave :sqr
+                         :duty 0.25
+                         :mix 0.9)) ;; TODO: mix in decibels, not absolute percentages...
+        :lfo (list :route '(:freq :freq)
+                   :wave :tri
+                   :freq 2.4
+                   :depth (cents 20))
+        :lpf (list :cutoff 1200
+                   :res 0)
+        :amp (list :attack 0.32
+                   :decay  1 ;; author suggestion is max?
+                   :sustain 1
+                   :release 0.93)))
+(def vocalMale (mkwelsh vocalMaleConfig))
