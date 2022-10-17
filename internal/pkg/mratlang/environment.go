@@ -121,6 +121,8 @@ func (env *environment) evalList(n *value.List) (value.Value, error) {
 			return env.evalDef(n)
 		case "if":
 			return env.evalIf(n)
+		case "case":
+			return env.evalCase(n)
 		case "and":
 			return env.evalAnd(n)
 		case "or":
@@ -295,6 +297,41 @@ func (env *environment) evalIf(n *value.List) (value.Value, error) {
 
 	if len(n.Items) == 4 {
 		return env.Eval(n.Items[3])
+	}
+	return nil, nil
+}
+
+// cases use syntax and most of the semantics of Clojure's case (not Scheme's).
+// see https://clojuredocs.org/clojure.core/case
+func (env *environment) evalCase(n *value.List) (value.Value, error) {
+	if len(n.Items) < 4 {
+		return nil, env.errorf(n, "invalid case, need `case caseExp & caseClauses`")
+	}
+	cond, err := env.Eval(n.Items[1])
+	if err != nil {
+		return nil, err
+	}
+
+	cases := n.Items[2:]
+
+	for len(cases) >= 2 {
+		test, result := cases[0], cases[1]
+		cases = cases[2:]
+
+		testItems := []value.Value{test}
+		testList, ok := test.(*value.List)
+		if ok {
+			testItems = testList.Items
+		}
+
+		for _, testItem := range testItems {
+			if testItem.Equal(cond) {
+				return env.Eval(result)
+			}
+		}
+	}
+	if len(cases) == 1 {
+		return env.Eval(cases[0])
 	}
 	return nil, nil
 }
