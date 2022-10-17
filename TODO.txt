@@ -21,6 +21,7 @@ Either:
 *** DONE Low-pass Filter with cutoff and resonance parameters
 *** DONE triangle wave generator
 *** DONE pow to compute semitone ratios
+*** TODO oscillator phase sync (and about time to make phase a parameter)
 *** TODO ADSR, or sustain support for env
 *** TODO Envelope for LPF
 ** DONE quality of life special forms

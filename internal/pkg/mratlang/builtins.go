@@ -74,6 +74,7 @@ func init() {
 				funcSymbol("saw", sawBuiltin),
 				funcSymbol("sqr", sqrBuiltin),
 				funcSymbol("tri", triBuiltin),
+				funcSymbol("phasor", phasorBuiltin),
 				funcSymbol("noise", noiseBuiltin),
 			},
 		},
@@ -557,7 +558,7 @@ func trandBuiltin(env value.Environment, args []value.Value) (value.Value, error
 	}, nil
 }
 
-func sinBuiltin(env value.Environment, args []value.Value) (value.Value, error) {
+func phasorBuiltin(env value.Environment, args []value.Value) (value.Value, error) {
 	var freq graph.NodeID
 	if len(args) == 0 {
 		freq = env.Graph().AddGeneratorNode(generator.NewConstant(440), graph.WithLabel("440"))
@@ -568,53 +569,115 @@ func sinBuiltin(env value.Environment, args []value.Value) (value.Value, error) 
 		case *value.Gen:
 			freq = arg.NodeID
 		default:
-			return nil, fmt.Errorf("invalid type for sin frequency: %v", arg)
+			return nil, fmt.Errorf("invalid type for phasor frequency: %v", arg)
 		}
 	}
-	nodeID := env.Graph().AddGeneratorNode(wavtabs.Generator(wavtabs.Sin(1024)), graph.WithLabel("sin"))
+	nodeID := env.Graph().AddGeneratorNode(wavtabs.Generator(wavtabs.Phasor(1024)), graph.WithLabel("phasor"))
 	env.Graph().AddEdge(freq, nodeID, "w")
+	return &value.Gen{
+		NodeID: nodeID,
+	}, nil
+}
+
+func handleExtraGenArgs(env value.Environment, nodeID graph.NodeID, args []value.Value) error {
+	for len(args) > 0 {
+		if len(args) < 2 {
+			return fmt.Errorf("expected key-value pairs in extra arguments, got %v", args)
+		}
+		key, val := args[0], args[1]
+		args = args[2:]
+
+		kw, ok := key.(*value.Keyword)
+		if !ok {
+			return fmt.Errorf("expected keyword as key, got %v", key)
+		}
+		switch kw.Value {
+		case "phase":
+			phase, ok := asGen(env, val)
+			if !ok {
+				return fmt.Errorf("expected generator as phase, got %v", val)
+			}
+			env.Graph().AddEdge(phase.NodeID, nodeID, "phase")
+		case "sync":
+			sync, ok := asGen(env, val)
+			if !ok {
+				return fmt.Errorf("expected generator as sync, got %v", val)
+			}
+			env.Graph().AddEdge(sync.NodeID, nodeID, "sync")
+		default:
+			return fmt.Errorf("unknown key %v", kw.Value)
+		}
+	}
+	return nil
+}
+
+func sinBuiltin(env value.Environment, args []value.Value) (value.Value, error) {
+	nodeID := env.Graph().AddGeneratorNode(wavtabs.Generator(wavtabs.Sin(1024)), graph.WithLabel("sin"))
+	if len(args) == 0 {
+		return &value.Gen{
+			NodeID: nodeID,
+		}, nil
+	}
+
+	freq, ok := asGen(env, args[0])
+	if !ok {
+		return nil, fmt.Errorf("expected generator or number as the first argument, got %v", args[0])
+	}
+	env.Graph().AddEdge(freq.NodeID, nodeID, "w")
+	args = args[1:]
+
+	if err := handleExtraGenArgs(env, nodeID, args); err != nil {
+		return nil, err
+	}
+
 	return &value.Gen{
 		NodeID: nodeID,
 	}, nil
 }
 
 func sawBuiltin(env value.Environment, args []value.Value) (value.Value, error) {
-	var freq graph.NodeID
-	if len(args) == 0 {
-		freq = env.Graph().AddGeneratorNode(generator.NewConstant(440), graph.WithLabel("440"))
-	} else {
-		switch arg := args[0].(type) {
-		case *value.Num:
-			freq = env.Graph().AddGeneratorNode(generator.NewConstant(arg.Value), graph.WithLabel(fmt.Sprintf("%v", arg.Value)))
-		case *value.Gen:
-			freq = arg.NodeID
-		default:
-			return nil, fmt.Errorf("invalid type for saw frequency: %v", arg)
-		}
-	}
 	nodeID := env.Graph().AddGeneratorNode(wavtabs.Generator(wavtabs.Saw(1024)), graph.WithLabel("saw"))
-	env.Graph().AddEdge(freq, nodeID, "w")
+	if len(args) == 0 {
+		return &value.Gen{
+			NodeID: nodeID,
+		}, nil
+	}
+
+	freq, ok := asGen(env, args[0])
+	if !ok {
+		return nil, fmt.Errorf("expected generator or number as the first argument, got %v", args[0])
+	}
+	env.Graph().AddEdge(freq.NodeID, nodeID, "w")
+	args = args[1:]
+
+	if err := handleExtraGenArgs(env, nodeID, args); err != nil {
+		return nil, err
+	}
+
 	return &value.Gen{
 		NodeID: nodeID,
 	}, nil
 }
 
 func triBuiltin(env value.Environment, args []value.Value) (value.Value, error) {
-	var freq graph.NodeID
-	if len(args) == 0 {
-		freq = env.Graph().AddGeneratorNode(generator.NewConstant(440), graph.WithLabel("440"))
-	} else {
-		switch arg := args[0].(type) {
-		case *value.Num:
-			freq = env.Graph().AddGeneratorNode(generator.NewConstant(arg.Value), graph.WithLabel(fmt.Sprintf("%v", arg.Value)))
-		case *value.Gen:
-			freq = arg.NodeID
-		default:
-			return nil, fmt.Errorf("invalid type for tri frequency: %v", arg)
-		}
-	}
 	nodeID := env.Graph().AddGeneratorNode(wavtabs.Generator(wavtabs.Tri(1024)), graph.WithLabel("tri"))
-	env.Graph().AddEdge(freq, nodeID, "w")
+	if len(args) == 0 {
+		return &value.Gen{
+			NodeID: nodeID,
+		}, nil
+	}
+
+	freq, ok := asGen(env, args[0])
+	if !ok {
+		return nil, fmt.Errorf("expected generator or number as the first argument, got %v", args[0])
+	}
+	env.Graph().AddEdge(freq.NodeID, nodeID, "w")
+	args = args[1:]
+
+	if err := handleExtraGenArgs(env, nodeID, args); err != nil {
+		return nil, err
+	}
+
 	return &value.Gen{
 		NodeID: nodeID,
 	}, nil
@@ -630,9 +693,13 @@ func squareWaveSample(dutyCycle, phase float64) float64 {
 
 func NewSquareGenerator() generator.SampleGenerator {
 	phase := 0.0
+	lastSync := 0.0
 	return generator.SampleGeneratorFunc(func(ctx context.Context, cfg generator.SampleConfig, n int) []float64 {
 		dcs := cfg.InputSamples["dc"]
 		ws := cfg.InputSamples["w"]
+		phases := cfg.InputSamples["phase"]
+		syncs := cfg.InputSamples["sync"]
+
 		res := make([]float64, n)
 		for i := 0; i < n; i++ {
 			w := 440.0
@@ -643,40 +710,55 @@ func NewSquareGenerator() generator.SampleGenerator {
 			if i < len(dcs) {
 				dc = dcs[i]
 			}
+			if i < len(phases) {
+				phase = phases[i]
+			}
 			res[i] = squareWaveSample(dc, phase)
 			phase += w / float64(cfg.SampleRateHz)
+			// keep phase in [0, 1)
 			phase -= math.Floor(phase)
+
+			// sync on the falling edge of the sync input if present
+			if i < len(syncs) && syncs[i] < lastSync {
+				phase = 0.0
+				lastSync = syncs[i]
+			}
 		}
 		return res
 	})
 }
 
 func sqrBuiltin(env value.Environment, args []value.Value) (value.Value, error) {
-	var freq graph.NodeID
+	nodeID := env.Graph().AddGeneratorNode(NewSquareGenerator(), graph.WithLabel("sqr"))
 	if len(args) == 0 {
-		freq = env.Graph().AddGeneratorNode(generator.NewConstant(440), graph.WithLabel("440"))
-	} else {
-		gen, ok := asGen(env, args[0])
-		if !ok {
-			return nil, fmt.Errorf("invalid type for sin frequency: %v", args[0])
-		}
-		freq = gen.NodeID
-		args = args[1:]
-	}
-	var dutyCycle graph.NodeID
-	if len(args) == 0 {
-		dutyCycle = env.Graph().AddGeneratorNode(generator.NewConstant(0.5), graph.WithLabel("0.5"))
-	} else {
-		gen, ok := asGen(env, args[0])
-		if !ok {
-			return nil, fmt.Errorf("invalid type for saw duty cycle: %v", args[0])
-		}
-		dutyCycle = gen.NodeID
+		return &value.Gen{
+			NodeID: nodeID,
+		}, nil
 	}
 
-	nodeID := env.Graph().AddGeneratorNode(NewSquareGenerator(), graph.WithLabel("sqr"))
-	env.Graph().AddEdge(freq, nodeID, "w")
-	env.Graph().AddEdge(dutyCycle, nodeID, "dc")
+	freq, ok := asGen(env, args[0])
+	if !ok {
+		return nil, fmt.Errorf("invalid type for frequency: %v", args[0])
+	}
+	env.Graph().AddEdge(freq.NodeID, nodeID, "w")
+	args = args[1:]
+	if len(args) == 0 {
+		return &value.Gen{
+			NodeID: nodeID,
+		}, nil
+	}
+
+	dutyCycle, ok := asGen(env, args[0])
+	if !ok {
+		return nil, fmt.Errorf("invalid type for duty cycle: %v", args[0])
+	}
+	env.Graph().AddEdge(dutyCycle.NodeID, nodeID, "dc")
+	args = args[1:]
+
+	if err := handleExtraGenArgs(env, nodeID, args); err != nil {
+		return nil, err
+	}
+
 	return &value.Gen{
 		NodeID: nodeID,
 	}, nil
