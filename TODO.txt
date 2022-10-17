@@ -19,12 +19,14 @@ Either:
 ** DONE add support for feedback
 ** TODO Support building instruments from Welsh's Synthesizer Cookbook
 *** DONE Low-pass Filter with cutoff and resonance parameters
-*** TODO triangle wave generator
-*** TODO pow to compute semitone ratios
+*** DONE triangle wave generator
+*** DONE pow to compute semitone ratios
+*** TODO ADSR, or sustain support for env
 *** TODO Envelope for LPF
 ** DONE quality of life special forms
 *** DONE and/or
 *** DONE let
+*** DONE case
 ** TODO reload synth when any dependency changes
 ** TODO add a file picker to the UI
 ** TODO infrastructure to make it easier to export functions to lisp

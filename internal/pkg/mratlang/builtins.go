@@ -35,6 +35,7 @@ func init() {
 				funcSymbol("first", firstBuiltin),
 				funcSymbol("rest", restBuiltin),
 				// math functions
+				funcSymbol("pow", powBuiltin),
 				funcSymbol("*", mulBuiltin),
 				funcSymbol("/", divBuiltin),
 				funcSymbol("+", addBuiltin),
@@ -242,6 +243,21 @@ func notEmptyBuiltin(env value.Environment, args []value.Value) (value.Value, er
 		return nil, err
 	}
 	return notBuiltin(env, []value.Value{v})
+}
+
+func powBuiltin(env value.Environment, args []value.Value) (value.Value, error) {
+	if len(args) != 2 {
+		return nil, fmt.Errorf("pow expects 2 arguments, got %v", len(args))
+	}
+	a, ok := args[0].(*value.Num)
+	if !ok {
+		return nil, fmt.Errorf("pow expects a number, got %v", args[0])
+	}
+	b, ok := args[1].(*value.Num)
+	if !ok {
+		return nil, fmt.Errorf("pow expects a number, got %v", args[1])
+	}
+	return value.NewNum(math.Pow(a.Value, b.Value)), nil
 }
 
 func mulBuiltin(env value.Environment, args []value.Value) (value.Value, error) {

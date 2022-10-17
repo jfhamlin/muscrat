@@ -1,54 +1,153 @@
-(def ~lores mrat.effects.~lores)
+(load-file "./functional.mrat")
 
-;; (def (~mkwelsh o1 o2 lfo lpf env)
-;;   (let (osc (+ o1 o2)))
-
-(def ~env mrat.effects.env)
+;;; Make some functions easier to use.
+(def sin mrat.osc.sin)
+(def saw mrat.osc.saw)
+(def sqr mrat.osc.sqr)
 (def tri mrat.osc.tri)
+(def noise mrat.osc.noise)
 
-(def fivesemi 1.33483985417)
+(def ~lores mrat.effects.~lores)
+(def ~env mrat.effects.env)
 
-(def (wlfo) ;; frequency lowpass envelope
-  (tri 10)
-  )
+(def print mrat.core.io.print)
 
-(def (mkwelsh o1 o2 lfo lpf amp)
-  )
+;;; TODO: move to a library for music theory.
+(def (cents x) (pow 2 (/ x 1200)))
+(def (semitones x) (pow 2 (/ x 12)))
+(def (octaves x) (pow 2 x))
 
-(def (banjo w gate)
-  (let ((mixo1 1)
-        (mixo2 0.8)
-        (detune2 fivesemi)
-        (~lfo (wlfo))
-        (lfodepth 0.1)
-        (~lpf (fn (in) (~lores in 2900 0)))
-        (env (~env gate '(0 1 0) '(0.001 0.67)))
+;;; These should be in the standard library.
+(def nil '())
+(def (nil? x) (eq? x nil))
+
+;;; Helpers for grabbing key-value pairs from a list.
+(def (getval lst key)
+  (if (nil? lst)
+    nil
+    (if (eq? (first lst) key)
+      (first (rest lst))
+      (getval (rest lst) key))))
+
+(def (getvaldef lst key def)
+  (let ((v (getval lst key)))
+    (if (nil? v)
+      def
+      v)))
+
+;;; Generate sounds from configurations
+(def (mklpf cfg)
+  (let ((cutoff (getvaldef cfg :cutoff 1000))
+        (res (getvaldef cfg :res 0)))
+    (fn (in) (~lores in cutoff res))))
+
+(def (mkamp cfg)
+  (let ((attack (getvaldef cfg :attack 0))
+        (decay (getvaldef cfg :decay 0))
+        (sustain (getvaldef cfg :sustain 0))
+        (release (getvaldef cfg :release 0)))
+    (fn (gate) (~env gate (list 0 1 0) (list attack decay))))) ;; TODO: implement a real ADSR env
+
+(def (mkosc cfg)
+  (let ((oscs (map mkosc* cfg)))
+    (fn (w lfoinfo) (sum (map (fn (o) (o w lfoinfo)) oscs)))))
+
+(def (mkosc* cfg)
+  (let ((wave (getvaldef cfg :wave :tri))
+        (duty (getvaldef cfg :duty 0.5))
+        (mix (getvaldef cfg :mix 1))
+        (detune (getvaldef cfg :detune 1)))
+    (fn (w lfoinfo)
+      (let ((w (* w detune)))
+        (let ((duty (lfoduty lfoinfo duty)))
+        (* mix (case wave
+                 :tri (tri w)
+                 :sqr (sqr w duty)
+                 :saw (saw w)
+                 :sin (sin w)
+                 :noise (noise))))))))
+
+(def (mklfo cfg)
+  (if (nil? cfg)
+    nil
+    (let ((wave (getvaldef cfg :wave :tri))
+          (duty (getvaldef cfg :duty 0.5))
+          (w (getval cfg :freq)))
+      (fn () (case wave
+               :tri (tri w)
+               :sqr (sqr w duty)
+               :saw (saw w)
+               :sin (sin w)
+               :noise (noise))))))
+
+(def (mkwelsh cfg)
+  (let ((osccfg (getval cfg :osc))
+        (lpfcfg  (getval cfg :lpf))
+        (ampcfg  (getval cfg :amp))
+        (lfocfg  (getval cfg :lfo)))
+    (let ((~lpf (mklpf lpfcfg))
+          (~osc (mkosc osccfg))
+          (~amp (mkamp ampcfg))
+          (~lfo (mklfo lfocfg)))
+      (fn (w gate)
+        (let ((lfoinfo (list :lfo (~lfo) :cfg lfocfg)))
+          (* (~amp gate) (~lpf (~osc w lfoinfo)))
+          )
         )
-    (let
-        (
-         (~osc
-          (+ (* mixo1 (sqr w 0.2))
-             (* mixo2 (sqr (* w detune2) 0.1))
-             ))
-         (~amplfo (+ 1 (* lfodepth ~lfo)))
-         )
-      (* env (~lpf (* ~amplfo ~osc))))))
+      )
+    )
+  )
 
-;; (def (bongo w gate)
-;;   (let ((mixo1 1)
-;;         (mixo2 0.8)
-;;         (detune2 fivesemi)
-;;         (~lfo (wlfo))
-;;         (lfodepth 0.1)
-;;         (~lpf (fn (in) (~lores in 2900 0)))
-;;         (env (~env gate '(0 1 0) '(0.001 0.67)))
-;;         )
-;;     (let
-;;         (
-;;          (~osc
-;;           (+ (* mixo1 (sqr w 0.2))
-;;              (* mixo2 (sqr (* w detune2) 0.1))
-;;              ))
-;;          (~amplfo (+ 1 (* lfodepth ~lfo)))
-;;          )
-;;       (* env (~lpf (* ~amplfo ~osc))))))
+;;; TODO: i have no idea what the envelope value on the low-pass
+;;; filter is for.
+
+;;; Configurations and sample generator constructors.
+(def bongoConfig
+  (list :osc (list (list :wave :tri
+                         :mix 1)
+                   (list :wave :sqr
+                         :mix 0.65))
+        :lpf (list :cutoff 600
+                   :res 0
+                   :env 0.6)
+        :amp (list :attack 0.0001
+                   :decay 0.22
+                   :sustain 0
+                   :release 0.22)))
+(def bongo (mkwelsh bongoConfig))
+
+(def acidBassConfig
+  (list :osc (list (list :wave :sqr
+                         :duty 0.25
+                         :detune (cents 10)
+                         :mix 0.7)
+                   (list :wave :sqr
+                         :mix 1
+                         :detune (* (octaves -2) (cents -10))))
+        :lpf (list :cutoff 450
+                   :res 0.6)
+        :amp (list :attack 0.0001
+                   :decay 0.45
+                   :sustain 0.15
+                   :release 0.26)))
+(def acidBass (mkwelsh acidBassConfig))
+
+(def darkCityConfig
+  (list :osc (list (list :wave :sqr
+                         :duty 0.5
+                         :detune (octaves -2)
+                         :mix 1)
+                   (list :wave :saw
+                         :detune (* (semitones -11) (cents -92))
+                         :mix 1))
+        :lfo (list :route '(:osc1 :duty :osc2 :duty)
+                   :wave :sin
+                   :freq 4
+                   :depth 0.45)
+        :lpf (list :cutoff 300
+                   :res 0)
+        :amp (list :attack 0.0001
+                   :decay 3.9
+                   :sustain 0.7
+                   :release 6.35)))
+(def darkCity (mkwelsh darkCityConfig))
