@@ -9,8 +9,15 @@
 
 (def ~lores mrat.effects.~lores)
 (def ~env mrat.effects.env)
+(def clip mrat.effects.clip)
 
 (def print mrat.core.io.print)
+
+;;; Sawtooth wave but with a duty cycle parameter.
+(def (sawduty w duty)
+  (let ((min (+ 1 (* -2 (clip duty 0 1))))
+        (max 1))
+    (clip (saw w) min max)))
 
 ;;; TODO: move to a library for music theory.
 (def (cents x) (pow 2 (/ x 1200)))
@@ -41,6 +48,9 @@
         (res (getvaldef cfg :res 0)))
     (fn (in) (~lores in cutoff res))))
 
+;;; Make an amplitude envelope constructor from a configuration. The
+;;; returned constructor takes a gate signal and returns an envelope
+;;; generator that is triggered by the gate.
 (def (mkamp cfg)
   (let ((attack (getvaldef cfg :attack 0))
         (decay (getvaldef cfg :decay 0))
@@ -48,10 +58,23 @@
         (release (getvaldef cfg :release 0)))
     (fn (gate) (~env gate (list 0 1 0) (list attack decay))))) ;; TODO: implement a real ADSR env
 
+
 (def (mkosc cfg)
   (let ((oscs (map mkosc* cfg)))
     (fn (w lfoinfo) (sum (map (fn (o) (o w lfoinfo)) oscs)))))
 
+;;; If the LFO is configured to target this oscillator's duty cycle,
+;;; return the modulated duty cycle. Otherwise, return the original.
+(def (lfoduty lfoinfo key duty)
+  (let ((lfocfg (getval lfoinfo :cfg)))
+    (let ((route (getval (getval lfocfg :route) key)))
+      (if (or (nil? route) (not (eq? route :duty)))
+        duty
+        (let ((~lfo (getval lfoinfo :lfo))
+              (depth (getval lfocfg :depth)))
+          (* (+ 1 (* depth ~lfo)) duty))))))
+
+;;; Make an oscillator constructor from a configuration.
 (def (mkosc* cfg)
   (let ((wave (getvaldef cfg :wave :tri))
         (duty (getvaldef cfg :duty 0.5))
@@ -59,14 +82,15 @@
         (detune (getvaldef cfg :detune 1)))
     (fn (w lfoinfo)
       (let ((w (* w detune)))
-        (let ((duty (lfoduty lfoinfo duty)))
+        (let ((duty (lfoduty lfoinfo (getval cfg :key) duty)))
         (* mix (case wave
                  :tri (tri w)
                  :sqr (sqr w duty)
-                 :saw (saw w)
+                 :saw (sawduty w duty)
                  :sin (sin w)
                  :noise (noise))))))))
 
+;;; Make a low-frequency oscillator constructor from a configuration.
 (def (mklfo cfg)
   (if (nil? cfg)
     nil
@@ -80,6 +104,9 @@
                :sin (sin w)
                :noise (noise))))))
 
+;;; Make a sound generator from a configuration. Configuration
+;;; structure is defined in Fred Welsh's "Welsh's Synthesizer
+;;; Cookbook."
 (def (mkwelsh cfg)
   (let ((osccfg (getval cfg :osc))
         (lpfcfg  (getval cfg :lpf))
@@ -102,10 +129,13 @@
 ;;; filter is for.
 
 ;;; Configurations and sample generator constructors.
+
 (def bongoConfig
-  (list :osc (list (list :wave :tri
+  (list :osc (list (list :key :osc1
+                         :wave :tri
                          :mix 1)
-                   (list :wave :sqr
+                   (list :key :osc2
+                         :wave :sqr
                          :mix 0.65))
         :lpf (list :cutoff 600
                    :res 0
@@ -116,12 +146,16 @@
                    :release 0.22)))
 (def bongo (mkwelsh bongoConfig))
 
+;;; TODO: expose controls for modulating the cutoff frequency
+;;; dynamically.
 (def acidBassConfig
-  (list :osc (list (list :wave :sqr
+  (list :osc (list (list :key :osc1
+                         :wave :sqr
                          :duty 0.25
                          :detune (cents 10)
                          :mix 0.7)
-                   (list :wave :sqr
+                   (list :key :osc2
+                         :wave :sqr
                          :mix 1
                          :detune (* (octaves -2) (cents -10))))
         :lpf (list :cutoff 450
@@ -132,12 +166,15 @@
                    :release 0.26)))
 (def acidBass (mkwelsh acidBassConfig))
 
+;;; Dark Knight vibes.
 (def darkCityConfig
-  (list :osc (list (list :wave :sqr
+  (list :osc (list (list :key :osc1
+                         :wave :sqr
                          :duty 0.5
                          :detune (octaves -2)
                          :mix 1)
-                   (list :wave :saw
+                   (list :key :osc2
+                         :wave :saw
                          :detune (* (semitones -11) (cents -92))
                          :mix 1))
         :lfo (list :route '(:osc1 :duty :osc2 :duty)

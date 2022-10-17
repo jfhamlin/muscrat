@@ -745,12 +745,15 @@ func freeverbBuiltin(env value.Environment, args []value.Value) (value.Value, er
 	}, nil
 }
 
-func NewClipGenerator(min, max float64) generator.SampleGenerator {
-	// TODO: min and max should be inputs
+func NewClipGenerator() generator.SampleGenerator {
 	return generator.SampleGeneratorFunc(func(ctx context.Context, cfg generator.SampleConfig, n int) []float64 {
 		input := cfg.InputSamples["$0"]
+		mins := cfg.InputSamples["min"]
+		maxs := cfg.InputSamples["max"]
 		output := make([]float64, n)
 		for i := 0; i < n; i++ {
+			min := mins[0]
+			max := maxs[0]
 			output[i] = math.Max(min, math.Min(max, input[i]))
 		}
 		return output
@@ -766,16 +769,18 @@ func clipBuiltin(env value.Environment, args []value.Value) (value.Value, error)
 	if !ok {
 		return nil, fmt.Errorf("clip expects a Gen as the first argument, got %v", args[0])
 	}
-	min, ok := args[1].(*value.Num)
+	min, ok := asGen(env, args[1])
 	if !ok {
-		return nil, fmt.Errorf("clip expects a Num as the second argument, got %v", args[1])
+		return nil, fmt.Errorf("clip expects a gennable as the second argument, got %v", args[1])
 	}
-	max, ok := args[2].(*value.Num)
+	max, ok := asGen(env, args[2])
 	if !ok {
-		return nil, fmt.Errorf("clip expects a Num as the third argument, got %v", args[2])
+		return nil, fmt.Errorf("clip expects a gennable as the third argument, got %v", args[2])
 	}
-	nodeID := env.Graph().AddGeneratorNode(NewClipGenerator(min.Value, max.Value), graph.WithLabel("clip"))
+	nodeID := env.Graph().AddGeneratorNode(NewClipGenerator(), graph.WithLabel("clip"))
 	env.Graph().AddEdge(gen.NodeID, nodeID, "$0")
+	env.Graph().AddEdge(min.NodeID, nodeID, "min")
+	env.Graph().AddEdge(max.NodeID, nodeID, "max")
 	return &value.Gen{
 		NodeID: nodeID,
 	}, nil
