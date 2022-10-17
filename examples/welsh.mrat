@@ -5,6 +5,7 @@
 (def saw mrat.osc.saw)
 (def sqr mrat.osc.sqr)
 (def tri mrat.osc.tri)
+(def phasor mrat.osc.phasor)
 (def noise mrat.osc.noise)
 
 (def ~lores mrat.effects.~lores)
@@ -13,11 +14,25 @@
 
 (def print mrat.core.io.print)
 
+(def (cons car cdr) (concat (list car) cdr))
+
+(def (flatten lst)
+  (if (empty? lst)
+    lst
+    (if (list? (first lst))
+      (concat (flatten (first lst)) (flatten (rest lst)))
+      (cons (first lst) (flatten (rest lst))))))
+
+(def (oscrng osc min max)
+  (+ min
+     (/ (- max min) 2)
+     (* (/ (- max min) 2) osc)))
+
 ;;; Sawtooth wave but with a duty cycle parameter.
 (def (sawduty w duty)
   (let ((min (+ 1 (* -2 (clip duty 0 1))))
         (max 1))
-    (clip (saw w) min max)))
+    (clip (apply saw (cons w (rest (rest $args)))) min max)))
 
 ;;; TODO: move to a library for music theory.
 (def (cents x) (pow 2 (/ x 1200)))
@@ -32,9 +47,25 @@
 (def (getval lst key)
   (if (nil? lst)
     nil
+    (if (not (list? key))
+      (if (eq? (first lst) key)
+        (first (rest lst))
+        (getval (rest lst) key))
+      (let ((val (getval lst (first key))))
+        (if (nil? val)
+          nil
+          (if (empty? (rest key))
+            val
+            (getval val (rest key))))))))
+
+(def (haskeyval? lst key val)
+  (if (nil? lst)
+    #f
     (if (eq? (first lst) key)
-      (first (rest lst))
-      (getval (rest lst) key))))
+      (if (eq? (first (rest lst)) val)
+        #t
+        (haskeyval? (rest lst) key val))
+      (haskeyval? (rest lst) key val))))
 
 (def (getvaldef lst key def)
   (let ((v (getval lst key)))
@@ -43,62 +74,111 @@
       v)))
 
 ;;; Generate sounds from configurations
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; Make a low-pass filter constructor.
 (def (mklpf cfg)
-  (let ((cutoff (getvaldef cfg :cutoff 1000))
-        (res (getvaldef cfg :res 0)))
-    (fn (in) (~lores in cutoff res))))
+  (let ((cutoff (getvaldef cfg '(:lpf :cutoff) 1000))
+        (res (getvaldef cfg '(:lpf :res) 0)))
+    (fn (lfoinfo in)
+      (~lores in (getlfocutoff lfoinfo cutoff) (getlfores lfoinfo res)))))
 
 ;;; Make an amplitude envelope constructor from a configuration. The
 ;;; returned constructor takes a gate signal and returns an envelope
 ;;; generator that is triggered by the gate.
 (def (mkamp cfg)
-  (let ((attack (getvaldef cfg :attack 0))
-        (decay (getvaldef cfg :decay 0))
-        (sustain (getvaldef cfg :sustain 0))
-        (release (getvaldef cfg :release 0)))
-    (fn (gate) (~env gate (list 0 1 sustain 0) (list attack decay release))))) ;; TODO: implement a real ADSR env
+  (let ((ampcfg (getval cfg :amp)))
+    (let ((attack (getvaldef ampcfg :attack 0))
+          (decay (getvaldef ampcfg :decay 0))
+          (sustain (getvaldef ampcfg :sustain 0))
+          (release (getvaldef ampcfg :release 0)))
+      (fn (gate) (~env gate (list 0 1 sustain 0) (list attack decay release)))))) ;; TODO: implement a real ADSR env
 
+;; TODO: don't create phasors we don't need, and link up phasors to drive frequency of the dependent oscillators.
 
+(def (getoscphasor cfg w lfoinfo)
+  (let ((detune (getvaldef cfg :detune 1)))
+    (let ((w (* w detune))
+          (osckey (getval cfg :key)))
+      (let ((w (getlfofreq lfoinfo osckey w)))
+        (list osckey (phasor w))))))
+
+;;; Make an oscillator constructor for the given configuration.
 (def (mkosc cfg)
-  (let ((oscs (map mkosc* cfg)))
-    (fn (w lfoinfo) (sum (map (fn (o) (o w lfoinfo)) oscs)))))
+  (fn (w lfoinfo)
+    (let ((phasors (flatten (map (fn (oscCfg) (getoscphasor oscCfg w lfoinfo)) (getval cfg :osc)))))
+      (let ((oscs (map (fn (cfg) (mk~osc cfg phasors)) (getval cfg :osc))))
+        (sum (map (fn (~osc) (~osc w lfoinfo)) oscs))))))
 
 ;;; If the LFO is configured to target this oscillator's duty cycle,
 ;;; return the modulated duty cycle. Otherwise, return the original.
-(def (lfoduty lfoinfo key duty)
+(def (getlfoduty lfoinfo key duty)
   (let ((lfocfg (getval lfoinfo :cfg)))
-    (let ((route (getval (getval lfocfg :route) key)))
-      (if (or (nil? route) (not (eq? route :duty)))
-        duty
+    (if (not (haskeyval? (getval lfocfg :route) key :duty))
+      duty
+      (let ((~lfo (getval lfoinfo :lfo))
+            (depth (getval (getval lfocfg :depth) :duty)))
+        (* (+ 1 (* depth ~lfo)) duty)))))
+
+(def (getlfofreq lfoinfo key w)
+  (let ((lfocfg (getval lfoinfo :cfg)))
+    (if (not (haskeyval? (getval lfocfg :route) key :freq))
+        w
         (let ((~lfo (getval lfoinfo :lfo))
-              (depth (getval (getval lfocfg :depth) :duty)))
-          (* (+ 1 (* depth ~lfo)) duty))))))
+              (depth (getval (getval lfocfg :depth) :freq)))
+          (* (oscrng ~lfo (pow depth -1) depth) w)))))
+
+(def (getlfocutoff lfoinfo cutoff)
+  (let ((lfocfg (getval lfoinfo :cfg)))
+    (if (not (haskeyval? (getval lfocfg :route) :lpf :cutoff))
+      cutoff
+      (let ((~lfo (getval lfoinfo :lfo))
+            (depth (getval lfocfg '(:depth :cutoff))))
+        (* cutoff (+ 1 (* depth ~lfo)))))))
+
+(def (getlfores lfoinfo res)
+  (let ((lfocfg (getval lfoinfo :cfg)))
+    (if (not (haskeyval? (getval lfocfg :route) :lpf :res))
+      res
+      (let ((~lfo (getval lfoinfo :lfo))
+            (depth (getval lfocfg '(:depth :res))))
+        (* res (+ 1 (* depth (oscrng ~lfo -1 0))))))))
+
+(def (getsyncargs cfg phasors)
+  (let ((syncosc (getval cfg :sync)))
+    (if (nil? syncosc)
+      nil
+      (let ((syncph (getval phasors syncosc)))
+        (list :sync syncph)))))
 
 ;;; Make an oscillator constructor from a configuration.
-(def (mkosc* cfg)
+;;; - cfg is the configuration for this oscillator (not all).
+;;; - phasors is a key-value list of phasor generators for other oscillators, used for sync.
+(def (mk~osc cfg phasors)
   (let ((wave (getvaldef cfg :wave :tri))
         (duty (getvaldef cfg :duty 0.5))
         (mix (getvaldef cfg :mix 1))
-        (detune (getvaldef cfg :detune 1)))
+        (detune (getvaldef cfg :detune 1))
+        (syncargs (getsyncargs cfg phasors)))
     (fn (w lfoinfo)
       (let ((w (* w detune))
             (osckey (getval cfg :key)))
-        (let ((duty (lfoduty lfoinfo osckey duty))
-              (w    (lfofreq lfoinfo osckey w)))
-        (* mix (case wave
-                 :tri (tri w)
-                 :sqr (sqr w duty)
-                 :saw (sawduty w duty)
-                 :sin (sin w)
-                 :noise (noise))))))))
+        (let ((duty (getlfoduty lfoinfo osckey duty))
+              (w    (getlfofreq lfoinfo osckey w)))
+          (* mix (case wave
+                   :tri (apply tri (cons w syncargs))
+                   :sqr (apply sqr (concat (list w duty) syncargs))
+                   :saw (apply sawduty (concat (list w duty) syncargs))
+                   :sin (apply sin (cons w syncargs))
+                   :noise (noise))))))))
 
 ;;; Make a low-frequency oscillator constructor from a configuration.
 (def (mklfo cfg)
   (if (nil? cfg)
     nil
-    (let ((wave (getvaldef cfg :wave :tri))
-          (duty (getvaldef cfg :duty 0.5))
-          (w (getval cfg :freq)))
+    (let ((wave (getvaldef cfg '(:lfo :wave) :tri))
+          (duty (getvaldef cfg '(:lfo :duty) 0.5))
+          (w (getval cfg '(:lfo :freq))))
       (fn () (case wave
                :tri (tri w)
                :sqr (sqr w duty)
@@ -106,30 +186,17 @@
                :sin (sin w)
                :noise (noise))))))
 
-(def (lfofreq lfoinfo key w)
-  (let ((lfocfg (getval lfoinfo :cfg)))
-    (if (not (eq? (getval (getval lfocfg :route) key) :freq))
-        w
-        (let ((~lfo (getval lfoinfo :lfo))
-              (depth (getval (getval lfocfg :depth) :freq)))
-          (+ (* depth ~lfo) w)))))
-
 ;;; Make a sound generator from a configuration. Configuration
 ;;; structure is defined in Fred Welsh's "Welsh's Synthesizer
 ;;; Cookbook."
 (def (mkwelsh cfg)
-  (let ((osccfg (getval cfg :osc))
-        (lpfcfg  (getval cfg :lpf))
-        (ampcfg  (getval cfg :amp))
-        (lfocfg  (getval cfg :lfo)))
-    (let ((~lpf (mklpf lpfcfg))
-          (~osc (mkosc osccfg))
-          (~amp (mkamp ampcfg))
-          (~lfo (mklfo lfocfg)))
-      (fn (w gate)
-        (let ((lfoinfo (list :lfo (~lfo) :cfg lfocfg)))
-          (* (~amp gate) (~lpf (~osc w lfoinfo)))
-          )
+  (let ((~lpf (mklpf cfg))
+        (~osc (mkosc cfg))
+        (~amp (mkamp cfg))
+        (~lfo (mklfo cfg)))
+    (fn (w gate)
+      (let ((lfoinfo (list :lfo (~lfo) :cfg (getval cfg :lfo))))
+        (* (~amp gate) (~lpf lfoinfo (~osc w lfoinfo)))
         )
       )
     )
@@ -190,7 +257,7 @@
         :lfo (list :route '(:osc1 :duty :osc2 :duty)
                    :wave :sin
                    :freq 4
-                   :depth (list :duty 0.45)) ;; TODO: confirm that we're interpreting this correctly for the duty cycle
+                   :depth '(:duty 0.45)) ;; TODO: confirm that we're interpreting this correctly for the duty cycle
         :lpf (list :cutoff 300
                    :res 0)
         :amp (list :attack 0.0001
@@ -252,11 +319,15 @@
                          :wave :saw
                          :mix 1
                          :detune (semitones -1)
-                         :sync :osc1) ;; osc sync not yet supported
+                         :sync :osc1
+                         )
                    (list :key :noise
                          :wave :noise
                          :mix 0.9))
-        :lfo (list :route '(:osc1 :duty :osc2 :duty :lpf :cutoff :osc2 :freq)
+        :lfo (list :route (list :osc1 :duty
+                                :osc2 :duty
+                                :osc2 :freq
+                                :lpf :cutoff)
                    :wave :sin
                    :freq 0.25
                    :depth (list :duty .45
@@ -269,3 +340,19 @@
                    :sustain 1
                    :release 2.25)))
 (def androidDreams (mkwelsh androidDreamsConfig))
+
+(def celestialWashConfig
+  (list :osc (list (list :key :noise
+                         :wave :noise
+                         :mix 1))
+        :lfo (list :route (list :lpf :res)
+                   :wave :sqr
+                   :freq 5.5
+                   :depth '(:res 1))
+        :lpf (list :cutoff 1000
+                   :res 1)
+        :amp (list :attack 1.65
+                   :decay 5.85
+                   :sustain 0
+                   :release 4.40)))
+(def celestialWash (mkwelsh celestialWashConfig))

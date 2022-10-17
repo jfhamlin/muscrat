@@ -45,6 +45,7 @@ func init() {
 				funcSymbol("apply", applyBuiltin),
 				// test predicates
 				funcSymbol("eq?", eqBuiltin),
+				funcSymbol("list?", isListBuiltin),
 				funcSymbol("empty?", emptyBuiltin),
 				funcSymbol("not-empty?", notEmptyBuiltin),
 				// boolean functions
@@ -225,6 +226,14 @@ func eqBuiltin(env value.Environment, args []value.Value) (value.Value, error) {
 		return nil, fmt.Errorf("eq? expects 2 arguments, got %v", len(args))
 	}
 	return value.NewBool(args[0].Equal(args[1])), nil
+}
+
+func isListBuiltin(env value.Environment, args []value.Value) (value.Value, error) {
+	if len(args) != 1 {
+		return nil, fmt.Errorf("list? expects 1 argument, got %v", len(args))
+	}
+	_, ok := args[0].(*value.List)
+	return value.NewBool(ok), nil
 }
 
 func emptyBuiltin(env value.Environment, args []value.Value) (value.Value, error) {
@@ -719,8 +728,10 @@ func NewSquareGenerator() generator.SampleGenerator {
 			phase -= math.Floor(phase)
 
 			// sync on the falling edge of the sync input if present
-			if i < len(syncs) && syncs[i] < lastSync {
-				phase = 0.0
+			if i < len(syncs) {
+				if syncs[i] < lastSync {
+					phase = 0.0
+				}
 				lastSync = syncs[i]
 			}
 		}
@@ -882,9 +893,6 @@ func NewDelayGenerator() generator.SampleGenerator {
 		res := make([]float64, n)
 		in := cfg.InputSamples["$0"]
 
-		// var targetDelaySecs float64
-		// var targetDelaySamps float64
-		// var actualDelaySamps float64
 		for i := 0; i < n; i++ {
 			delaySeconds := cfg.InputSamples["delay"][i]
 			if delaySeconds < 0 {
@@ -937,13 +945,7 @@ func NewDelayGenerator() generator.SampleGenerator {
 				tape = tape[int(readHead):]
 				readHead = readHead - math.Floor(readHead)
 			}
-
-			// targetDelaySecs = delaySeconds
-			// targetDelaySamps = delaySamples
-			// actualDelaySamps = actualDelaySamples
 		}
-
-		// fmt.Printf("sample diff: %v, target delay sec: %v, target delay samps: %v, actual delay samps: %v, read head: %v\n, ratio: %v\n", targetDelaySamps-actualDelaySamps, targetDelaySecs, targetDelaySamps, actualDelaySamps, readHead, actualDelaySamps/targetDelaySamps)
 
 		return res
 	})

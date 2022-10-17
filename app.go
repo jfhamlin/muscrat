@@ -493,7 +493,7 @@ var (
 	grayscaleASCII    = []byte(" .:-=+*#%@")
 	grayscaleASCII70  = []byte(" .'`^\",:;Il!i><~+_-?][}{1)(|\\/tfjrxnuvczXYUJCLQ0OZmwqpdbkhao*#MW&8%B@$")
 
-	fftOn    = false
+	fftOn    = true
 	timingOn = false
 )
 

@@ -31,8 +31,10 @@ func Generator(wavtab Table) generator.SampleGenerator {
 			phase -= math.Floor(phase)
 
 			// sync on the falling edge of the sync input if present
-			if i < len(syncs) && syncs[i] < lastSync {
-				phase = 0.0
+			if i < len(syncs) {
+				if syncs[i] < lastSync {
+					phase = 0.0
+				}
 				lastSync = syncs[i]
 			}
 		}
