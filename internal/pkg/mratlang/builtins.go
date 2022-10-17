@@ -72,6 +72,7 @@ func init() {
 				funcSymbol("sin", sinBuiltin),
 				funcSymbol("saw", sawBuiltin),
 				funcSymbol("sqr", sqrBuiltin),
+				funcSymbol("tri", triBuiltin),
 				funcSymbol("noise", noiseBuiltin),
 			},
 		},
@@ -572,10 +573,31 @@ func sawBuiltin(env value.Environment, args []value.Value) (value.Value, error) 
 		case *value.Gen:
 			freq = arg.NodeID
 		default:
-			return nil, fmt.Errorf("invalid type for sin frequency: %v", arg)
+			return nil, fmt.Errorf("invalid type for saw frequency: %v", arg)
 		}
 	}
 	nodeID := env.Graph().AddGeneratorNode(wavtabs.Generator(wavtabs.Saw(1024)), graph.WithLabel("saw"))
+	env.Graph().AddEdge(freq, nodeID, "w")
+	return &value.Gen{
+		NodeID: nodeID,
+	}, nil
+}
+
+func triBuiltin(env value.Environment, args []value.Value) (value.Value, error) {
+	var freq graph.NodeID
+	if len(args) == 0 {
+		freq = env.Graph().AddGeneratorNode(generator.NewConstant(440), graph.WithLabel("440"))
+	} else {
+		switch arg := args[0].(type) {
+		case *value.Num:
+			freq = env.Graph().AddGeneratorNode(generator.NewConstant(arg.Value), graph.WithLabel(fmt.Sprintf("%v", arg.Value)))
+		case *value.Gen:
+			freq = arg.NodeID
+		default:
+			return nil, fmt.Errorf("invalid type for tri frequency: %v", arg)
+		}
+	}
+	nodeID := env.Graph().AddGeneratorNode(wavtabs.Generator(wavtabs.Tri(1024)), graph.WithLabel("tri"))
 	env.Graph().AddEdge(freq, nodeID, "w")
 	return &value.Gen{
 		NodeID: nodeID,

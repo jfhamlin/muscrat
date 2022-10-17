@@ -19,10 +19,13 @@ Either:
 ** DONE add support for feedback
 ** TODO Support building instruments from Welsh's Synthesizer Cookbook
 *** DONE Low-pass Filter with cutoff and resonance parameters
+*** TODO triangle wave generator
+*** TODO pow to compute semitone ratios
 *** TODO Envelope for LPF
 ** DONE quality of life special forms
 *** DONE and/or
 *** DONE let
+** TODO reload synth when any dependency changes
 ** TODO add a file picker to the UI
 ** TODO infrastructure to make it easier to export functions to lisp
 ** TODO Transition between graphs by mutating the graph and fading between altered nodes

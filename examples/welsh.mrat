@@ -1,0 +1,54 @@
+(def ~lores mrat.effects.~lores)
+
+;; (def (~mkwelsh o1 o2 lfo lpf env)
+;;   (let (osc (+ o1 o2)))
+
+(def ~env mrat.effects.env)
+(def tri mrat.osc.tri)
+
+(def fivesemi 1.33483985417)
+
+(def (wlfo) ;; frequency lowpass envelope
+  (tri 10)
+  )
+
+(def (mkwelsh o1 o2 lfo lpf amp)
+  )
+
+(def (banjo w gate)
+  (let ((mixo1 1)
+        (mixo2 0.8)
+        (detune2 fivesemi)
+        (~lfo (wlfo))
+        (lfodepth 0.1)
+        (~lpf (fn (in) (~lores in 2900 0)))
+        (env (~env gate '(0 1 0) '(0.001 0.67)))
+        )
+    (let
+        (
+         (~osc
+          (+ (* mixo1 (sqr w 0.2))
+             (* mixo2 (sqr (* w detune2) 0.1))
+             ))
+         (~amplfo (+ 1 (* lfodepth ~lfo)))
+         )
+      (* env (~lpf (* ~amplfo ~osc))))))
+
+;; (def (bongo w gate)
+;;   (let ((mixo1 1)
+;;         (mixo2 0.8)
+;;         (detune2 fivesemi)
+;;         (~lfo (wlfo))
+;;         (lfodepth 0.1)
+;;         (~lpf (fn (in) (~lores in 2900 0)))
+;;         (env (~env gate '(0 1 0) '(0.001 0.67)))
+;;         )
+;;     (let
+;;         (
+;;          (~osc
+;;           (+ (* mixo1 (sqr w 0.2))
+;;              (* mixo2 (sqr (* w detune2) 0.1))
+;;              ))
+;;          (~amplfo (+ 1 (* lfodepth ~lfo)))
+;;          )
+;;       (* env (~lpf (* ~amplfo ~osc))))))

@@ -1,0 +1,57 @@
+;; for map, reduce, etc.
+(load-file "./examples/functional.mrat")
+(load-file "./examples/notes.mrat")
+(load-file "./examples/bell.mrat")
+
+;; make a bunch of builtins available more concisely
+(def sin mrat.osc.sin)
+(def saw mrat.osc.saw)
+(def sqr mrat.osc.sqr)
+(def noise mrat.osc.noise)
+
+(def print mrat.core.io.print)
+
+(def freeverb mrat.effects.freeverb)
+(def delay mrat.effects.delay)
+(def clip mrat.effects.clip) ;; should remove from effects
+(def mixer mrat.effects.mixer) ;; should remove from effects
+(def trand mrat.math.rand.trand)
+(def env mrat.effects.env) ;; should remove from effects
+
+(def pulse
+  (env (sqr 0.5) '(0 1 1 0) '(0.1 0.1 1)))
+
+(def (shortpulse freq)
+  (env (sqr freq) '(0 2 2 0) '(0.01 0.02 0.02)))
+
+(def (firstn lst n)
+  (if (eq? n 0)
+    '()
+    (if (empty? lst)
+      '()
+      (concat (list (first lst)) (firstn (rest lst) (- n 1))))))
+
+(def (bellFreqs note) (map (fn (x) (* x note)) bellRatios))
+
+;;(def mysound (* pulse (sum (map saw (list C4 Eb4 Bb4)))))
+(def duty (+ 0.3 (* 0.2 (sin 4))))
+(def mysound
+  (* pulse
+     (apply mixer (map (fn (w) (sqr w duty))
+                       (apply concat (map bellFreqs (list C4 Eb4 Bb4)))))))
+
+;; (def mysound (sqr 440 duty))
+
+(def othersound (* pulse (sqr 440 (+ pulse 0.02))))
+(def noisy (sum (map (fn (freq) (* (shortpulse freq) (noise))) '(2 5))))
+
+(def mixed
+  (mixer ;;mysound
+         ;; othersound
+         mysound
+         (freeverb (+ othersound mysound noisy))
+         ;; (sin 440)
+         ;; noisy
+         ))
+
+(mrat.core.io.out (* 0.5 mixed))
