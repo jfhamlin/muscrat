@@ -557,6 +557,7 @@ func renderSpectrumHist(x []complex128, width, height int) string {
 		origIdx := math.Pow(10, float64(i)/(float64(len(freqs)-1))*math.Log10(float64(len(hx)))) - 1
 		freqs[i] = origIdx * sampleRate / 2 / float64(len(hx))
 	}
+
 	// throw out all bins with frequencies below 20 Hz
 	for i := 0; i < len(freqs); i++ {
 		if freqs[i] > 20 {
@@ -694,6 +695,13 @@ func (a *App) renderOscilloscope(samps []float64, width, height int) string {
 			}
 		}
 		lastY = y
+	}
+
+	maxStr := fmt.Sprintf("%.2f", maxAbsVal)
+	grid[len(grid)-1][1] = '-'
+	for i, rune := range maxStr {
+		grid[0][i+1] = rune
+		grid[len(grid)-1][i+2] = rune
 	}
 
 	builder := strings.Builder{}

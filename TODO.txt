@@ -17,6 +17,10 @@ Either:
 *** DONE skeleton for parser
 *** DONE define and implement a basic type system
 ** DONE add support for feedback
+** DONE quality of life special forms
+*** DONE and/or
+*** DONE let
+*** DONE case
 ** TODO Support building instruments from Welsh's Synthesizer Cookbook
 *** DONE Low-pass Filter with cutoff and resonance parameters
 *** DONE triangle wave generator
@@ -27,10 +31,7 @@ Either:
 *** TODO fix LFO range. should probably be unipolar.
 *** TODO ADSR, or sustain support for env
 *** TODO Envelope for LPF
-** DONE quality of life special forms
-*** DONE and/or
-*** DONE let
-*** DONE case
+** TODO Fix spectrograph frequency labels
 ** TODO reload synth when any dependency changes
 ** TODO add a file picker to the UI
 ** TODO infrastructure to make it easier to export functions to lisp
