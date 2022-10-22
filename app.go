@@ -23,6 +23,7 @@ import (
 	"github.com/jfhamlin/muscrat/internal/pkg/graph"
 	"github.com/jfhamlin/muscrat/internal/pkg/mratlang"
 	"github.com/jfhamlin/muscrat/internal/pkg/notes"
+	"github.com/jfhamlin/muscrat/internal/pkg/plot"
 	"github.com/jfhamlin/muscrat/internal/pkg/wavtabs"
 
 	"github.com/jfhamlin/muscrat/pkg/freeverb"
@@ -79,6 +80,9 @@ func NewApp() *App {
 		outputChannel:            make(chan []float64, 4), // buffer four packets of samples
 		synthFileName:            "synth.mrat",
 		gain:                     0.25,
+		showSpectrum:             true,
+		showSpectrumHist:         true,
+		showOscilloscope:         true,
 		oscilloscopeWindow:       1.0 / 440,
 		oscilloscopeUpdateFreqHz: 1,
 	}
@@ -552,6 +556,7 @@ func renderSpectrumLine(x []complex128, width int) string {
 func renderSpectrumHist(x []complex128, width, height int) string {
 	hx := x[:len(x)/2]
 
+	// the frequencies in the output are spaced logarithmically.
 	freqs := make([]float64, len(hx))
 	for i := 0; i < len(freqs); i++ {
 		origIdx := math.Pow(10, float64(i)/(float64(len(freqs)-1))*math.Log10(float64(len(hx)))) - 1
@@ -569,12 +574,10 @@ func renderSpectrumHist(x []complex128, width, height int) string {
 
 	abs := make([]float64, width-3)
 	for i := 0; i < len(hx); i++ {
-		// map to [0, 255] in abs with a logaritmic scale so that more
-		// resolution is given to the lower frequencies.
 		t := float64(len(abs)-1) * math.Log10(float64(i+1)) / math.Log10(float64(len(hx)))
 		floorT := float64(int(t))
 		t -= floorT
-		val := cmplx.Abs(x[i])
+		val := cmplx.Abs(hx[i])
 		abs[int(floorT)] += (1 - t) * val
 		if floorT < float64(len(abs)-1) {
 			abs[int(floorT)+1] += t * val
@@ -646,74 +649,7 @@ func renderSpectrumHist(x []complex128, width, height int) string {
 }
 
 func (a *App) renderOscilloscope(samps []float64, width, height int) string {
-	maxAbsVal := math.Inf(-1)
-	for _, samp := range samps {
-		maxAbsVal = math.Max(maxAbsVal, math.Abs(samp))
-	}
-	grid := make([][]rune, height-2)
-	for i := 0; i < len(grid); i++ {
-		grid[i] = make([]rune, width)
-		for j := 0; j < len(grid[i]); j++ {
-			grid[i][j] = ' '
-		}
-		grid[i][0] = '|'
-		grid[i][len(grid[i])-2] = '|'
-		grid[i][len(grid[i])-1] = '\n'
-	}
-
-	// zero is always at the center
-	zero := (height - 2) / 2
-	// draw a dashed line at zero
-	for i := 1; i < len(grid[zero])-2; i++ {
-		if i%2 == 0 {
-			grid[zero][i] = '-'
-		}
-	}
-
-	lastY := zero
-	for i := 0; i < len(grid[0])-3; i++ {
-		x := float64(i) / float64(len(grid[0])-3)
-		idx := int(x * float64(len(samps)))
-		y := zero - int(samps[idx]/maxAbsVal*float64(zero))
-		if y < 0 {
-			y = 0
-		}
-		if y >= len(grid)-2 {
-			y = len(grid) - 3
-		}
-		grid[y][i+1] = 'O'
-		if i > 0 && y != lastY {
-			// draw a line from the last point to this point
-			if y > lastY {
-				for j := lastY + 1; j <= y; j++ {
-					grid[j][i+1] = 'o'
-				}
-			} else {
-				for j := y + 1; j <= lastY; j++ {
-					grid[j][i+1] = 'o'
-				}
-			}
-		}
-		lastY = y
-	}
-
-	maxStr := fmt.Sprintf("%.2f", maxAbsVal)
-	grid[len(grid)-1][1] = '-'
-	for i, rune := range maxStr {
-		grid[0][i+1] = rune
-		grid[len(grid)-1][i+2] = rune
-	}
-
-	builder := strings.Builder{}
-	builder.WriteString(strings.Repeat("-", width-1))
-	builder.WriteRune('\n')
-	for _, row := range grid {
-		for _, cell := range row {
-			builder.WriteRune(cell)
-		}
-	}
-	builder.WriteString(strings.Repeat("-", width-1))
-	return builder.String()
+	return plot.LineChart(samps, width, height)
 }
 
 func (a *App) spectrumWorker() {
@@ -725,7 +661,7 @@ func (a *App) spectrumWorker() {
 	lastOscilloscopeRender := time.Now()
 	var lastOscilloscopeFrame string
 	for {
-		oscilloscopeRenderInterval := time.Duration(1/a.oscilloscopeUpdateFreqHz) * time.Second
+		oscilloscopeRenderInterval := time.Duration(1 / a.oscilloscopeUpdateFreqHz * float64(time.Second))
 
 		width, height, err := term.GetSize(int(os.Stdout.Fd()))
 		if err != nil || (!a.showOscilloscope && !a.showSpectrum) {
@@ -765,6 +701,7 @@ func (a *App) spectrumWorker() {
 			fmt.Print(builder.String())
 			continue
 		}
+		builder.WriteRune('\n')
 		// apply a Bartlett window to the samples to reduce the spectral
 		// leakage.
 		for i := 0; i < len(samps); i++ {

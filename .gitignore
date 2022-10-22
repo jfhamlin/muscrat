@@ -2,3 +2,5 @@ build/bin
 build/darwin
 node_modules
 frontend/dist
+
+*~

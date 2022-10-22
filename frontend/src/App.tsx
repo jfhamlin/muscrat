@@ -20,10 +20,10 @@ function App() {
   const [graphSeqNum, setGraphSeqNum] = useState(0);
   const [graphDot, setGraphDot] = useState<string|undefined>();
 
-  const [showFFT, setShowFFT] = useState(false);
-  const [showFFTHist, setShowFFTHist] = useState(false);
+  const [showFFT, setShowFFT] = useState(true);
+  const [showFFTHist, setShowFFTHist] = useState(true);
 
-  const [showOscilloscope, setShowOscilloscope] = useState(false);
+  const [showOscilloscope, setShowOscilloscope] = useState(true);
   const [oscilloscopeWindow, setOscilloscopeWindow] = useState(0.01);
   const [oscilloscopeFreq, setOscilloscopeFreq] = useState(1);
 
