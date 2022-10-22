@@ -40,32 +40,32 @@ func Generator(wavtab Table, opts ...GeneratorOption) generator.SampleGenerator 
 		dcs := cfg.InputSamples["dc"]
 
 		res := make([]float64, n)
-		w := 440.0 // default frequency
-		dc := options.defaultDutyCycle
 		for i := 0; i < n; i++ {
 			if i < len(phases) {
 				phase = phases[i]
 			}
+			dc := options.defaultDutyCycle
 			if i < len(dcs) {
 				dc = dcs[i]
-				if dc < 0 {
-					dc = 0
-				}
-				if dc > 1 {
-					dc = 1
-				}
+				// if dc < 0 {
+				// 	dc = 0
+				// }
+				// if dc > 1 {
+				// 	dc = 1
+				// }
 			}
 			if dc == 0 {
 				res[i] = wavtab[0]
-				continue
+			} else {
+				t := (phase - math.Floor(phase)) / dc
+				if t > 1 {
+					res[i] = wavtab[len(wavtab)-1]
+				} else {
+					res[i] = wavtab.Lerp(t)
+				}
 			}
-			t := phase / dc
-			if t > 1 {
-				res[i] = wavtab[len(wavtab)-1]
-				continue
-			}
-			res[i] = wavtab.Lerp(t)
 
+			w := 440.0 // default frequency
 			if i < len(ws) {
 				w = ws[i]
 			}

@@ -18,6 +18,18 @@ export function SetGain(arg1) {
   return window['go']['main']['App']['SetGain'](arg1);
 }
 
+export function SetOscilloscopeFreq(arg1) {
+  return window['go']['main']['App']['SetOscilloscopeFreq'](arg1);
+}
+
+export function SetOscilloscopeWindow(arg1) {
+  return window['go']['main']['App']['SetOscilloscopeWindow'](arg1);
+}
+
+export function SetShowOscilloscope(arg1) {
+  return window['go']['main']['App']['SetShowOscilloscope'](arg1);
+}
+
 export function SetShowSpectrum(arg1) {
   return window['go']['main']['App']['SetShowSpectrum'](arg1);
 }

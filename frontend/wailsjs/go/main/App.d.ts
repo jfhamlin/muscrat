@@ -10,6 +10,12 @@ export function RegisterWaveformCallback(arg1:main.WaveformCallback):Promise<voi
 
 export function SetGain(arg1:number):Promise<void>;
 
+export function SetOscilloscopeFreq(arg1:number):Promise<void>;
+
+export function SetOscilloscopeWindow(arg1:number):Promise<void>;
+
+export function SetShowOscilloscope(arg1:boolean):Promise<void>;
+
 export function SetShowSpectrum(arg1:boolean):Promise<void>;
 
 export function SetShowSpectrumHist(arg1:boolean):Promise<void>;

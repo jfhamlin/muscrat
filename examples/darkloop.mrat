@@ -1,0 +1,59 @@
+;; for map, reduce, etc.
+(load-file "./examples/functional.mrat")
+(load-file "./examples/notes.mrat")
+(load-file "./examples/bell.mrat")
+(load-file "./examples/welsh.mrat")
+
+;; make a bunch of builtins available more concisely
+(def sin mrat.osc.sin)
+(def saw mrat.osc.saw)
+(def sqr mrat.osc.sqr)
+(def noise mrat.osc.noise)
+(def phasor mrat.osc.phasor)
+
+
+(def print mrat.core.io.print)
+
+(def freeverb mrat.effects.freeverb)
+(def delay mrat.effects.delay)
+(def clip mrat.effects.clip) ;; should remove from effects
+(def mixer mrat.effects.mixer) ;; should remove from effects
+(def trand mrat.math.rand.trand)
+(def env mrat.effects.env) ;; should remove from effects
+(def ~lores mrat.effects.~lores) ;; should remove from effects
+
+(def (oscrng osc min max)
+  (+ min
+     (/ (- max min) 2)
+     (* (/ (- max min) 2) osc)))
+
+(def feedback (~pipe))
+
+(def gate (sqr 2))
+
+(def sound (+
+            (darkCity C3 gate)
+            (~lores (* (clip gate 0 1) (vocalFemale 260 gate)) (+ 275 (* 400 (sin 0.5))) 0.9)
+            (~lores (* 0.1 (clip (* (sin 0.5) gate) 0 1) (noise)) 1700 0.85)
+            ))
+
+(def clipval (+ 2 (tri 1)))
+
+(def reverb (* 1 (freeverb (+ sound feedback))))
+
+(pipeset feedback (delay (~lores (* 0.25 reverb)
+                          (oscrng (sin 0.2) 300 600)
+                          0.92)
+                         0.2))
+
+(def amp (phasor 0.02))
+
+(mrat.core.io.out (* amp
+                     (mixer
+                      (* 2 (clip sound (* -1 clipval) clipval))
+                      reverb
+                      ;; (sin 655)
+                      ;;(~lores (noise) (+ 440 (oscrng (sin 0.1) -100 500)) 0.95)
+                      ;; (clip (freeverb (sin (+ 440 (* 400 (sin 1))))) -0.5 0.5)
+                      )))
+

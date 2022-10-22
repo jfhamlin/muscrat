@@ -75,6 +75,7 @@ func init() {
 				funcSymbol("saw", sawBuiltin),
 				funcSymbol("sqr", sqrBuiltin),
 				funcSymbol("tri", triBuiltin),
+				funcSymbol("pulse", pulseBuiltin),
 				funcSymbol("phasor", phasorBuiltin),
 				funcSymbol("noise", noiseBuiltin),
 			},
@@ -613,6 +614,12 @@ func handleExtraGenArgs(env value.Environment, nodeID graph.NodeID, args []value
 				return fmt.Errorf("expected generator as sync, got %v", val)
 			}
 			env.Graph().AddEdge(sync.NodeID, nodeID, "sync")
+		case "duty":
+			duty, ok := asGen(env, val)
+			if !ok {
+				return fmt.Errorf("expected generator as duty cycle, got %v", val)
+			}
+			env.Graph().AddEdge(duty.NodeID, nodeID, "dc")
 		default:
 			return fmt.Errorf("unknown key %v", kw.Value)
 		}
@@ -692,55 +699,44 @@ func triBuiltin(env value.Environment, args []value.Value) (value.Value, error) 
 	}, nil
 }
 
-func squareWaveSample(dutyCycle, phase float64) float64 {
-	phase = phase - math.Floor(phase)
-	if phase < dutyCycle {
-		return 1
-	}
-	return -1
-}
-
-func NewSquareGenerator() generator.SampleGenerator {
-	phase := 0.0
-	lastSync := 0.0
-	return generator.SampleGeneratorFunc(func(ctx context.Context, cfg generator.SampleConfig, n int) []float64 {
-		dcs := cfg.InputSamples["dc"]
-		ws := cfg.InputSamples["w"]
-		phases := cfg.InputSamples["phase"]
-		syncs := cfg.InputSamples["sync"]
-
-		res := make([]float64, n)
-		for i := 0; i < n; i++ {
-			w := 440.0
-			dc := 0.5
-			if i < len(ws) {
-				w = ws[i]
-			}
-			if i < len(dcs) {
-				dc = dcs[i]
-			}
-			if i < len(phases) {
-				phase = phases[i]
-			}
-			res[i] = squareWaveSample(dc, phase)
-			phase += w / float64(cfg.SampleRateHz)
-			// keep phase in [0, 1)
-			phase -= math.Floor(phase)
-
-			// sync on the falling edge of the sync input if present
-			if i < len(syncs) {
-				if syncs[i] < lastSync {
-					phase = 0.0
-				}
-				lastSync = syncs[i]
-			}
-		}
-		return res
-	})
-}
-
 func sqrBuiltin(env value.Environment, args []value.Value) (value.Value, error) {
-	nodeID := env.Graph().AddGeneratorNode(NewSquareGenerator(), graph.WithLabel("sqr"))
+	nodeID := env.Graph().AddGeneratorNode(wavtabs.Generator(wavtabs.Pulse(1024), wavtabs.WithDefaultDutyCycle(0.5)), graph.WithLabel("sqr"))
+	if len(args) == 0 {
+		return &value.Gen{
+			NodeID: nodeID,
+		}, nil
+	}
+
+	freq, ok := asGen(env, args[0])
+	if !ok {
+		return nil, fmt.Errorf("invalid type for frequency: %v", args[0])
+	}
+	env.Graph().AddEdge(freq.NodeID, nodeID, "w")
+	args = args[1:]
+	if len(args) == 0 {
+		return &value.Gen{
+			NodeID: nodeID,
+		}, nil
+	}
+
+	dutyCycle, ok := asGen(env, args[0])
+	if !ok {
+		return nil, fmt.Errorf("invalid type for duty cycle: %v", args[0])
+	}
+	env.Graph().AddEdge(dutyCycle.NodeID, nodeID, "dc")
+	args = args[1:]
+
+	if err := handleExtraGenArgs(env, nodeID, args); err != nil {
+		return nil, err
+	}
+
+	return &value.Gen{
+		NodeID: nodeID,
+	}, nil
+}
+
+func pulseBuiltin(env value.Environment, args []value.Value) (value.Value, error) {
+	nodeID := env.Graph().AddGeneratorNode(wavtabs.Generator(wavtabs.Pulse(1024), wavtabs.WithDefaultDutyCycle(0.5)), graph.WithLabel("pulse"))
 	if len(args) == 0 {
 		return &value.Gen{
 			NodeID: nodeID,
