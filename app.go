@@ -20,6 +20,7 @@ import (
 
 	"github.com/fsnotify/fsnotify"
 	"github.com/mjibson/go-dsp/fft"
+	"golang.org/x/term"
 
 	"github.com/jfhamlin/muscrat/internal/pkg/generator"
 	"github.com/jfhamlin/muscrat/internal/pkg/graph"
@@ -52,7 +53,8 @@ type App struct {
 	nextGenerator generator.SampleGenerator
 	fade          float64
 
-	fftBuffer []float64
+	showSpectrum     bool
+	showSpectrumHist bool
 
 	waveformCallback WaveformCallback
 
@@ -76,6 +78,7 @@ func NewApp() *App {
 		outputChannel: make(chan []float64, 4), // buffer four packets of samples
 		synthFileName: "synth.mrat",
 		gain:          0.25,
+		showSpectrum:  true,
 	}
 }
 
@@ -489,13 +492,168 @@ func scaleSamples(buf []float64, gain float64) []float64 {
 }
 
 var (
-	lastSpectrumCheck time.Time
-	grayscaleASCII    = []byte(" .:-=+*#%@")
-	grayscaleASCII70  = []byte(" .'`^\",:;Il!i><~+_-?][}{1)(|\\/tfjrxnuvczXYUJCLQ0OZmwqpdbkhao*#MW&8%B@$")
+	grayscaleASCII   = []byte(" .:-=+*#%@")
+	grayscaleASCII70 = []byte(" .'`^\",:;Il!i><~+_-?][}{1)(|\\/tfjrxnuvczXYUJCLQ0OZmwqpdbkhao*#MW&8%B@$")
 
 	fftOn    = true
 	timingOn = false
+
+	fftChan = make(chan []float64, 2)
 )
+
+func renderSpectrumLine(x []complex128, width int) string {
+	abs := make([]float64, width)
+	// group pairs of bins. ignore the top half of the spectrum.
+	for i := 0; i < len(x)/2; i++ {
+		// map to [0, 255] in abs with a logaritmic scale so that more
+		// resolution is given to the lower frequencies.
+		t := float64(len(abs)-1) * math.Log10(float64(i+1)) / math.Log10(float64(len(x)/2))
+		floorT := float64(int(t))
+		t -= floorT
+		val := cmplx.Abs(x[i])
+		abs[int(floorT)] += (1 - t) * val
+		if floorT < float64(len(abs)-1) {
+			abs[int(floorT)+1] += t * val
+		}
+	}
+
+	for i := 0; i < len(abs); i++ {
+		abs[i] = math.Log10(abs[i] + 1)
+	}
+
+	maxVal := 0.0
+	for i := 0; i < len(abs); i++ {
+		maxVal = math.Max(maxVal, abs[i])
+	}
+	const lines = 10
+
+	builder := strings.Builder{}
+	builder.WriteRune('|')
+	for i := 0; i < len(abs); i++ {
+		val := abs[i]
+		if val < 0.1 {
+			val = 0
+		}
+		builder.WriteByte(grayscaleASCII70[int((val/maxVal)*float64(len(grayscaleASCII70)-1))])
+	}
+	builder.WriteRune('|')
+	return builder.String()
+}
+
+func renderSpectrumHist(x []complex128, width, height int) string {
+	// Render an ASCII histogram of the spectrum with a logarithmic
+	// scale. The bottom line should show frequency labels.
+
+	hx := x[:len(x)/2]
+	abs := make([]float64, width-3)
+	for i := 0; i < len(hx); i++ {
+		// map to [0, 255] in abs with a logaritmic scale so that more
+		// resolution is given to the lower frequencies.
+		t := float64(len(abs)-1) * math.Log10(float64(i+1)) / math.Log10(float64(len(hx)))
+		floorT := float64(int(t))
+		t -= floorT
+		val := cmplx.Abs(x[i])
+		abs[int(floorT)] += (1 - t) * val
+		if floorT < float64(len(abs)-1) {
+			abs[int(floorT)+1] += t * val
+		}
+	}
+
+	for i := 0; i < len(abs); i++ {
+		abs[i] = math.Log10(abs[i] + 1)
+	}
+
+	maxVal := 0.0
+	for i := 0; i < len(abs); i++ {
+		maxVal = math.Max(maxVal, abs[i])
+	}
+
+	graphHeight := height - 4
+
+	builder := strings.Builder{}
+	builder.WriteRune('\n')
+	builder.WriteString(strings.Repeat("-", width-1))
+	builder.WriteRune('\n')
+	for i := 0; i < graphHeight; i++ {
+		builder.WriteRune('|')
+		for j := 0; j < len(abs); j++ {
+			if abs[j]/maxVal >= (float64(graphHeight-i)+0.5)/float64(graphHeight) {
+				builder.WriteByte('#')
+			} else {
+				builder.WriteByte(' ')
+			}
+		}
+		builder.WriteRune('|')
+		builder.WriteRune('\n')
+	}
+	builder.WriteString(strings.Repeat("-", width-1))
+	builder.WriteRune('\n')
+
+	const sampleRate = 44100
+	absFreq := make([]float64, len(abs))
+	for i := 0; i < len(absFreq); i++ {
+		origIdx := math.Pow(10, float64(i)/(float64(len(absFreq)-1))*math.Log10(float64(len(hx)))) - 1
+		absFreq[i] = origIdx * sampleRate / 2 / float64(len(hx))
+	}
+
+	// draw frequency labels. assume 44100 Hz sample rate. frequencies
+	// are between 0 and 22050 Hz.
+	numIndexes := (width - 1) / 10 // 10 characters per label
+	labelIndexes := make([]int, numIndexes)
+	labelIndexes[0] = 0
+	labelIndexes[numIndexes-1] = len(absFreq) - 1
+	for i := 1; i < numIndexes-1; i++ {
+		labelIndexes[i] = i * len(absFreq) / numIndexes
+	}
+	labelStrings := make([]string, len(labelIndexes))
+	for i, idx := range labelIndexes {
+		labelStrings[i] = fmt.Sprintf("%d", int(absFreq[idx]))
+	}
+	offset := 0
+	for i := 0; i < len(labelStrings); i++ {
+		if i == len(labelStrings)-1 {
+			builder.WriteString(strings.Repeat(" ", width-1-offset-len(labelStrings[i])))
+		} else if i > 0 {
+			off := i*(width-1)/(len(labelStrings)-1) - len(labelStrings[i])/2 - offset
+			if off <= 0 {
+				continue
+			}
+			offset += off
+			builder.WriteString(strings.Repeat(" ", off))
+		}
+		builder.WriteString(labelStrings[i])
+		offset += len(labelStrings[i])
+	}
+
+	builder.WriteRune('\n')
+	builder.WriteString(strings.Repeat(" ", (width-1)/2-3))
+	builder.WriteString("Hz")
+	return builder.String()
+}
+
+func (a *App) spectrumWorker() {
+	if !term.IsTerminal(int(os.Stdout.Fd())) {
+		fmt.Println("not a terminal")
+		return
+	}
+	for {
+		samps := <-fftChan
+		samps = append(samps, (<-fftChan)...)
+		if !a.showSpectrum {
+			continue
+		}
+		x := fft.FFTReal(samps)
+		width, height, err := term.GetSize(int(os.Stdout.Fd()))
+		if err != nil {
+			continue
+		}
+		if a.showSpectrumHist {
+			fmt.Print(renderSpectrumHist(x, width, height))
+		} else {
+			fmt.Println(renderSpectrumLine(x, width-2))
+		}
+	}
+}
 
 func (a *App) getSamples(cfg *audio.AudioConfig, n int) []int {
 	if timingOn {
@@ -508,34 +666,10 @@ func (a *App) getSamples(cfg *audio.AudioConfig, n int) []int {
 	}
 
 	samples := <-a.outputChannel
-	if fftOn && time.Since(lastSpectrumCheck) > time.Second/60 {
-		go func() {
-			lastSpectrumCheck = time.Now()
-			x := fft.FFTReal(samples)
-			abs := make([]float64, len(x)/4)
 
-			// group pairs of bins. ignore the top half of the spectrum.
-			for i := 0; i < len(x)/4; i++ {
-				abs[i] = cmplx.Abs(x[2*i]) + cmplx.Abs(x[2*i+1])
-			}
-			maxVal := 0.0
-			for i := 0; i < len(abs); i++ {
-				maxVal = math.Max(maxVal, abs[i])
-			}
-			const lines = 10
-
-			builder := strings.Builder{}
-			builder.WriteRune('|')
-			for i := 0; i < len(abs); i++ {
-				val := abs[i]
-				if val < 0.1 {
-					val = 0
-				}
-				builder.WriteByte(grayscaleASCII70[int((val/maxVal)*float64(len(grayscaleASCII70)-1))])
-			}
-			builder.WriteRune('|')
-			fmt.Println(builder.String())
-		}()
+	select {
+	case fftChan <- samples:
+	default:
 	}
 
 	samples = scaleSamples(samples, a.gain)
@@ -556,6 +690,8 @@ func (a *App) startup(ctx context.Context) {
 		panic(err)
 	}
 	sink.Start(a.getSamples)
+
+	go a.spectrumWorker()
 
 	watcher, err := fsnotify.NewWatcher()
 	if err != nil {
@@ -998,4 +1134,12 @@ func (a *App) GraphDot() string {
 		return ""
 	}
 	return a.graph.Dot()
+}
+
+func (a *App) SetShowSpectrum(showSpectrum bool) {
+	a.showSpectrum = showSpectrum
+}
+
+func (a *App) SetShowSpectrumHist(showSpectrumHist bool) {
+	a.showSpectrumHist = showSpectrumHist
 }

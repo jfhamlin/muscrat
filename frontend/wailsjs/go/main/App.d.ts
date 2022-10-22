@@ -9,3 +9,7 @@ export function GraphDot():Promise<string>;
 export function RegisterWaveformCallback(arg1:main.WaveformCallback):Promise<void>;
 
 export function SetGain(arg1:number):Promise<void>;
+
+export function SetShowSpectrum(arg1:boolean):Promise<void>;
+
+export function SetShowSpectrumHist(arg1:boolean):Promise<void>;

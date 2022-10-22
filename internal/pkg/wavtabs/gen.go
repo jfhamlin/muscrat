@@ -10,6 +10,7 @@ import (
 func Generator(wavtab Table) generator.SampleGenerator {
 	phase := 0.0
 	lastSync := 0.0
+
 	return generator.SampleGeneratorFunc(func(ctx context.Context, cfg generator.SampleConfig, n int) []float64 {
 		ws := cfg.InputSamples["w"]
 		phases := cfg.InputSamples["phase"]
@@ -17,6 +18,7 @@ func Generator(wavtab Table) generator.SampleGenerator {
 
 		res := make([]float64, n)
 		w := 440.0 // default frequency
+
 		for i := 0; i < n; i++ {
 			if i < len(phases) {
 				phase = phases[i]

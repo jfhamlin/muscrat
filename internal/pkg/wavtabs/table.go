@@ -1,6 +1,8 @@
 package wavtabs
 
-import "math"
+import (
+	"math"
+)
 
 const (
 	DefaultResolution = 1024
@@ -16,8 +18,8 @@ type Table []float64
 // and will be wrapped to the appropriate position in the table.
 func (t Table) Lerp(x float64) float64 {
 	x -= math.Floor(x)
-	x = x * float64(len(t))
+	x = x * float64(len(t)-1)
 	i := int(x)
 	f := x - float64(i)
-	return t[i%len(t)]*(1-f) + t[(i+1)%len(t)]*f
+	return t[i]*(1-f) + t[i+1]*f
 }

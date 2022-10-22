@@ -7,6 +7,7 @@ require (
 	github.com/fsnotify/fsnotify v1.5.4
 	github.com/mjibson/go-dsp v0.0.0-20180508042940-11479a337f12
 	github.com/wailsapp/wails/v2 v2.0.0
+	golang.org/x/term v0.0.0-20221017184919-83659145692c
 )
 
 require (
@@ -34,6 +35,6 @@ require (
 	github.com/wailsapp/mimetype v1.4.1 // indirect
 	golang.org/x/crypto v0.0.0-20210921155107-089bfa567519 // indirect
 	golang.org/x/net v0.0.0-20211015210444-4f30a5c0130f // indirect
-	golang.org/x/sys v0.0.0-20220412211240-33da011f77ad // indirect
+	golang.org/x/sys v0.1.0 // indirect
 	golang.org/x/text v0.3.7 // indirect
 )

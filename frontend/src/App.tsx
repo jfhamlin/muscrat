@@ -7,6 +7,8 @@ import './App.css';
 import {
   SetGain,
   GraphDot,
+  SetShowSpectrum,
+  SetShowSpectrumHist,
 } from "../wailsjs/go/main/App";
 
 import Graphviz from 'graphviz-react';
@@ -14,6 +16,9 @@ import Graphviz from 'graphviz-react';
 function App() {
   const [graphSeqNum, setGraphSeqNum] = useState(0);
   const [graphDot, setGraphDot] = useState<string|undefined>();
+
+  const [showFFT, setShowFFT] = useState(true);
+  const [showFFTHist, setShowFFTHist] = useState(false);
 
   useEffect(() => {
     const ival = setInterval(() => {
@@ -39,6 +44,16 @@ function App() {
       <h2>Synthesizer</h2>
       <label>Output Gain</label>
       <FloatInput onValueChange={handleGainChange} />
+      <label>Show FFT</label>
+      <input type="checkbox" checked={showFFT} onChange={(e) => {
+        setShowFFT(e.target.checked);
+        SetShowSpectrum(e.target.checked);
+      }} />
+      <label>Show FFT Histogram</label>
+      <input type="checkbox" checked={showFFTHist} onChange={(e) => {
+        setShowFFTHist(e.target.checked);
+        SetShowSpectrumHist(e.target.checked);
+      }} />
       <div>
         {graphDot && <Graphviz options={{width: 1000}} dot={graphDot} />}
       </div>

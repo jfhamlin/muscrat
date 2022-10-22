@@ -22,7 +22,7 @@ Either:
 *** DONE triangle wave generator
 *** DONE pow to compute semitone ratios
 *** DONE oscillator phase sync (and about time to make phase a parameter)
-*** TODO osc phase sync cleanup
+*** TODO osc phase sync cleanup. don't create unused phasors
 *** TODO fix frequency modulation (don't add, multiply. this may be fixed?)
 *** TODO fix LFO range. should probably be unipolar.
 *** TODO ADSR, or sustain support for env

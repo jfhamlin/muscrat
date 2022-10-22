@@ -17,3 +17,11 @@ export function RegisterWaveformCallback(arg1) {
 export function SetGain(arg1) {
   return window['go']['main']['App']['SetGain'](arg1);
 }
+
+export function SetShowSpectrum(arg1) {
+  return window['go']['main']['App']['SetShowSpectrum'](arg1);
+}
+
+export function SetShowSpectrumHist(arg1) {
+  return window['go']['main']['App']['SetShowSpectrumHist'](arg1);
+}
