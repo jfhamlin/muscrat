@@ -540,11 +540,26 @@ func renderSpectrumLine(x []complex128, width int) string {
 	return builder.String()
 }
 
+// renderSpectrumHist renders an ASCII histogram of the spectrum with
+// a logarithmic scale. The bottom line shows frequency labels.
 func renderSpectrumHist(x []complex128, width, height int) string {
-	// Render an ASCII histogram of the spectrum with a logarithmic
-	// scale. The bottom line should show frequency labels.
-
 	hx := x[:len(x)/2]
+
+	const sampleRate = 44100
+	freqs := make([]float64, len(hx))
+	for i := 0; i < len(freqs); i++ {
+		origIdx := math.Pow(10, float64(i)/(float64(len(freqs)-1))*math.Log10(float64(len(hx)))) - 1
+		freqs[i] = origIdx * sampleRate / 2 / float64(len(hx))
+	}
+	// throw out all bins with frequencies below 20 Hz
+	for i := 0; i < len(freqs); i++ {
+		if freqs[i] > 20 {
+			freqs = freqs[i:]
+			hx = hx[i:]
+			break
+		}
+	}
+
 	abs := make([]float64, width-3)
 	for i := 0; i < len(hx); i++ {
 		// map to [0, 255] in abs with a logaritmic scale so that more
@@ -589,25 +604,18 @@ func renderSpectrumHist(x []complex128, width, height int) string {
 	builder.WriteString(strings.Repeat("-", width-1))
 	builder.WriteRune('\n')
 
-	const sampleRate = 44100
-	absFreq := make([]float64, len(abs))
-	for i := 0; i < len(absFreq); i++ {
-		origIdx := math.Pow(10, float64(i)/(float64(len(absFreq)-1))*math.Log10(float64(len(hx)))) - 1
-		absFreq[i] = origIdx * sampleRate / 2 / float64(len(hx))
-	}
-
 	// draw frequency labels. assume 44100 Hz sample rate. frequencies
 	// are between 0 and 22050 Hz.
 	numIndexes := (width - 1) / 10 // 10 characters per label
 	labelIndexes := make([]int, numIndexes)
 	labelIndexes[0] = 0
-	labelIndexes[numIndexes-1] = len(absFreq) - 1
+	labelIndexes[numIndexes-1] = len(freqs) - 1
 	for i := 1; i < numIndexes-1; i++ {
-		labelIndexes[i] = i * len(absFreq) / numIndexes
+		labelIndexes[i] = i * len(freqs) / numIndexes
 	}
 	labelStrings := make([]string, len(labelIndexes))
 	for i, idx := range labelIndexes {
-		labelStrings[i] = fmt.Sprintf("%d", int(absFreq[idx]))
+		labelStrings[i] = fmt.Sprintf("%d", int(freqs[idx]))
 	}
 	offset := 0
 	for i := 0; i < len(labelStrings); i++ {
@@ -641,6 +649,15 @@ func (a *App) spectrumWorker() {
 		samps = append(samps, (<-fftChan)...)
 		if !a.showSpectrum {
 			continue
+		}
+		// apply a Bartlett window to the samples to reduce the spectral
+		// leakage.
+		for i := 0; i < len(samps); i++ {
+			if i < (len(samps)-1)/2 {
+				samps[i] *= 2 * float64(i) / float64(len(samps)-1)
+			} else {
+				samps[i] *= 2 - 2*float64(i)/float64(len(samps)-1)
+			}
 		}
 		x := fft.FFTReal(samps)
 		width, height, err := term.GetSize(int(os.Stdout.Fd()))
