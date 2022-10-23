@@ -7,7 +7,7 @@ import (
 	"strings"
 )
 
-func LineChart(values []float64, width, height int) string {
+func LineChartString(values []float64, width, height int) string {
 	// three characters of the width go to chart borders and newline
 	plotWidth := width - 3
 	// two characters of the height go to chart borders
@@ -95,10 +95,4 @@ func LineChart(values []float64, width, height int) string {
 	}
 	writeChartHLine(&builder, width)
 	return builder.String()
-}
-
-func writeChartHLine(builder *strings.Builder, width int) {
-	builder.WriteRune('+')
-	builder.WriteString(strings.Repeat("-", width-3))
-	builder.WriteRune('+')
 }
