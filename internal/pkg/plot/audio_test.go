@@ -66,11 +66,23 @@ func TestDFTHistogramString(t *testing.T) {
 
 		var opts []PlotOption
 		for _, field := range fields[3:] {
-			switch field {
-			case "logDomain":
+			switch {
+			case field == "logDomain":
 				opts = append(opts, WithLogDomain())
-			case "logRange":
+			case field == "logRange":
 				opts = append(opts, WithLogRange())
+			case strings.HasPrefix(field, "min="):
+				min, err := strconv.ParseFloat(strings.TrimPrefix(field, "min="), 64)
+				if err != nil {
+					t.Fatal(err)
+				}
+				opts = append(opts, WithMinFreq(min))
+			case strings.HasPrefix(field, "max="):
+				max, err := strconv.ParseFloat(strings.TrimPrefix(field, "max="), 64)
+				if err != nil {
+					t.Fatal(err)
+				}
+				opts = append(opts, WithMaxFreq(max))
 			default:
 				t.Fatalf("unknown option %q", field)
 			}

@@ -554,98 +554,7 @@ func renderSpectrumLine(x []complex128, width int) string {
 // renderSpectrumHist renders an ASCII histogram of the spectrum with
 // a logarithmic scale. The bottom line shows frequency labels.
 func renderSpectrumHist(x []complex128, width, height int) string {
-	hx := x[:len(x)/2]
-
-	// the frequencies in the output are spaced logarithmically.
-	freqs := make([]float64, len(hx))
-	for i := 0; i < len(freqs); i++ {
-		origIdx := math.Pow(10, float64(i)/(float64(len(freqs)-1))*math.Log10(float64(len(hx)))) - 1
-		freqs[i] = origIdx * sampleRate / 2 / float64(len(hx))
-	}
-
-	// throw out all bins with frequencies below 20 Hz
-	for i := 0; i < len(freqs); i++ {
-		if freqs[i] > 20 {
-			freqs = freqs[i:]
-			hx = hx[i:]
-			break
-		}
-	}
-
-	abs := make([]float64, width-3)
-	for i := 0; i < len(hx); i++ {
-		t := float64(len(abs)-1) * math.Log10(float64(i+1)) / math.Log10(float64(len(hx)))
-		floorT := float64(int(t))
-		t -= floorT
-		val := cmplx.Abs(hx[i])
-		abs[int(floorT)] += (1 - t) * val
-		if floorT < float64(len(abs)-1) {
-			abs[int(floorT)+1] += t * val
-		}
-	}
-
-	for i := 0; i < len(abs); i++ {
-		abs[i] = math.Log10(abs[i] + 1)
-	}
-
-	maxVal := 0.0
-	for i := 0; i < len(abs); i++ {
-		maxVal = math.Max(maxVal, abs[i])
-	}
-
-	graphHeight := height - 4
-
-	builder := strings.Builder{}
-	builder.WriteString(strings.Repeat("-", width-1))
-	builder.WriteRune('\n')
-	for i := 0; i < graphHeight; i++ {
-		builder.WriteRune('|')
-		for j := 0; j < len(abs); j++ {
-			if abs[j]/maxVal >= (float64(graphHeight-i)+0.5)/float64(graphHeight) {
-				builder.WriteByte('#')
-			} else {
-				builder.WriteByte(' ')
-			}
-		}
-		builder.WriteRune('|')
-		builder.WriteRune('\n')
-	}
-	builder.WriteString(strings.Repeat("-", width-1))
-	builder.WriteRune('\n')
-
-	// draw frequency labels. assume 44100 Hz sample rate. frequencies
-	// are between 0 and 22050 Hz.
-	numIndexes := (width - 1) / 10 // 10 characters per label
-	labelIndexes := make([]int, numIndexes)
-	labelIndexes[0] = 0
-	labelIndexes[numIndexes-1] = len(freqs) - 1
-	for i := 1; i < numIndexes-1; i++ {
-		labelIndexes[i] = i * len(freqs) / numIndexes
-	}
-	labelStrings := make([]string, len(labelIndexes))
-	for i, idx := range labelIndexes {
-		labelStrings[i] = fmt.Sprintf("%d", int(freqs[idx]))
-	}
-	offset := 0
-	for i := 0; i < len(labelStrings); i++ {
-		if i == len(labelStrings)-1 {
-			builder.WriteString(strings.Repeat(" ", width-1-offset-len(labelStrings[i])))
-		} else if i > 0 {
-			off := i*(width-1)/(len(labelStrings)-1) - len(labelStrings[i])/2 - offset
-			if off <= 0 {
-				continue
-			}
-			offset += off
-			builder.WriteString(strings.Repeat(" ", off))
-		}
-		builder.WriteString(labelStrings[i])
-		offset += len(labelStrings[i])
-	}
-
-	builder.WriteRune('\n')
-	builder.WriteString(strings.Repeat(" ", (width-1)/2-3))
-	builder.WriteString("Hz")
-	return builder.String()
+	return plot.DFTHistogramString(x, sampleRate, width, height, plot.WithLogDomain(), plot.WithLogRange(), plot.WithMinFreq(20), plot.WithMaxFreq(20000))
 }
 
 func (a *App) renderOscilloscope(samps []float64, width, height int) string {
@@ -701,6 +610,7 @@ func (a *App) spectrumWorker() {
 			fmt.Print(builder.String())
 			continue
 		}
+
 		builder.WriteRune('\n')
 		// apply a Bartlett window to the samples to reduce the spectral
 		// leakage.

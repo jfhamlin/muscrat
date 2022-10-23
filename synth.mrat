@@ -32,7 +32,7 @@
 (def gate (sqr 2))
 
 (def sound (+
-            (darkCity C3 gate)
+            (* 1.5 (darkCity C3 gate))
             (~lores (* (clip gate 0 1) (vocalFemale 260 gate)) (+ 275 (* 400 (sin 0.5))) 0.9)
             (~lores (* 0.1 (clip (* (sin 0.5) gate) 0 1) (noise)) 1700 0.85)
             ))
@@ -48,11 +48,13 @@
 
 (def amp (env 1 '(0.001 0.3) '(10) :exp))
 
-(mrat.core.io.out (* 0.1 ;;amp
+(mrat.core.io.out (* amp
                      (mixer
                       ;; (* (env gate '(0 1 0.8 0) '(0.001 0.1 1.2))
                       ;;    (~lores (noise) (* 200 (env gate '(0.5 20 1) '(0.1 1))) 0.9))
-                      (noise)
-                      ;; (* 2 (clip sound (* -1 clipval) clipval))
-                      ;; reverb
+                      ;; (* (oscrng (pulse 0.2 0.1) 0 1) (bell 260))
+
+                      ;;;;;;;;;;; better stuff below
+                      (* 2 (clip sound (* -1 clipval) clipval))
+                      reverb
                       )))

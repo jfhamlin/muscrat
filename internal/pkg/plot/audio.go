@@ -16,6 +16,8 @@ type PlotOption func(*plotOptions)
 type plotOptions struct {
 	logDomain bool
 	logRange  bool
+	minFreq   float64
+	maxFreq   float64
 }
 
 // WithLogDomain returns a PlotOption that causes the plot to be
@@ -31,6 +33,22 @@ func WithLogDomain() PlotOption {
 func WithLogRange() PlotOption {
 	return func(o *plotOptions) {
 		o.logRange = true
+	}
+}
+
+// WithMinFreq returns a PlotOption that causes the plot to be
+// rendered omitting frequencies below minFreq.
+func WithMinFreq(minFreq float64) PlotOption {
+	return func(o *plotOptions) {
+		o.minFreq = minFreq
+	}
+}
+
+// WithMaxFreq returns a PlotOption that causes the plot to be
+// rendered omitting frequencies above maxFreq.
+func WithMaxFreq(maxFreq float64) PlotOption {
+	return func(o *plotOptions) {
+		o.maxFreq = maxFreq
 	}
 }
 
@@ -62,6 +80,20 @@ func DFTHistogramString(bins []complex128, sampleRate float64, width, height int
 	if len(freqs) != len(halfBins) {
 		panic("len(freqs) != len(halfBins)")
 	}
+
+	if o.maxFreq > 0 {
+		maxBin := int(o.maxFreq / freqs[1])
+		if maxBin < len(halfBins)-1 {
+			halfBins = halfBins[:maxBin+1]
+			freqs = freqs[:maxBin+1]
+		}
+	}
+	if o.minFreq > 0 {
+		minBin := int(o.minFreq / freqs[1])
+		halfBins = halfBins[minBin:]
+		freqs = freqs[minBin:]
+	}
+
 	plotPower := make([]float64, plotWidth)
 	if !o.logDomain {
 		freqStep := freqs[1] - freqs[0]
@@ -89,7 +121,15 @@ func DFTHistogramString(bins []complex128, sampleRate float64, width, height int
 				logFreqs[i] = math.Log2(freqs[i])
 			}
 		}
-		plotLogFreqRange := math.Log2(sampleRate/2+freqs[1]-freqs[0]) - minLogFreq
+
+		maxFreq := sampleRate/2 + freqs[1] - freqs[0]
+		if o.maxFreq > 0 {
+			maxFreq = o.maxFreq + freqs[1] - freqs[0]
+		}
+		if o.minFreq > 0 {
+			minLogFreq = math.Log2(o.minFreq)
+		}
+		plotLogFreqRange := math.Log2(maxFreq) - minLogFreq
 		plotLogFreqStep := plotLogFreqRange / float64(plotWidth)
 		halfBinCursor := 0
 		for i := 0; i < plotWidth; i++ {
@@ -170,7 +210,7 @@ func tryFitLabels(labels []string) (string, bool) {
 		}
 		if builder.Len() < targetOffset {
 			builder.WriteString(strings.Repeat(" ", targetOffset-builder.Len()))
-		} else if builder.Len() >= targetOffset {
+		} else if i > 0 && builder.Len() >= targetOffset {
 			return "", false
 		}
 		builder.WriteString(label)
@@ -218,51 +258,6 @@ func xLabelString(labelValues [][]float64, width int) string {
 		}
 	}
 	return strings.Repeat("-", len(labels)+2)
-
-	/*
-	   	usedValues := make([]float64, 0, len(labelValues))
-
-	   	labelBuilder := strings.Builder{}
-	   	offset := 0
-	   	for i := 0; i < len(labels); i++ {
-	   		if i == len(labels)-1 {
-	   			padding := width - 1 - offset - len(labels[i])
-	   			if padding < 0 {
-	   				padding = 0
-	   			}
-	   			labelBuilder.WriteString(strings.Repeat(" ", padding))
-	   		} else if i > 0 {
-	   			off := i*(width-1)/(len(labels)-1) - len(labels[i])/2 - offset
-	   			if off <= 0 {
-	   				continue
-	   			}
-	   			offset += off
-	   			labelBuilder.WriteString(strings.Repeat(" ", off))
-	   		}
-	   		if labels[i] == "" {
-	   			continue
-	   		}
-	   		usedValues = append(usedValues, labelValues[i][0])
-	   		labelBuilder.WriteString(labels[i])
-	   		offset += len(labels[i])
-	   	}
-
-	   	builder := strings.Builder{}
-	   	builder.WriteByte('+')
-	   Outer:
-	   	for i := 0; i < width-3; i++ {
-	   		if len(labelValues[i]) > 0 && containsFloat64(usedValues, labelValues[i][0]) {
-	   			builder.WriteByte('.')
-	   			continue Outer
-	   		}
-	   		builder.WriteByte('-')
-	   	}
-	   	builder.WriteByte('+')
-	   	builder.WriteByte('\n')
-	   	builder.WriteString(labelBuilder.String())
-
-	   	return builder.String()
-	*/
 }
 
 func containsFloat64(slice []float64, value float64) bool {
