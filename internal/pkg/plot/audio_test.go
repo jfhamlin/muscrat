@@ -65,8 +65,15 @@ func TestDFTHistogramString(t *testing.T) {
 		}
 
 		var opts []PlotOption
-		if len(fields) > 3 && fields[3] == "logDomain" {
-			opts = append(opts, WithLogDomain())
+		for _, field := range fields[3:] {
+			switch field {
+			case "logDomain":
+				opts = append(opts, WithLogDomain())
+			case "logRange":
+				opts = append(opts, WithLogRange())
+			default:
+				t.Fatalf("unknown option %q", field)
+			}
 		}
 
 		// parse data
