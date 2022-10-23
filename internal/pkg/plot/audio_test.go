@@ -16,6 +16,7 @@ func TestDFTHistogramString(t *testing.T) {
 		data          []complex128
 		sampleRate    float64
 		width, height int
+		opts          []PlotOption
 		want          string
 	}
 
@@ -63,6 +64,11 @@ func TestDFTHistogramString(t *testing.T) {
 			t.Fatal(err)
 		}
 
+		var opts []PlotOption
+		if len(fields) > 3 && fields[3] == "logDomain" {
+			opts = append(opts, WithLogDomain())
+		}
+
 		// parse data
 		data := []complex128{}
 		for i, line := range lines[1:] {
@@ -81,6 +87,7 @@ func TestDFTHistogramString(t *testing.T) {
 			sampleRate: sampleRate,
 			width:      width,
 			height:     height,
+			opts:       opts,
 			want:       string(out),
 		})
 	}
@@ -89,7 +96,7 @@ func TestDFTHistogramString(t *testing.T) {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-			got := DFTHistogramString(tc.data, tc.sampleRate, tc.width, tc.height)
+			got := DFTHistogramString(tc.data, tc.sampleRate, tc.width, tc.height, tc.opts...)
 			assert.Equal(t, tc.want, got)
 		})
 	}

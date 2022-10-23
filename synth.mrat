@@ -48,10 +48,11 @@
 
 (def amp (env 1 '(0.001 0.3) '(10) :exp))
 
-(mrat.core.io.out (* 1 ;;amp
+(mrat.core.io.out (* 0.1 ;;amp
                      (mixer
-                      (* (env gate '(0 1 0.8 0) '(0.001 0.1 1.2))
-                         (~lores (noise) (* 200 (env gate '(0.5 20 1) '(0.1 1))) 0.9))
+                      ;; (* (env gate '(0 1 0.8 0) '(0.001 0.1 1.2))
+                      ;;    (~lores (noise) (* 200 (env gate '(0.5 20 1) '(0.1 1))) 0.9))
+                      (noise)
                       ;; (* 2 (clip sound (* -1 clipval) clipval))
                       ;; reverb
                       )))

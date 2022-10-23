@@ -649,7 +649,7 @@ func renderSpectrumHist(x []complex128, width, height int) string {
 }
 
 func (a *App) renderOscilloscope(samps []float64, width, height int) string {
-	return plot.LineChart(samps, width, height)
+	return plot.LineChartString(samps, width, height)
 }
 
 func (a *App) spectrumWorker() {

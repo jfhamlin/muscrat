@@ -1,7 +1,6 @@
 package dsp
 
 import (
-	"math"
 	"math/bits"
 	"strconv"
 )
@@ -19,27 +18,4 @@ func FFTFreqs(sampleRate float64, bins int) []float64 {
 		freqs[i] = float64(i) * sampleRate / float64(bins)
 	}
 	return freqs
-}
-
-// LogRange returns a logarithmically spaced range of values. The
-// range is inclusive of min and max. min and max cannot have
-// different signs.
-func LogRange(min, max float64, n int) []float64 {
-	if min*max < 0 {
-		panic("min and max must have the same sign")
-	}
-	if min == 0 {
-		panic("min cannot be 0")
-	}
-	if min < 0 {
-		min, max = -max, -min
-	}
-	logMin, logMax := math.Log2(min), math.Log2(max)
-	logRange := logMax - logMin
-	step := logRange / float64(n)
-	vals := make([]float64, n)
-	for i := range vals {
-		vals[i] = math.Pow(2, logMin+float64(i)*step)
-	}
-	return vals
 }
