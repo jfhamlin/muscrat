@@ -94,7 +94,7 @@ func TestEvalErrors(t *testing.T) {
 		if !strings.HasPrefix(lines[0], ";;;ERROR=") {
 			t.Fatalf("no error line in %s", path)
 		}
-		errorS := strings.TrimPrefix(lines[0], ";;;ERROR=")
+		errorS := strings.Replace(strings.TrimPrefix(lines[0], ";;;ERROR="), "\\n", "\n", -1)
 
 		testCases = append(testCases, testCase{
 			name:   filepath.Base(path),

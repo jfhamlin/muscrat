@@ -256,7 +256,24 @@ func (f *Func) Equal(v Value) bool {
 	return f.Exprs == other.Exprs
 }
 
+func errorWithStack(err error, stackFrame StackFrame) error {
+	if err == nil {
+		return nil
+	}
+	valErr, ok := err.(*Error)
+	if !ok {
+		return NewError(stackFrame, err)
+	}
+	return valErr.AddStack(stackFrame)
+}
+
 func (f *Func) Apply(env Environment, args []Value) (Value, error) {
+	// function name for error messages
+	fnName := f.LambdaName
+	if fnName == "" {
+		fnName = "<anonymous function>"
+	}
+
 	fnEnv := f.Env.PushScope()
 	fnEnv.Define("$args", &List{Items: args})
 	if f.LambdaName != "" {
@@ -280,7 +297,10 @@ func (f *Func) Apply(env Environment, args []Value) (Value, error) {
 	for _, expr := range f.Exprs.Items {
 		v, err := fnEnv.Eval(expr)
 		if err != nil {
-			return nil, err
+			return nil, errorWithStack(err, StackFrame{
+				FunctionName: fnName,
+				Pos:          expr.Pos(),
+			})
 		}
 		res = v
 	}
@@ -306,6 +326,17 @@ func (f *BuiltinFunc) Equal(v Value) bool {
 		return false
 	}
 	return f == other
+}
+
+func (f *BuiltinFunc) Apply(env Environment, args []Value) (Value, error) {
+	val, err := f.Applyer.Apply(env, args)
+	if err != nil {
+		return nil, NewError(StackFrame{
+			FunctionName: "* builtin " + f.Name + " *",
+			Pos:          f.Section.Pos(),
+		}, err)
+	}
+	return val, nil
 }
 
 type Symbol struct {

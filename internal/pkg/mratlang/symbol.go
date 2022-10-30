@@ -2,6 +2,8 @@ package mratlang
 
 import "github.com/jfhamlin/muscrat/internal/pkg/mratlang/value"
 
+// TODO: this stuff isn't really used. clean it up.
+
 type Location struct {
 }
 

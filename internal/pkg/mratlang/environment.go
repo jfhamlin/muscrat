@@ -214,9 +214,13 @@ func (env *environment) evalDef(n *value.List) (value.Value, error) {
 			argNames = append(argNames, argSym.Value)
 		}
 		env.Define(sym.Value, &value.Func{
-			ArgNames: argNames,
-			Exprs:    value.NewList(n.Items[2:]),
-			Env:      env,
+			// TODO: Section (here and elsewhere in this file) isn't quite
+			// right, but close enough for now for useful errors.
+			Section:    n.Section,
+			LambdaName: sym.Value,
+			ArgNames:   argNames,
+			Exprs:      value.NewList(n.Items[2:]),
+			Env:        env,
 		})
 		return nil, nil
 	}
@@ -238,6 +242,7 @@ func (env *environment) evalLambda(n *value.List) (value.Value, error) {
 		return nil, err
 	}
 	return &value.Func{
+		Section:  n.Section,
 		ArgNames: argNames,
 		Exprs:    value.NewList(n.Items[2:]),
 		Env:      env,
@@ -272,6 +277,7 @@ func (env *environment) evalFn(n *value.List) (value.Value, error) {
 		return nil, err
 	}
 	return &value.Func{
+		Section:    n.Section,
 		LambdaName: fnName,
 		ArgNames:   argNames,
 		Exprs:      value.NewList(items[1:]),
