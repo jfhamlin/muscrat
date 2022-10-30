@@ -41,6 +41,7 @@ func init() {
 				funcSymbol("+", addBuiltin),
 				funcSymbol("-", subBuiltin),
 				funcSymbol("<", ltBuiltin),
+				funcSymbol(">", gtBuiltin),
 				// function application
 				funcSymbol("apply", applyBuiltin),
 				// test predicates
@@ -391,6 +392,22 @@ func ltBuiltin(env value.Environment, args []value.Value) (value.Value, error) {
 	}
 
 	return value.NewBool(a.Value < b.Value), nil
+}
+
+func gtBuiltin(env value.Environment, args []value.Value) (value.Value, error) {
+	if len(args) != 2 {
+		return nil, fmt.Errorf("> expects 2 arguments, got %v", len(args))
+	}
+	a, ok := args[0].(*value.Num)
+	if !ok {
+		return nil, fmt.Errorf("> expects a number as the first argument, got %v", args[0])
+	}
+	b, ok := args[1].(*value.Num)
+	if !ok {
+		return nil, fmt.Errorf("> expects a number as the second argument, got %v", args[1])
+	}
+
+	return value.NewBool(a.Value > b.Value), nil
 }
 
 type pipe struct {

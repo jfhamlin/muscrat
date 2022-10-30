@@ -47,16 +47,13 @@ func Generator(wavtab Table, opts ...GeneratorOption) generator.SampleGenerator 
 			dc := options.defaultDutyCycle
 			if i < len(dcs) {
 				dc = dcs[i]
-				// if dc < 0 {
-				// 	dc = 0
-				// }
-				// if dc > 1 {
-				// 	dc = 1
-				// }
 			}
-			if dc == 0 {
+			switch dc {
+			case 0:
 				res[i] = wavtab[0]
-			} else {
+			case 1:
+				res[i] = wavtab.Lerp(phase)
+			default:
 				t := (phase - math.Floor(phase)) / dc
 				if t > 1 {
 					res[i] = wavtab[len(wavtab)-1]
