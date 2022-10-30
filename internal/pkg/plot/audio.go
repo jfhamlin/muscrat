@@ -57,7 +57,7 @@ func WithMaxFreq(maxFreq float64) PlotOption {
 // of 2.
 func DFTHistogramString(bins []complex128, sampleRate float64, width, height int, opts ...PlotOption) string {
 	if bits.OnesCount(uint(len(bins))) != 1 {
-		panic("len(bins) must be a power of 2")
+		panic(fmt.Sprintf("len(bins) must be a power of 2, got %d", len(bins)))
 	}
 
 	o := plotOptions{}

@@ -1,25 +1,23 @@
 ;; for map, reduce, etc.
 (load-file "./examples/functional.mrat")
 (load-file "./examples/notes.mrat")
-(load-file "./examples/bell.mrat")
 (load-file "./examples/welsh.mrat")
 
 ;; make a bunch of builtins available more concisely
-(def sin mrat.osc.sin)
-(def saw mrat.osc.saw)
-(def sqr mrat.osc.sqr)
-(def pulse mrat.osc.pulse)
-(def noise mrat.osc.noise)
-(def phasor mrat.osc.phasor)
+(def ~sin mrat.osc.sin)
+(def ~saw mrat.osc.saw)
+(def ~sqr mrat.osc.sqr)
+(def ~pulse mrat.osc.pulse)
+(def ~noise mrat.osc.noise)
+(def ~phasor mrat.osc.phasor)
 
 (def print mrat.core.io.print)
 
-(def freeverb mrat.effects.freeverb)
-(def delay mrat.effects.delay)
-(def clip mrat.effects.clip) ;; should remove from effects
-(def mixer mrat.effects.mixer) ;; should remove from effects
-(def trand mrat.math.rand.trand)
-(def env mrat.effects.env) ;; should remove from effects
+(def ~freeverb mrat.effects.freeverb)
+(def ~delay mrat.effects.delay)
+(def ~clip mrat.effects.clip) ;; should remove from effects
+(def ~trand mrat.math.rand.trand)
+(def ~env mrat.effects.env) ;; should remove from effects
 (def ~lores mrat.effects.~lores) ;; should remove from effects
 
 (def (oscrng osc min max)
@@ -27,34 +25,68 @@
      (/ (- max min) 2)
      (* (/ (- max min) 2) osc)))
 
-(def feedback (~pipe))
+(def (range beg end)
+  (if (or (> beg end) (eq? beg end))
+    '()
+    (cons beg (range (+ beg 1) end))))
 
-(def gate (sqr 2))
+(def bpm (* 3.8 60))
 
-(def sound (+
-            (* 1.5 (darkCity C3 gate))
-            (~lores (* (clip gate 0 1) (vocalFemale 260 gate)) (+ 275 (* 400 (sin 0.5))) 0.9)
-            (~lores (* 0.1 (clip (* (sin 0.5) gate) 0 1) (noise)) 1700 0.85)
-            ))
+;; (def metro (sqr 3.65))
 
-(def clipval (+ 2 (tri 1)))
+;; (def pulseDuty (phasor 2))
 
-(def reverb (* 1 (freeverb (+ sound feedback))))
+;; (def voice (vocalMale 440 (sqr 1)))
 
-(pipeset feedback (delay (~lores (* 0.25 reverb)
-                          (oscrng (sin 0.2) 300 600)
-                          0.92)
-                         0.2))
+(def myMetroConfig
+  (list :osc (list (list :key :osc1
+                         :wave :sqr
+                         :duty 0.05
+                         :mix 1)
+                   (list :key :osc2
+                         :wave :sqr
+                         :duty 0.5
+                         :detune (cents 10)
+                         :mix 0.65))
+        :lfo (list :route '(:osc1 :freq :osc2 :freq)
+                   :wave :tri
+                   :freq 2.4
+                   :depth (list :freq (cents 10)))
+        :lpf (list :cutoff 500
+                   :res 0.85)
+        :amp (list :attack 0.01
+                   :decay  0
+                   :sustain 1
+                   :release 0.1)))
+(def myMetro (mkwelsh myMetroConfig))
 
-(def amp (env 1 '(0.001 0.3) '(10) :exp))
+(def (second lst) (first (rest lst)))
 
-(mrat.core.io.out (* amp
-                     (mixer
-                      ;; (* (env gate '(0 1 0.8 0) '(0.001 0.1 1.2))
-                      ;;    (~lores (noise) (* 200 (env gate '(0.5 20 1) '(0.1 1))) 0.9))
-                      ;; (* (oscrng (pulse 0.2 0.1) 0 1) (bell 260))
+(def (~mixer chanWeights)
+  (let ((totalSum (reduce (fn (acc el) (+ acc (first el))) chanWeights 0)))
+    (sum (map
+          (fn (el) (* (/ (first el) totalSum) (second el)))
+          chanWeights))))
 
-                      ;;;;;;;;;;; better stuff below
-                      (* 2 (clip sound (* -1 clipval) clipval))
-                      reverb
-                      )))
+(def (harmonikit amps)
+  (fn (freq)
+    (let ((sinFn (fn (amp idx) (list amp (~sin (* freq (+ idx 1)))))))
+      (~mixer (maps sinFn amps (range 0 (length amps)))))))
+
+(def (times value n)
+  (if (eq? n 0)
+    '()
+    (cons value (times value (- n 1)))))
+
+
+(def harmAmps (map-idx (fn (x i) (/ 1 (* x x x))) (range 1 101)))
+(def myInst (harmonikit harmAmps))
+
+(def ~dc (darkCity (+ 260 (* 100 (~noise)))
+           (~sqr 1)))
+
+(def ~reverb (~lores (~freeverb ~dc) 880 0.8))
+
+(mrat.core.io.out (~mixer (list (list 0.1 (* (oscrng (~tri 32) 0 1)(~noise)))
+                                (list 4 ~dc)
+                                (list 8 (* (oscrng (~tri 4) 0.1 1) ~reverb)))))

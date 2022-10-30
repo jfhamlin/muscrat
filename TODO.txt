@@ -21,6 +21,10 @@ Either:
 *** DONE and/or
 *** DONE let
 *** DONE case
+** DONE Fix spectrograph frequency labels
+** TODO Synth will occasionally hang
+*** TODO Show timing stats for all gens
+*** TODO Alert on gens taking too long or blocking for too long
 ** TODO Support building instruments from Welsh's Synthesizer Cookbook
 *** DONE Low-pass Filter with cutoff and resonance parameters
 *** DONE triangle wave generator
@@ -31,7 +35,6 @@ Either:
 *** TODO fix LFO range. should probably be unipolar.
 *** TODO ADSR, or sustain support for env
 *** TODO Envelope for LPF
-** TODO Fix spectrograph frequency labels
 ** TODO reload synth when any dependency changes
 ** TODO add a file picker to the UI
 ** TODO infrastructure to make it easier to export functions to lisp
@@ -42,6 +45,7 @@ Either:
 *** TODO tools for sequencer
 ** TODO music theory libraries
 ** TODO lisp language improvements
+*** TODO call stacks in runtime errors
 *** TODO include whitespace and comment information in output from reader
 This allows us to modify the AST programmatically and output a file
 retaining comments and formatting.

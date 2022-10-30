@@ -1,7 +1,26 @@
 (def (map func lst)
     (if (not-empty? lst)
         (concat (list (func (first lst))) (map func (rest lst)))
-        (list)))
+        '()))
+
+(def (zip arrs)
+  (if (empty? (first arrs))
+    '()
+    (cons (map first arrs)
+          (zip (map rest arrs)))))
+
+(def (maps func)
+  (let ((map-list (zip (rest $args))))
+    (map (fn (args) (apply func args)) map-list)))
+
+;; TODO: keep this private or add to the standard library?
+(def (range beg end)
+  (if (or (> beg end) (eq? beg end))
+    '()
+    (cons beg (range (+ beg 1) end))))
+
+(def (map-idx func lst)
+  (maps (fn (val idx) (func val idx)) lst (range 0 (length lst))))
 
 (def (reduce func lst acc)
     (if (not-empty? lst)

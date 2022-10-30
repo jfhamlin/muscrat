@@ -67,7 +67,11 @@ func (l *List) String() string {
 
 	b.WriteString("(")
 	for i, v := range l.Items {
-		b.WriteString(v.String())
+		if v == nil {
+			b.WriteString("()")
+		} else {
+			b.WriteString(v.String())
+		}
 		if i < len(l.Items)-1 {
 			b.WriteString(" ")
 		}

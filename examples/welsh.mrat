@@ -1,16 +1,16 @@
 (load-file "./functional.mrat")
 
 ;;; Make some functions easier to use.
-(def sin mrat.osc.sin)
-(def saw mrat.osc.saw)
-(def sqr mrat.osc.sqr)
-(def tri mrat.osc.tri)
-(def phasor mrat.osc.phasor)
-(def noise mrat.osc.noise)
+(def ~sin mrat.osc.sin)
+(def ~saw mrat.osc.saw)
+(def ~sqr mrat.osc.sqr)
+(def ~tri mrat.osc.tri)
+(def ~phasor mrat.osc.phasor)
+(def ~noise mrat.osc.noise)
 
 (def ~lores mrat.effects.~lores)
 (def ~env mrat.effects.env)
-(def clip mrat.effects.clip)
+(def ~clip mrat.effects.clip)
 
 (def print mrat.core.io.print)
 
@@ -30,9 +30,9 @@
 
 ;;; Sawtooth wave but with a duty cycle parameter.
 (def (sawduty w duty)
-  (let ((min (+ 1 (* -2 (clip duty 0 1))))
+  (let ((min (+ 1 (* -2 (~clip duty 0 1))))
         (max 1))
-    (clip (apply saw (cons w (rest (rest $args)))) min max)))
+    (~clip (apply ~saw (cons w (rest (rest $args)))) min max)))
 
 ;;; TODO: move to a library for music theory.
 (def (cents x) (pow 2 (/ x 1200)))
@@ -101,7 +101,7 @@
     (let ((w (* w detune))
           (osckey (getval cfg :key)))
       (let ((w (getlfofreq lfoinfo osckey w)))
-        (list osckey (phasor w))))))
+        (list osckey (~phasor w))))))
 
 ;;; Make an oscillator constructor for the given configuration.
 (def (mkosc cfg)
@@ -166,11 +166,11 @@
         (let ((duty (getlfoduty lfoinfo osckey duty))
               (w    (getlfofreq lfoinfo osckey w)))
           (* mix (case wave
-                   :tri (apply tri (cons w syncargs))
-                   :sqr (apply sqr (concat (list w duty) syncargs))
+                   :tri (apply ~tri (cons w syncargs))
+                   :sqr (apply ~sqr (concat (list w duty) syncargs))
                    :saw (apply sawduty (concat (list w duty) syncargs))
-                   :sin (apply sin (cons w syncargs))
-                   :noise (noise))))))))
+                   :sin (apply ~sin (cons w syncargs))
+                   :noise (~noise))))))))
 
 ;;; Make a low-frequency oscillator constructor from a configuration.
 (def (mklfo cfg)
@@ -180,10 +180,10 @@
           (duty (getvaldef cfg '(:lfo :duty) 0.5))
           (w (getval cfg '(:lfo :freq))))
       (fn () (case wave
-               :tri (tri w)
-               :sqr (sqr w duty)
-               :saw (saw w)
-               :sin (sin w)
+               :tri (~tri w)
+               :sqr (~sqr w duty)
+               :saw (~saw w)
+               :sin (~sin w)
                :noise (noise))))))
 
 ;;; Make a sound generator from a configuration. Configuration

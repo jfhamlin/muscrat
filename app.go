@@ -71,18 +71,18 @@ type App struct {
 	graph             *graph.Graph
 	lastSynthFileHash [32]byte
 
-	mtx sync.Mutex
+	mtx sync.RWMutex
 }
 
 // NewApp creates a new App application struct
 func NewApp() *App {
 	return &App{
-		outputChannel:            make(chan []float64, 4), // buffer four packets of samples
-		synthFileName:            "synth.mrat",
-		gain:                     0.25,
-		showSpectrum:             true,
-		showSpectrumHist:         true,
-		showOscilloscope:         true,
+		outputChannel: make(chan []float64, 4), // buffer four packets of samples
+		synthFileName: "synth.mrat",
+		gain:          0.25,
+		// showSpectrum:             true,
+		showSpectrumHist: true,
+		// showOscilloscope:         true,
 		oscilloscopeWindow:       1.0 / 440,
 		oscilloscopeUpdateFreqHz: 1,
 	}
@@ -570,64 +570,68 @@ func (a *App) spectrumWorker() {
 	lastOscilloscopeRender := time.Now()
 	var lastOscilloscopeFrame string
 	for {
-		oscilloscopeRenderInterval := time.Duration(1 / a.oscilloscopeUpdateFreqHz * float64(time.Second))
+		func() {
+			oscilloscopeRenderInterval := time.Duration(1 / a.oscilloscopeUpdateFreqHz * float64(time.Second))
 
-		width, height, err := term.GetSize(int(os.Stdout.Fd()))
-		if err != nil || (!a.showOscilloscope && !a.showSpectrum) {
-			continue
-		}
-
-		samps := <-fftChan
-		samps = append(samps, (<-fftChan)...)
-
-		builder := strings.Builder{}
-
-		builder.WriteRune('\n')
-		if a.showOscilloscope {
-			oHeight := height
-			if a.showSpectrum {
-				oHeight = height / 2
-				height -= oHeight
+			width, height, err := term.GetSize(int(os.Stdout.Fd()))
+			if err != nil || (!a.showOscilloscope && !a.showSpectrum) {
+				return
 			}
 
-			if time.Since(lastOscilloscopeRender) >= oscilloscopeRenderInterval {
-				lastOscilloscopeRender = time.Now()
-				oscNumSamples := int(a.oscilloscopeWindow * 44100)
-				if oscNumSamples == 0 {
-					fmt.Println("oscilloscope window too small:", a.oscilloscopeWindow)
-					continue
-				}
-				for len(samps) < oscNumSamples {
-					samps = append(samps, (<-fftChan)...)
+			samps := <-fftChan
+			samps = append(samps, (<-fftChan)...)
+
+			builder := strings.Builder{}
+
+			builder.WriteRune('\n')
+			if a.showOscilloscope {
+				oHeight := height
+				if a.showSpectrum {
+					oHeight = height / 2
+					height -= oHeight
 				}
 
-				lastOscilloscopeFrame = a.renderOscilloscope(samps[:oscNumSamples], width, oHeight)
+				if time.Since(lastOscilloscopeRender) >= oscilloscopeRenderInterval {
+					lastOscilloscopeRender = time.Now()
+					oscNumSamples := int(a.oscilloscopeWindow * 44100)
+					if oscNumSamples == 0 {
+						fmt.Println("oscilloscope window too small:", a.oscilloscopeWindow)
+						return
+					}
+					for len(samps) < oscNumSamples {
+						samps = append(samps, (<-fftChan)...)
+					}
+
+					lastOscilloscopeFrame = a.renderOscilloscope(samps[:oscNumSamples], width, oHeight)
+				}
+				builder.WriteString(lastOscilloscopeFrame)
 			}
-			builder.WriteString(lastOscilloscopeFrame)
-		}
 
-		if !a.showSpectrum {
-			fmt.Print(builder.String())
-			continue
-		}
+			if !a.showSpectrum {
+				fmt.Print(builder.String())
+				return
+			}
 
-		builder.WriteRune('\n')
-		// apply a Bartlett window to the samples to reduce the spectral
-		// leakage.
-		for i := 0; i < len(samps); i++ {
-			if i < (len(samps)-1)/2 {
-				samps[i] *= 2 * float64(i) / float64(len(samps)-1)
+			builder.WriteRune('\n')
+			// apply a Bartlett window to the samples to reduce the spectral
+			// leakage.
+			for i := 0; i < len(samps); i++ {
+				if i < (len(samps)-1)/2 {
+					samps[i] *= 2 * float64(i) / float64(len(samps)-1)
+				} else {
+					samps[i] *= 2 - 2*float64(i)/float64(len(samps)-1)
+				}
+			}
+			// truncate the length of samps to the nearest power of 2.
+			samps = samps[:1<<uint(math.Log2(float64(len(samps))))]
+			x := fft.FFTReal(samps)
+			if a.showSpectrumHist {
+				builder.WriteString(renderSpectrumHist(x, width, height))
 			} else {
-				samps[i] *= 2 - 2*float64(i)/float64(len(samps)-1)
+				fmt.Println(renderSpectrumLine(x, width-2))
 			}
-		}
-		x := fft.FFTReal(samps)
-		if a.showSpectrumHist {
-			builder.WriteString(renderSpectrumHist(x, width, height))
-		} else {
-			fmt.Println(renderSpectrumLine(x, width-2))
-		}
-		fmt.Print(builder.String())
+			fmt.Print(builder.String())
+		}()
 	}
 }
 
@@ -823,6 +827,8 @@ type WaveformInfo struct {
 type WaveformCallback func(samples []float64, sampleFreq float64)
 
 func (a *App) RegisterWaveformCallback(cb WaveformCallback) {
+	a.mtx.Lock()
+	defer a.mtx.Unlock()
 	a.waveformCallback = cb
 }
 
@@ -837,21 +843,31 @@ func (a *App) GraphDot() string {
 }
 
 func (a *App) SetShowSpectrum(showSpectrum bool) {
+	a.mtx.Lock()
+	defer a.mtx.Unlock()
 	a.showSpectrum = showSpectrum
 }
 
 func (a *App) SetShowSpectrumHist(showSpectrumHist bool) {
+	a.mtx.Lock()
+	defer a.mtx.Unlock()
 	a.showSpectrumHist = showSpectrumHist
 }
 
 func (a *App) SetShowOscilloscope(showOscilloscope bool) {
+	a.mtx.Lock()
+	defer a.mtx.Unlock()
 	a.showOscilloscope = showOscilloscope
 }
 
 func (a *App) SetOscilloscopeWindow(window float64) {
+	a.mtx.Lock()
+	defer a.mtx.Unlock()
 	a.oscilloscopeWindow = window
 }
 
 func (a *App) SetOscilloscopeFreq(freq float64) {
+	a.mtx.Lock()
+	defer a.mtx.Unlock()
 	a.oscilloscopeUpdateFreqHz = freq
 }
