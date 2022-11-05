@@ -613,6 +613,9 @@ func (a *App) spectrumWorker() {
 			}
 
 			builder.WriteRune('\n')
+			// truncate the length of samps to the nearest power of 2.
+			samps = samps[:1<<uint(math.Log2(float64(len(samps))))]
+
 			// apply a Bartlett window to the samples to reduce the spectral
 			// leakage.
 			for i := 0; i < len(samps); i++ {
@@ -622,8 +625,6 @@ func (a *App) spectrumWorker() {
 					samps[i] *= 2 - 2*float64(i)/float64(len(samps)-1)
 				}
 			}
-			// truncate the length of samps to the nearest power of 2.
-			samps = samps[:1<<uint(math.Log2(float64(len(samps))))]
 			x := fft.FFTReal(samps)
 			if a.showSpectrumHist {
 				builder.WriteString(renderSpectrumHist(x, width, height))

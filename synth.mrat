@@ -68,10 +68,10 @@
           (fn (el) (* (/ (first el) totalSum) (second el)))
           chanWeights))))
 
-(def (harmonikit amps)
-  (fn (freq)
-    (let ((sinFn (fn (amp idx) (list amp (~sin (* freq (+ idx 1)))))))
-      (~mixer (maps sinFn amps (range 0 (length amps)))))))
+;; (def (harmonikit amps)
+;;   (fn (freq)
+;;     (let ((sinFn (fn (amp idx) (list amp (~sin (* freq (+ idx 1)))))))
+;;       (~mixer (maps sinFn amps (range 0 (length amps)))))))
 
 (def (times value n)
   (if (eq? n 0)
@@ -79,24 +79,25 @@
     (cons value (times value (- n 1)))))
 
 
-(def harmAmps (map-idx (fn (x i) (/ 1 (* x x x))) (range 1 101)))
-(def myInst (harmonikit harmAmps))
+;; (def harmAmps (map-idx (fn (x i) (/ 1 (* x x x))) (range 1 101)))
+;; (def myInst (harmonikit harmAmps))
 
-(def ~dc (darkCity (+ 260 (* 100 (~noise)))
-           (~sqr 1)))
+;; (def ~dc (darkCity (+ 260 (* 100 (~noise)))
+;;            (~sqr 1)))
 
-(def ~reverb (~lores (~freeverb ~dc) 880 0.8))
+;; (def ~reverb (~lores (~freeverb ~dc) 880 0.8))
 
 ;; (mrat.core.io.out (~mixer (list (list 16 (acidBass 100 (~sqr 1)))
 ;;                                 (list 4 ~dc)
 ;;                                 (list 8 (* (oscrng (~tri 4) 0.1 1) ~reverb)))))
 
 
-(def frequency-multiples (range 1 20))
-(def (~sins fundamental)
-  (sum (map (fn (x) (~pulse (* fundamental x))) frequency-multiples)))
+;; (def frequency-multiples (range 1 42))
+;; (def (~sins fundamental)
+;;   (sum (map (fn (x) (~pulse (* fundamental x))) frequency-multiples)))
 
-(mrat.core.io.out (~sin (oscrng (~sin 0.01) 100 200)))
+;; (mrat.core.io.out
+;;  (~sin (oscrng (~sins 0.01) 100 200)))
 
 ;; (mrat.core.io.out (~mixer (list
 ;;                            (list 1 (celestialWash 220 (~pulse 2)))
@@ -104,3 +105,25 @@
 ;;                            (list 1 ~reverb)
 ;;                            )))
 
+(def (avg lst)
+  (* (sum lst)
+     (/ 1 (length lst))))
+
+(def (meandering-sound lfo-freq-n lfo-rate)
+  (let ((frequency-multiples (range 1 lfo-freq-n)))
+    (let ((~sins
+           (fn (fundamental)
+             (avg (map
+                   (fn (x) (* (/ 1.0 1.0) (~pulse (* fundamental x))))
+                   frequency-multiples)))))
+      (let ((~lfo (~sins lfo-rate)))
+        (~saw (oscrng ~lfo 100 1000) :duty (oscrng ~lfo 0.1 0.9))))))
+
+;; (mrat.core.io.out (~lores (meandering-sound 10 0.1) 263 0.99))
+(mrat.core.io.out (darkCity 263 (~pulse 1)))
+
+;; (mrat.core.io.out
+;;  (let ((phs (~phasor 1)))
+;;    (~freeverb
+;;     (~mixer (list (list 1 (* phs (meandering-sound 60 8)))
+;;                   (list 1 (* (+ -1 phs) (~noise))))))))

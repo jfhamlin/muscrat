@@ -73,7 +73,11 @@ func LineChartString(values []float64, width, height int) string {
 	maxStrDec := strconv.FormatFloat(maxAbsVal-float64(int(maxAbsVal)), 'f', -1, 64)
 	if strings.HasPrefix(maxStrDec, "0.") {
 		// at most 3 decimal places
-		maxStrDec = maxStrDec[1:4]
+		if len(maxStrDec) > 4 {
+			maxStrDec = maxStrDec[1:4]
+		} else {
+			maxStrDec = maxStrDec[1:]
+		}
 	} else {
 		maxStrDec = ""
 	}

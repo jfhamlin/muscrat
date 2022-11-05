@@ -33,7 +33,10 @@ function App() {
     }, 1000);
 
     const updateGraph = async () => {
-      setGraphDot(await GraphDot());
+      const dot = await GraphDot();
+      if (dot !== graphDot) {
+        setGraphDot(dot);
+      }
     };
     updateGraph();
 
