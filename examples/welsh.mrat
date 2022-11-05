@@ -178,7 +178,7 @@
     nil
     (let ((wave (getvaldef cfg '(:lfo :wave) :tri))
           (duty (getvaldef cfg '(:lfo :duty) 0.5))
-          (w (getval cfg '(:lfo :freq))))
+          (w    (getvaldef cfg '(:lfo :freq) 0))) ;; default no lfo
       (fn () (case wave
                :tri (~tri w)
                :sqr (~sqr w duty)
@@ -202,8 +202,15 @@
     )
   )
 
-;;; TODO: i have no idea what the envelope value on the low-pass
-;;; filter is for.
+;;; how much should the lfo affect the cutoff frequency?
+;;; example:
+;;;
+;;; if the filter is set to a magnitude of 2, and the lfo is set to a
+;;; depth of 3, then the cutoff frequency will be modulated by a
+;;; magnitude of 6. so you're adding more high frequencies to the
+;;; signal.
+;;;
+;;; source: https://www.youtube.com/watch?v=n8qkVnkk8b8
 
 ;;; Configurations and sample generator constructors.
 

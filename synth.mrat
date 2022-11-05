@@ -87,6 +87,20 @@
 
 (def ~reverb (~lores (~freeverb ~dc) 880 0.8))
 
-(mrat.core.io.out (~mixer (list (list 0.1 (* (oscrng (~tri 32) 0 1)(~noise)))
-                                (list 4 ~dc)
-                                (list 8 (* (oscrng (~tri 4) 0.1 1) ~reverb)))))
+;; (mrat.core.io.out (~mixer (list (list 16 (acidBass 100 (~sqr 1)))
+;;                                 (list 4 ~dc)
+;;                                 (list 8 (* (oscrng (~tri 4) 0.1 1) ~reverb)))))
+
+
+(def frequency-multiples (range 1 20))
+(def (~sins fundamental)
+  (sum (map (fn (x) (~pulse (* fundamental x))) frequency-multiples)))
+
+(mrat.core.io.out (~sin (oscrng (~sin 0.01) 100 200)))
+
+;; (mrat.core.io.out (~mixer (list
+;;                            (list 1 (celestialWash 220 (~pulse 2)))
+;;                            (list 1 ~dc)
+;;                            (list 1 ~reverb)
+;;                            )))
+

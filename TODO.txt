@@ -45,7 +45,9 @@ Either:
 *** TODO tools for sequencer
 ** TODO music theory libraries
 ** TODO lisp language improvements
-*** TODO call stacks in runtime errors
+*** DONE call stacks in runtime errors
+*** TODO macro support
+*** TODO implement special forms as macros
 *** TODO include whitespace and comment information in output from reader
 This allows us to modify the AST programmatically and output a file
 retaining comments and formatting.
