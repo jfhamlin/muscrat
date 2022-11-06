@@ -81,26 +81,81 @@ func WithSection(s ast.Section) Option {
 // List is a list of values.
 type List struct {
 	ast.Section
-	Items []Value
+
+	// the empty list is represented by a nil item and a nil next. all
+	// other lists have a non-nil item and a non-nil next.
+	item Value
+	next *List
 }
+
+var emptyList = &List{}
 
 func NewList(values []Value, opts ...Option) *List {
 	var o options
 	for _, opt := range opts {
 		opt(&o)
 	}
+
+	list := emptyList
+	for i := len(values) - 1; i >= 0; i-- {
+		list = &List{
+			Section: o.section,
+			item:    values[i],
+			next:    list,
+		}
+	}
+	return list
+}
+
+func ConsList(item Value, next *List) *List {
+	if next == nil {
+		next = emptyList
+	}
 	return &List{
-		Section: o.section,
-		Items:   values,
+		item: item,
+		next: next,
 	}
 }
 
+// Item returns the data from this list node. AKA car.
+func (l *List) Item() Value {
+	if l.IsEmpty() {
+		panic("cannot get item of empty list")
+	}
+	return l.item
+}
+
+// Next returns the next list node. AKA cdr, with the requirement that
+// it must be a list.
+func (l *List) Next() *List {
+	if l.IsEmpty() {
+		panic("cannot get next of empty list")
+	}
+	return l.next
+}
+
+func (l *List) IsEmpty() bool {
+	return l.item == nil && l.next == nil
+}
+
 func (l *List) Count() int {
-	return len(l.Items)
+	count := 0
+	for !l.IsEmpty() {
+		count++
+		l = l.next
+	}
+	return count
 }
 
 func (l *List) Enumerate() (<-chan Value, func()) {
-	return enumerateItems(l.Items)
+	return enumerateFunc(func() (v Value, ok bool) {
+		if l.IsEmpty() {
+			return nil, false
+		}
+		v = l.item
+		l = l.next
+		return v, true
+	})
 }
 
 func enumerateItems(items []Value) (<-chan Value, func()) {
@@ -123,27 +178,52 @@ func enumerateItems(items []Value) (<-chan Value, func()) {
 	return ch, cancel
 }
 
+func enumerateFunc(next func() (v Value, ok bool)) (<-chan Value, func()) {
+	ch := make(chan Value)
+
+	done := make(chan struct{})
+	cancel := func() {
+		close(done)
+	}
+	go func() {
+		for {
+			v, ok := next()
+			if !ok {
+				break
+			}
+			select {
+			case ch <- v:
+			case <-done:
+				return
+			}
+		}
+		close(ch)
+	}()
+	return ch, cancel
+}
+
 func (l *List) String() string {
 	b := strings.Builder{}
 
 	// special case for quoted values
-	if len(l.Items) == 2 {
+	if l.Count() == 2 {
 		// TODO: only do this if it used quote shorthand when read.
-		if sym, ok := l.Items[0].(*Symbol); ok && sym.Value == "quote" {
+		if sym, ok := l.item.(*Symbol); ok && sym.Value == "quote" {
 			b.WriteString("'")
-			b.WriteString(l.Items[1].String())
+			b.WriteString(l.next.item.String())
 			return b.String()
 		}
 	}
 
 	b.WriteString("(")
-	for i, v := range l.Items {
+	for cur := l; !cur.IsEmpty(); cur = cur.next {
+		v := cur.item
 		if v == nil {
 			b.WriteString("()")
 		} else {
 			b.WriteString(v.String())
 		}
-		if i < len(l.Items)-1 {
+		if !cur.next.IsEmpty() {
 			b.WriteString(" ")
 		}
 	}
@@ -156,14 +236,21 @@ func (l *List) Equal(v Value) bool {
 	if !ok {
 		return false
 	}
-	if len(l.Items) != len(other.Items) {
-		return false
-	}
-	for i, v := range l.Items {
-		if !v.Equal(other.Items[i]) {
+
+	for {
+		if l.IsEmpty() != other.IsEmpty() {
 			return false
 		}
+		if l.IsEmpty() {
+			return true
+		}
+		if !l.item.Equal(other.item) {
+			return false
+		}
+		l = l.next
+		other = other.next
 	}
+
 	return true
 }
 
@@ -450,7 +537,35 @@ type Func struct {
 }
 
 func (f *Func) String() string {
-	return fmt.Sprintf("(fn (%v) %s)", f.ArgNames, f.Exprs)
+	b := strings.Builder{}
+	b.WriteString("(fn")
+	if f.LambdaName != "" {
+		b.WriteString(" ")
+		b.WriteString(f.LambdaName)
+	}
+	b.WriteString(" (")
+	for i, arg := range f.ArgNames {
+		if i > 0 {
+			b.WriteString(" ")
+		}
+		b.WriteString(arg)
+	}
+	if f.Variadic {
+		if len(f.ArgNames) > 0 {
+			b.WriteString(" ")
+		}
+		b.WriteString("&")
+		b.WriteString(f.ArgNames[len(f.ArgNames)-1])
+	}
+	b.WriteString(") ")
+	for cur := f.Exprs; !cur.IsEmpty(); cur = cur.Next() {
+		if cur != f.Exprs {
+			b.WriteString(" ")
+		}
+		b.WriteString(cur.Item().String())
+	}
+	b.WriteString(")")
+	return b.String()
 }
 
 func (f *Func) Equal(v Value) bool {
@@ -473,6 +588,23 @@ func errorWithStack(err error, stackFrame StackFrame) error {
 }
 
 func (f *Func) Apply(env Environment, args []Value) (Value, error) {
+	var res Value
+	var err error
+	continuation := func() (Value, Continuation, error) {
+		return f.ContinuationApply(env, args)
+	}
+	for {
+		res, continuation, err = continuation()
+		if err != nil {
+			return nil, err
+		}
+		if continuation == nil {
+			return res, nil
+		}
+	}
+}
+
+func (f *Func) ContinuationApply(env Environment, args []Value) (Value, Continuation, error) {
 	// function name for error messages
 	fnName := f.LambdaName
 	if fnName == "" {
@@ -480,7 +612,7 @@ func (f *Func) Apply(env Environment, args []Value) (Value, error) {
 	}
 
 	fnEnv := f.Env.PushScope()
-	fnEnv.Define("$args", &List{Items: args})
+	fnEnv.Define("$args", &Vector{Items: args})
 	if f.LambdaName != "" {
 		// Define the function name in the environment.
 		fnEnv.Define(f.LambdaName, f)
@@ -488,7 +620,7 @@ func (f *Func) Apply(env Environment, args []Value) (Value, error) {
 
 	for i, argName := range f.ArgNames {
 		if i >= len(args) {
-			return nil, fmt.Errorf("too few arguments to function")
+			return nil, nil, fmt.Errorf("too few arguments to function")
 		}
 		fnEnv.Define(argName, args[i])
 	}
@@ -498,63 +630,36 @@ func (f *Func) Apply(env Environment, args []Value) (Value, error) {
 		}
 	}
 
-	var res Value
-	for _, expr := range f.Exprs.Items {
-		// // if i know that this is
-		// // - the last expression and
-		// // - a function call
-		// //
-		// // then i can skip the stack frame creation
-		// if i == len(f.Exprs.Items)-1 && isFunctionCall(expr) {
-		// 	var res []Value
-		// 	for _, item := range expr.(*List).Items {
-		// 		v, err := fnEnv.Eval(item)
-		// 		if err != nil {
-		// 			return nil, err
-		// 		}
-		// 		res = append(res, v)
-		// 	}
-		// 	if fn, ok := res[0].(*Func); ok {
-		// 		f = fn
-		// 		args = res[1:]
-		// 		goto Start
-		// 	}
-		// }
-		// fmt.Println(fnName, "- not a tail call", expr)
-		v, err := fnEnv.Eval(expr)
+	var exprs []Value
+	for cur := f.Exprs; !cur.IsEmpty(); cur = cur.next {
+		exprs = append(exprs, cur.item)
+	}
+	if len(exprs) == 0 {
+		panic("empty function body")
+	}
+
+	for _, expr := range exprs[:len(exprs)-1] {
+		_, err := fnEnv.Eval(expr)
 		if err != nil {
-			return nil, errorWithStack(err, StackFrame{
+			return nil, nil, errorWithStack(err, StackFrame{
 				FunctionName: fnName,
 				Pos:          expr.Pos(),
 			})
 		}
-		res = v
 	}
-	return res, nil
+	// return the last expression as a continuation
+	lastExpr := exprs[len(exprs)-1]
+	return nil, func() (Value, Continuation, error) {
+		v, c, err := fnEnv.ContinuationEval(lastExpr)
+		if err != nil {
+			return nil, nil, errorWithStack(err, StackFrame{
+				FunctionName: fnName,
+				Pos:          lastExpr.Pos(),
+			})
+		}
+		return v, c, nil
+	}, nil
 }
-
-// func isFunctionCall(expr Value) bool {
-// 	list, ok := expr.(*List)
-// 	if !ok || len(list.Items) == 0 {
-// 		return false
-// 	}
-
-// 	sym, ok := list.Items[0].(*Symbol)
-// 	if ok && isSpecialForm(sym.Value) {
-// 		return false
-// 	}
-
-// 	return true
-// }
-
-// func isSpecialForm(name string) bool {
-// 	switch name {
-// 	// TODO: special forms with macros instead of special cases
-// 	case "def", "if", "case", "and", "or", "lambda", "fn", "quote", "let":
-// 		return true
-// 	}
-// 	return false
-// }
 
 // BuiltinFunc is a builtin function.
 type BuiltinFunc struct {

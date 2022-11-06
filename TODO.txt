@@ -30,6 +30,7 @@ Either:
 ** TODO Synth will occasionally hang
 *** TODO Show timing stats for all gens
 *** TODO Alert on gens taking too long or blocking for too long
+** TODO Add regression tests for raw audio output
 ** TODO Support building instruments from Welsh's Synthesizer Cookbook
 *** DONE Low-pass Filter with cutoff and resonance parameters
 *** DONE triangle wave generator
@@ -51,6 +52,7 @@ Either:
 ** TODO music theory libraries
 ** TODO lisp language improvements
 *** DONE call stacks in runtime errors
+*** TODO better call stacks when tail calls are optimized
 *** TODO macro support
 *** TODO implement special forms as macros
 *** TODO include whitespace and comment information in output from reader

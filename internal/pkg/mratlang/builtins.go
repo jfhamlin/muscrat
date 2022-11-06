@@ -32,6 +32,7 @@ func init() {
 				funcSymbol("list", listBuiltin),
 				funcSymbol("vector", vectorBuiltin),
 				funcSymbol("length", lengthBuiltin),
+				funcSymbol("conj", conjBuiltin),
 				funcSymbol("concat", concatBuiltin),
 				funcSymbol("first", firstBuiltin),
 				funcSymbol("rest", restBuiltin),
@@ -168,6 +169,11 @@ func lengthBuiltin(env value.Environment, args []value.Value) (value.Value, erro
 	if len(args) != 1 {
 		return nil, fmt.Errorf("length expects 1 argument, got %v", len(args))
 	}
+
+	if args[0] == nil {
+		return value.NewNum(0), nil
+	}
+
 	if c, ok := args[0].(value.Counter); ok {
 		return value.NewNum(float64(c.Count())), nil
 	}
@@ -185,6 +191,24 @@ func lengthBuiltin(env value.Environment, args []value.Value) (value.Value, erro
 		count++
 	}
 	return value.NewNum(float64(count)), nil
+}
+
+func conjBuiltin(env value.Environment, args []value.Value) (value.Value, error) {
+	if len(args) < 2 {
+		return nil, fmt.Errorf("conj expects at least 2 arguments, got %v", len(args))
+	}
+
+	for _, arg := range args[1:] {
+		switch c := args[0].(type) {
+		case *value.List:
+			return value.ConsList(arg, c), nil
+		case *value.Vector:
+			return value.NewVector(append(c.Items, arg)), nil
+		default:
+			return nil, fmt.Errorf("conj expects a collection, got %v", args[0])
+		}
+	}
+	panic("unreachable")
 }
 
 func concatBuiltin(env value.Environment, args []value.Value) (value.Value, error) {
@@ -1231,7 +1255,7 @@ func envBuiltin(env value.Environment, args []value.Value) (value.Value, error) 
 	}
 
 	// the second argument is the list of levels.
-	levels, ok := asList(args[1])
+	levels, ok := asSlice(args[1])
 	if !ok {
 		return nil, fmt.Errorf("env expects a list as the second argument, got %v", args[1])
 	}
@@ -1245,7 +1269,7 @@ func envBuiltin(env value.Environment, args []value.Value) (value.Value, error) 
 	}
 
 	// the third argument is the list of durations.
-	durations, ok := asList(args[2])
+	durations, ok := asSlice(args[2])
 	if !ok {
 		return nil, fmt.Errorf("env expects a list as the third argument, got %v", args[2])
 	}
@@ -1388,12 +1412,19 @@ func asGen(env value.Environment, v value.Value) (*value.Gen, bool) {
 	}
 }
 
-func asList(v value.Value) ([]value.Value, bool) {
-	// asList converts a Value to a list, if possible.
-	switch v := v.(type) {
-	case *value.List:
-		return v.Items, true
-	default:
+// asSlice converts a Value to a slice of Values, if possible.
+func asSlice(v value.Value) ([]value.Value, bool) {
+	enum, ok := v.(value.Enumerable)
+	if !ok {
 		return nil, false
 	}
+
+	ch, cancel := enum.Enumerate()
+	defer cancel()
+
+	var list []value.Value
+	for v := range ch {
+		list = append(list, v)
+	}
+	return list, true
 }

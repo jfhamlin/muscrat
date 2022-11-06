@@ -108,27 +108,55 @@ func (env *environment) errorf(n poser, format string, args ...interface{}) erro
 }
 
 func (env *environment) Eval(n value.Value) (value.Value, error) {
+	var result value.Value
+	var err error
+	continuation := func() (value.Value, value.Continuation, error) {
+		return env.eval(n)
+	}
+
+	for {
+		result, continuation, err = continuation()
+		if err != nil {
+			return nil, err
+		}
+		if continuation == nil {
+			return result, nil
+		}
+	}
+}
+
+func (env *environment) ContinuationEval(n value.Value) (value.Value, value.Continuation, error) {
+	return env.eval(n)
+}
+
+func (env *environment) eval(n value.Value) (value.Value, value.Continuation, error) {
 	switch v := n.(type) {
 	case *value.List:
 		return env.evalList(v)
 	case *value.Vector:
-		return env.evalVector(v)
+		res, err := env.evalVector(v)
+		return res, nil, err
 	default:
-		return env.evalScalar(n)
+		res, err := env.evalScalar(n)
+		return res, nil, err
 	}
 }
 
-func (env *environment) evalList(n *value.List) (value.Value, error) {
-	if len(n.Items) == 0 {
-		return nil, nil
+func asContinuationResult(v value.Value, err error) (value.Value, value.Continuation, error) {
+	return v, nil, err
+}
+
+func (env *environment) evalList(n *value.List) (value.Value, value.Continuation, error) {
+	if n.IsEmpty() {
+		return nil, nil, nil
 	}
 
-	first := n.Items[0]
+	first := n.Item()
 	if sym, ok := first.(*value.Symbol); ok {
 		// handle special forms
 		switch sym.Value {
 		case "def":
-			return env.evalDef(n)
+			return asContinuationResult(env.evalDef(n))
 		case "if":
 			return env.evalIf(n)
 		case "case":
@@ -138,11 +166,11 @@ func (env *environment) evalList(n *value.List) (value.Value, error) {
 		case "or":
 			return env.evalOr(n)
 		case "lambda":
-			return env.evalLambda(n)
+			return asContinuationResult(env.evalLambda(n))
 		case "fn":
-			return env.evalFn(n)
+			return asContinuationResult(env.evalFn(n))
 		case "quote":
-			return env.evalQuote(n)
+			return asContinuationResult(env.evalQuote(n))
 		case "let":
 			return env.evalLet(n)
 		}
@@ -150,14 +178,18 @@ func (env *environment) evalList(n *value.List) (value.Value, error) {
 
 	// otherwise, handle a function call
 	var res []value.Value
-	for _, item := range n.Items {
+	for cur := n; !cur.IsEmpty(); cur = cur.Next() {
+		item := cur.Item()
 		v, err := env.Eval(item)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		res = append(res, v)
 	}
-	return env.applyFunc(res[0], res[1:])
+
+	return nil, func() (value.Value, value.Continuation, error) {
+		return env.applyFunc(res[0], res[1:])
+	}, nil
 }
 
 func (env *environment) evalVector(n *value.Vector) (value.Value, error) {
@@ -185,14 +217,20 @@ func (env *environment) evalScalar(n value.Value) (value.Value, error) {
 	}
 }
 
-func (env *environment) applyFunc(f value.Value, args []value.Value) (value.Value, error) {
+func (env *environment) applyFunc(f value.Value, args []value.Value) (value.Value, value.Continuation, error) {
+	cfn, ok := f.(value.ContinuationApplyer)
+	if ok {
+		return cfn.ContinuationApply(env, args)
+	}
+
 	fn, ok := f.(value.Applyer)
 	if !ok {
 		// TODO: the error's location should indicate the call site, not
 		// the location at which the function value was defined.
-		return nil, env.errorf(f, "value is not a function: %v", f)
+		return nil, nil, env.errorf(f, "value is not a function: %v", f)
 	}
-	return fn.Apply(env, args)
+	res, err := fn.Apply(env, args)
+	return res, nil, err
 }
 
 // Special forms
@@ -204,31 +242,33 @@ func (na *nopApplyer) Apply(env *environment, args []value.Value) (value.Value, 
 }
 
 func (env *environment) evalDef(n *value.List) (value.Value, error) {
-	if len(n.Items) < 3 {
+	listLength := n.Count()
+	if listLength < 3 {
 		return nil, env.errorf(n, "invalid definition, too few items")
 	}
 
-	switch v := n.Items[1].(type) {
+	switch v := n.Next().Item().(type) {
 	case *value.Symbol:
-		if len(n.Items) != 3 {
+		if listLength != 3 {
 			return nil, env.errorf(n, "invalid definition, too many items")
 		}
-		val, err := env.Eval(n.Items[2])
+		val, err := env.Eval(n.Next().Next().Item())
 		if err != nil {
 			return nil, err
 		}
 		env.Define(v.Value, val)
 		return nil, nil
 	case *value.List:
-		if len(v.Items) == 0 {
+		if v.Count() == 0 {
 			return nil, env.errorf(n, "invalid function definition, no name")
 		}
-		sym, ok := v.Items[0].(*value.Symbol)
+		sym, ok := v.Item().(*value.Symbol)
 		if !ok {
 			return nil, env.errorf(n, "invalid function definition, name is not a symbol")
 		}
-		argNames := make([]string, 0, len(v.Items)-1)
-		for _, item := range v.Items[1:] {
+		argNames := make([]string, 0, v.Count()-1)
+		for cur := v.Next(); !cur.IsEmpty(); cur = cur.Next() {
+			item := cur.Item()
 			argSym, ok := item.(*value.Symbol)
 			if !ok {
 				return nil, env.errorf(n, "invalid function definition, argument is not a symbol")
@@ -241,7 +281,7 @@ func (env *environment) evalDef(n *value.List) (value.Value, error) {
 			Section:    n.Section,
 			LambdaName: sym.Value,
 			ArgNames:   argNames,
-			Exprs:      value.NewList(n.Items[2:]),
+			Exprs:      n.Next().Next(),
 			Env:        env,
 		})
 		return nil, nil
@@ -251,10 +291,10 @@ func (env *environment) evalDef(n *value.List) (value.Value, error) {
 }
 
 func (env *environment) evalLambda(n *value.List) (value.Value, error) {
-	if len(n.Items) < 3 {
+	if n.Count() < 3 {
 		return nil, env.errorf(n, "invalid lambda, need args and body")
 	}
-	args, ok := n.Items[1].(*value.List)
+	args, ok := n.Next().Item().(*value.List)
 	if !ok {
 		return nil, env.errorf(n, "invalid lambda, args must be a list")
 	}
@@ -266,17 +306,21 @@ func (env *environment) evalLambda(n *value.List) (value.Value, error) {
 	return &value.Func{
 		Section:  n.Section,
 		ArgNames: argNames,
-		Exprs:    value.NewList(n.Items[2:]),
+		Exprs:    n.Next().Next(),
 		Env:      env,
 	}, nil
 }
 
 func (env *environment) evalFn(n *value.List) (value.Value, error) {
-	if len(n.Items) < 3 {
+	listLength := n.Count()
+	if listLength < 3 {
 		return nil, env.errorf(n, "invalid fn expression, need args and body")
 	}
 
-	items := n.Items[1:]
+	items := make([]value.Value, 0, listLength-1)
+	for cur := n.Next(); !cur.IsEmpty(); cur = cur.Next() {
+		items = append(items, cur.Item())
+	}
 
 	var fnName string
 	if sym, ok := items[0].(*value.Symbol); ok {
@@ -307,40 +351,48 @@ func (env *environment) evalFn(n *value.List) (value.Value, error) {
 	}, nil
 }
 
-func (env *environment) evalIf(n *value.List) (value.Value, error) {
-	if len(n.Items) < 3 || len(n.Items) > 4 {
-		return nil, env.errorf(n, "invalid if, need `cond ifExp [elseExp]`")
+func (env *environment) evalIf(n *value.List) (value.Value, value.Continuation, error) {
+	listLength := n.Count()
+	if listLength < 3 || listLength > 4 {
+		return nil, nil, env.errorf(n, "invalid if, need `cond ifExp [elseExp]`")
 	}
-	cond, err := env.Eval(n.Items[1])
+	cond, err := env.Eval(n.Next().Item())
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	b, ok := cond.(*value.Bool)
-	if !ok || b.Value {
-		res, err := env.Eval(n.Items[2])
-		// non-bool is always true
-		return res, err //env.Eval(n.Items[2])
+	if !ok || b.Value { // non-bool is always true
+		return nil, func() (value.Value, value.Continuation, error) {
+			return env.eval(n.Next().Next().Item())
+		}, nil
 	}
 
-	if len(n.Items) == 4 {
-		return env.Eval(n.Items[3])
+	if listLength == 4 {
+		return nil, func() (value.Value, value.Continuation, error) {
+			return env.eval(n.Next().Next().Next().Item())
+		}, nil
 	}
-	return nil, nil
+	return nil, nil, nil
 }
 
 // cases use syntax and most of the semantics of Clojure's case (not Scheme's).
 // see https://clojuredocs.org/clojure.core/case
-func (env *environment) evalCase(n *value.List) (value.Value, error) {
-	if len(n.Items) < 4 {
-		return nil, env.errorf(n, "invalid case, need `case caseExp & caseClauses`")
+func (env *environment) evalCase(n *value.List) (value.Value, value.Continuation, error) {
+	listLength := n.Count()
+	if listLength < 4 {
+		return nil, nil, env.errorf(n, "invalid case, need `case caseExp & caseClauses`")
 	}
-	cond, err := env.Eval(n.Items[1])
+	cond, err := env.Eval(n.Next().Item())
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
-	cases := n.Items[2:]
+	//cases := n.Items[2:]
+	cases := make([]value.Value, 0, listLength-2)
+	for cur := n.Next().Next(); !cur.IsEmpty(); cur = cur.Next() {
+		cases = append(cases, cur.Item())
+	}
 
 	for len(cases) >= 2 {
 		test, result := cases[0], cases[1]
@@ -349,65 +401,112 @@ func (env *environment) evalCase(n *value.List) (value.Value, error) {
 		testItems := []value.Value{test}
 		testList, ok := test.(*value.List)
 		if ok {
-			testItems = testList.Items
+			testItems = make([]value.Value, 0, testList.Count())
+			for cur := testList; !cur.IsEmpty(); cur = cur.Next() {
+				testItems = append(testItems, cur.Item())
+			}
 		}
 
 		for _, testItem := range testItems {
 			if testItem.Equal(cond) {
-				return env.Eval(result)
+				return nil, func() (value.Value, value.Continuation, error) {
+					return env.eval(result)
+				}, nil
 			}
 		}
 	}
 	if len(cases) == 1 {
-		return env.Eval(cases[0])
+		return nil, func() (value.Value, value.Continuation, error) {
+			return env.eval(cases[0])
+		}, nil
 	}
-	return nil, nil
+	return nil, nil, nil
 }
 
-func (env *environment) evalAnd(n *value.List) (value.Value, error) {
-	if len(n.Items) < 2 {
-		return nil, env.errorf(n, "invalid and, need at least one arg")
+func toBool(v value.Value) *value.Bool {
+	b, ok := v.(*value.Bool)
+	if !ok {
+		return value.NewBool(false)
 	}
-	for _, item := range n.Items[1:] {
+	return b
+}
+
+func toBoolContinuation(v value.Value, c value.Continuation, err error) (value.Value, value.Continuation, error) {
+	if err != nil {
+		return nil, nil, err
+	}
+	if c == nil {
+		return toBool(v), nil, nil
+	}
+	return nil, func() (value.Value, value.Continuation, error) {
+		return toBoolContinuation(c())
+	}, nil
+}
+
+func (env *environment) evalAnd(n *value.List) (value.Value, value.Continuation, error) {
+	listLength := n.Count()
+	if listLength < 2 {
+		return nil, nil, env.errorf(n, "invalid and, need at least one arg")
+	}
+
+	cur := n.Next()
+	// iterate through all but the last item.
+	// evaluate the final item in a continuation.
+	for ; !cur.Next().IsEmpty(); cur = cur.Next() {
+		item := cur.Item()
 		res, err := env.Eval(item)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		b, ok := res.(*value.Bool)
 		if !ok || !b.Value {
 			if b == nil {
-				return value.NewBool(false), nil
+				return value.NewBool(false), nil, nil
 			}
-			return b, nil
+			return b, nil, nil
 		}
 	}
-	return &value.Bool{Value: true}, nil
+	// return a continuation for the last item
+	return toBoolContinuation(nil, func() (value.Value, value.Continuation, error) {
+		// TODO: need to convert to bool...
+		return env.eval(cur.Item())
+	}, nil)
 }
 
-func (env *environment) evalOr(n *value.List) (value.Value, error) {
-	if len(n.Items) < 2 {
-		return nil, env.errorf(n, "invalid or, need at least one arg")
+func (env *environment) evalOr(n *value.List) (value.Value, value.Continuation, error) {
+	listLength := n.Count()
+	if listLength < 2 {
+		return nil, nil, env.errorf(n, "invalid or, need at least one arg")
 	}
 
-	for _, item := range n.Items[1:] {
+	//for _, item := range n.Items[1 : len(n.Items)-1] {
+	cur := n.Next()
+	// iterate through all but the last item.
+	// evaluate the final item in a continuation.
+	for ; !cur.Next().IsEmpty(); cur = cur.Next() {
+		item := cur.Item()
 		res, err := env.Eval(item)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		b, ok := res.(*value.Bool)
 		if ok && b.Value {
-			return b, nil
+			return b, nil, nil
 		}
 	}
-	return &value.Bool{Value: false}, nil
+	// return a continuation for the last item
+	return toBoolContinuation(nil, func() (value.Value, value.Continuation, error) {
+		return env.eval(cur.Item())
+	}, nil)
 }
 
 func (env *environment) evalQuote(n *value.List) (value.Value, error) {
-	if len(n.Items) != 2 {
+	listLength := n.Count()
+	if listLength != 2 {
 		return nil, env.errorf(n, "invalid quote, need 1 argument")
 	}
 
-	return n.Items[1], nil
+	return n.Next().Item(), nil
 }
 
 // essential syntax: let <bindings> <body>
@@ -426,23 +525,25 @@ func (env *environment) evalQuote(n *value.List) (value.Value, error) {
 // extended environment, and the value of the last expression of
 // <body> is returned. Each binding of a <variable> has <body> as its
 // region.
-func (env *environment) evalLet(n *value.List) (value.Value, error) {
-	if len(n.Items) < 3 {
-		return nil, env.errorf(n, "invalid let, need bindings and body")
+func (env *environment) evalLet(n *value.List) (value.Value, value.Continuation, error) {
+	items := listAsSlice(n)
+	if len(items) < 3 {
+		return nil, nil, env.errorf(n, "invalid let, need bindings and body")
 	}
 
-	bindings, ok := n.Items[1].(*value.List)
+	bindingList, ok := items[1].(*value.List)
 	if !ok {
-		return nil, env.errorf(n.Items[1], "invalid let, bindings must be a list")
+		return nil, nil, env.errorf(items[1], "invalid let, bindings must be a list")
 	}
+	bindings := listAsSlice(bindingList)
 
 	// shuffle the bindings to evaluate them in a random order. this
 	// prevents users from relying on the order of evaluation.
-	shuffled := make([]*value.List, len(bindings.Items))
-	for i, j := range rand.Perm(len(bindings.Items)) {
-		item, ok := bindings.Items[i].(*value.List)
-		if !ok || len(item.Items) != 2 {
-			return nil, env.errorf(bindings.Items[i], "invalid let, bindings must be a list of lists of length 2")
+	shuffled := make([]*value.List, len(bindings))
+	for i, j := range rand.Perm(len(bindings)) {
+		item, ok := bindings[i].(*value.List)
+		if !ok || item.Count() != 2 {
+			return nil, nil, env.errorf(bindings[i], "invalid let, bindings must be a list of lists of length 2")
 		}
 		shuffled[j] = item
 	}
@@ -450,43 +551,47 @@ func (env *environment) evalLet(n *value.List) (value.Value, error) {
 	// evaluate the bindings in a random order
 	bindingsMap := make(map[string]value.Value)
 	for _, binding := range shuffled {
-		name, ok := binding.Items[0].(*value.Symbol)
+		nameValue := binding.Item()
+		name, ok := nameValue.(*value.Symbol)
 		if !ok {
-			return nil, env.errorf(binding.Items[0], "invalid let, binding name must be a symbol")
+			return nil, nil, env.errorf(nameValue, "invalid let, binding name must be a symbol")
 		}
 		if _, ok := bindingsMap[name.Value]; ok {
-			return nil, env.errorf(binding.Items[0], "invalid let, duplicate binding name")
+			return nil, nil, env.errorf(nameValue, "invalid let, duplicate binding name")
 		}
-		val, err := env.Eval(binding.Items[1])
+		val, err := env.Eval(binding.Next().Item())
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		bindingsMap[name.Value] = val
 	}
 
 	// create a new environment with the bindings
-	newEnv := env.PushScope()
+	newEnv := env.PushScope().(*environment)
 	for name, val := range bindingsMap {
 		newEnv.Define(name, val)
 	}
 
 	// evaluate the body
-	var res value.Value
 	var err error
-	for _, item := range n.Items[2:] {
-		res, err = newEnv.Eval(item)
+	for _, item := range items[2 : len(items)-1] {
+		_, err = newEnv.Eval(item)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 	}
-	return res, nil
+	// return a continuation for the last item
+	return nil, func() (value.Value, value.Continuation, error) {
+		return newEnv.eval(items[len(items)-1])
+	}, nil
 }
 
 // Helpers
 
 func nodeAsStringList(n *value.List) ([]string, error) {
 	var res []string
-	for _, item := range n.Items {
+	for cur := n; !cur.IsEmpty(); cur = cur.Next() {
+		item := cur.Item()
 		sym, ok := item.(*value.Symbol)
 		if !ok {
 			return nil, fmt.Errorf("invalid argument list: %v", n)
@@ -494,4 +599,12 @@ func nodeAsStringList(n *value.List) ([]string, error) {
 		res = append(res, sym.Value)
 	}
 	return res, nil
+}
+
+func listAsSlice(lst *value.List) []value.Value {
+	var res []value.Value
+	for cur := lst; !cur.IsEmpty(); cur = cur.Next() {
+		res = append(res, cur.Item())
+	}
+	return res
 }

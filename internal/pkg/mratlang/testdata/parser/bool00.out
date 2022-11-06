@@ -21,3 +21,7 @@ eval #t
 eval #f
 eval #f
 (#f #f) => #f
+
+### bool conversion
+#f
+#f

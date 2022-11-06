@@ -2,9 +2,6 @@
 
 (def print mrat.core.io.print)
 
-(def (cons car cdr)
-  (concat (list car) cdr))
-
 (def (= a b) (eq? a b))
 
 (def (<= a b)
@@ -14,15 +11,18 @@
   (or (> a b) (= a b)))
 
 (def (range beg end)
-  (let ((range-internal
-         (fn range-internal (suffix beg end)
+  (let ((range-tail
+         (fn range-tail (suffix beg end)
            (if (>= beg end)
              suffix
-             ;; TODO: implement tail recursion
-             (range-internal (cons (- end 1) suffix) beg (- end 1))))))
+             (range-tail (conj suffix (- end 1)) beg (- end 1))))))
     (if (<= beg end)
-      (range-internal '() beg end)
+      (range-tail '() beg end)
       '())))
 
+(def (add a b)
+  (+ a b))
+
 (print (length (range 0 10)))
-;;(print (length (range 0 1000000)))
+;; requires tail call optimization
+(print (length (range 0 1000000)))

@@ -41,3 +41,8 @@
            (fn (bools)
              (print bools "=>" (testOr bools))))
 
+;; bool conversion
+(print)
+(print "### bool conversion")
+(print (and #t 2))
+(print (or #f 1))
