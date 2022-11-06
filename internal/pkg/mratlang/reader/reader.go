@@ -201,6 +201,10 @@ func (r *Reader) readExpr() (ast.Node, error) {
 		return r.readList()
 	case ')':
 		return nil, r.error("unexpected ')'")
+	case '[':
+		return r.readVector()
+	case ']':
+		return nil, r.error("unexpected ']'")
 	case '"':
 		return r.readString()
 	case '\'':
@@ -241,6 +245,30 @@ func (r *Reader) readList() (ast.Node, error) {
 		nodes = append(nodes, node)
 	}
 	return ast.NewList(nodes, r.popSection()), nil
+}
+
+func (r *Reader) readVector() (ast.Node, error) {
+	var nodes []ast.Node
+	for {
+		rune, err := r.next()
+		if err != nil {
+			return nil, err
+		}
+		if unicode.IsSpace(rune) {
+			continue
+		}
+		if rune == ']' {
+			break
+		}
+
+		r.rs.UnreadRune()
+		node, err := r.readExpr()
+		if err != nil {
+			return nil, err
+		}
+		nodes = append(nodes, node)
+	}
+	return ast.NewVector(nodes, r.popSection()), nil
 }
 
 func (r *Reader) readString() (ast.Node, error) {
@@ -319,7 +347,7 @@ func (r *Reader) readSymbol() (ast.Node, error) {
 		if err != nil {
 			return nil, r.error("error reading symbol: %w", err)
 		}
-		if unicode.IsSpace(rn) || rn == ')' {
+		if unicode.IsSpace(rn) || rn == ')' || rn == ']' {
 			r.rs.UnreadRune()
 			break
 		}
@@ -340,7 +368,7 @@ func (r *Reader) readKeyword() (ast.Node, error) {
 		if err != nil {
 			return nil, r.error("error reading keyword: %w", err)
 		}
-		if unicode.IsSpace(rn) || rn == ')' {
+		if unicode.IsSpace(rn) || rn == ')' || rn == ']' {
 			r.rs.UnreadRune()
 			break
 		}

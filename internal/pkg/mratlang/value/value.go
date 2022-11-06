@@ -19,6 +19,20 @@ type Value interface {
 	Pos() ast.Pos
 }
 
+// Enumerable is an interface for compound values that support
+// enumeration.
+type Enumerable interface {
+	// Enumerate returns a channel that will yield all of the values
+	// in the compound value.
+	Enumerate() (values <-chan Value, cancel func())
+}
+
+// Counter is an interface for compound values whose elements can be
+// counted.
+type Counter interface {
+	Count() int
+}
+
 type options struct {
 	// where the value was defined
 	section ast.Section
@@ -50,6 +64,34 @@ func NewList(values []Value, opts ...Option) *List {
 		Section: o.section,
 		Items:   values,
 	}
+}
+
+func (l *List) Count() int {
+	return len(l.Items)
+}
+
+func (l *List) Enumerate() (<-chan Value, func()) {
+	return enumerateItems(l.Items)
+}
+
+func enumerateItems(items []Value) (<-chan Value, func()) {
+	ch := make(chan Value)
+
+	done := make(chan struct{})
+	cancel := func() {
+		close(done)
+	}
+	go func() {
+		for _, v := range items {
+			select {
+			case ch <- v:
+			case <-done:
+				return
+			}
+		}
+		close(ch)
+	}()
+	return ch, cancel
 }
 
 func (l *List) String() string {
@@ -94,6 +136,85 @@ func (l *List) Equal(v Value) bool {
 		}
 	}
 	return true
+}
+
+// Vector is a vector of values.
+type Vector struct {
+	ast.Section
+	Items []Value
+}
+
+func NewVector(values []Value, opts ...Option) *Vector {
+	var o options
+	for _, opt := range opts {
+		opt(&o)
+	}
+	return &Vector{
+		Section: o.section,
+		Items:   values,
+	}
+}
+
+func (v *Vector) Count() int {
+	return len(v.Items)
+}
+
+func (v *Vector) Enumerate() (<-chan Value, func()) {
+	return enumerateItems(v.Items)
+}
+
+func (v *Vector) String() string {
+	b := strings.Builder{}
+
+	b.WriteString("[")
+	for i, el := range v.Items {
+		if el == nil {
+			b.WriteString("()")
+		} else {
+			b.WriteString(el.String())
+		}
+		if i < len(v.Items)-1 {
+			b.WriteString(" ")
+		}
+	}
+	b.WriteString("]")
+	return b.String()
+}
+
+func (v *Vector) Equal(v2 Value) bool {
+	other, ok := v2.(*Vector)
+	if !ok {
+		return false
+	}
+	if len(v.Items) != len(other.Items) {
+		return false
+	}
+	for i, v := range v.Items {
+		if !v.Equal(other.Items[i]) {
+			return false
+		}
+	}
+	return true
+}
+
+func (v *Vector) Apply(env Environment, args []Value) (Value, error) {
+	if len(args) > 2 {
+		return nil, fmt.Errorf("vector apply takes one or two arguments")
+	}
+
+	index, ok := args[0].(*Num)
+	if !ok {
+		return nil, fmt.Errorf("vector apply takes a number as an argument")
+	}
+
+	i := int(index.Value)
+	if i < 0 || i >= len(v.Items) && len(args) == 1 {
+		return nil, fmt.Errorf("index out of bounds")
+	}
+	if i >= len(v.Items) {
+		return args[1], nil
+	}
+	return v.Items[i], nil
 }
 
 // Gen is a generator.

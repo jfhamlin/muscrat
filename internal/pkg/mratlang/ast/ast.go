@@ -35,6 +35,7 @@ func (p Section) End() Pos { return p.EndPos }
 
 type List struct {
 	Section
+	// TODO: implement a linked list
 	Items []Node
 }
 
@@ -57,18 +58,39 @@ func (l *List) String() string {
 		}
 	}
 
-	b.WriteString("(")
-	for i, item := range l.Items {
+	b.WriteString(enumerableString(l.Items, "(", ")"))
+	return b.String()
+}
+
+func (l *List) private() {}
+
+type Vector struct {
+	Section
+	Items []Node
+}
+
+func NewVector(items []Node, pos Section) *Vector {
+	return &Vector{Section: pos, Items: items}
+}
+
+func (v *Vector) String() string {
+	return enumerableString(v.Items, "[", "]")
+}
+
+func (v *Vector) private() {}
+
+func enumerableString(items []Node, open, close string) string {
+	var b strings.Builder
+	b.WriteString(open)
+	for i, item := range items {
 		if i > 0 {
 			b.WriteString(" ")
 		}
 		b.WriteString(item.String())
 	}
-	b.WriteString(")")
+	b.WriteString(close)
 	return b.String()
 }
-
-func (l *List) private() {}
 
 type String struct {
 	Section

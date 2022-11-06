@@ -23,6 +23,12 @@ func FromAST(node ast.Node) Value {
 			items = append(items, FromAST(item))
 		}
 		return NewList(items, WithSection(node.Section))
+	case *ast.Vector:
+		var items []Value
+		for _, item := range node.Items {
+			items = append(items, FromAST(item))
+		}
+		return NewVector(items, WithSection(node.Section))
 	case *ast.Symbol:
 		return NewSymbol(node.Value, WithSection(node.Section))
 	default:

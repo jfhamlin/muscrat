@@ -22,6 +22,11 @@ Either:
 *** DONE let
 *** DONE case
 ** DONE Fix spectrograph frequency labels
+** TODO play from buffers
+*** TODO add explicit vector type
+*** TODO load audio files into buffers
+*** TODO drop duplicate implementations of data structures in value + ast?
+*** TODO lazily-evaluated seq/sequences
 ** TODO Synth will occasionally hang
 *** TODO Show timing stats for all gens
 *** TODO Alert on gens taking too long or blocking for too long

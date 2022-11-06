@@ -28,8 +28,9 @@ func init() {
 			Symbols: []*Symbol{
 				// importing/requiring other packages
 				funcSymbol("load-file", loadFileBuiltin),
-				// list functions
+				// list/vector functions
 				funcSymbol("list", listBuiltin),
+				funcSymbol("vector", vectorBuiltin),
 				funcSymbol("length", lengthBuiltin),
 				funcSymbol("concat", concatBuiltin),
 				funcSymbol("first", firstBuiltin),
@@ -158,16 +159,21 @@ func listBuiltin(env value.Environment, args []value.Value) (value.Value, error)
 	return value.NewList(args), nil
 }
 
+func vectorBuiltin(env value.Environment, args []value.Value) (value.Value, error) {
+	return value.NewVector(args), nil
+}
+
 func lengthBuiltin(env value.Environment, args []value.Value) (value.Value, error) {
 	if len(args) != 1 {
 		return nil, fmt.Errorf("length expects 1 argument, got %v", len(args))
 	}
-	switch arg := args[0].(type) {
-	case *value.List:
-		return value.NewNum(float64(len(arg.Items))), nil
-	default:
-		return nil, fmt.Errorf("length expects a list, got %v", arg)
+	if c, ok := args[0].(value.Counter); ok {
+		return value.NewNum(float64(c.Count())), nil
 	}
+
+	// TODO: try counting by enumerating instead
+
+	return nil, fmt.Errorf("length expects an enumerable, got %v", args[0])
 }
 
 func concatBuiltin(env value.Environment, args []value.Value) (value.Value, error) {
@@ -175,6 +181,8 @@ func concatBuiltin(env value.Environment, args []value.Value) (value.Value, erro
 	for _, arg := range args {
 		switch arg := arg.(type) {
 		case *value.List:
+			res = append(res, arg.Items...)
+		case *value.Vector:
 			res = append(res, arg.Items...)
 		default:
 			return nil, fmt.Errorf("invalid type for concat: %v", arg)
@@ -187,28 +195,41 @@ func firstBuiltin(env value.Environment, args []value.Value) (value.Value, error
 	if len(args) != 1 {
 		return nil, fmt.Errorf("first expects 1 argument, got %v", len(args))
 	}
-	list, ok := args[0].(*value.List)
+	enum, ok := args[0].(value.Enumerable)
 	if !ok {
-		return nil, fmt.Errorf("first expects a list, got %v", args[0])
+		return nil, fmt.Errorf("first expects an enumerable, got %v", args[0])
 	}
-	if len(list.Items) == 0 {
-		return nil, fmt.Errorf("first expects a non-empty list, got %v", list)
-	}
-	return list.Items[0], nil
+
+	itemCh, cancel := enum.Enumerate()
+	defer cancel()
+
+	return <-itemCh, nil
 }
 
 func restBuiltin(env value.Environment, args []value.Value) (value.Value, error) {
 	if len(args) != 1 {
 		return nil, fmt.Errorf("rest expects 1 argument, got %v", len(args))
 	}
-	list, ok := args[0].(*value.List)
+
+	enum, ok := args[0].(value.Enumerable)
 	if !ok {
-		return nil, fmt.Errorf("rest expects a list, got %v", args[0])
+		return nil, fmt.Errorf("rest expects an enumerable, got %v", args[0])
 	}
-	if len(list.Items) == 0 {
-		return list, nil
+
+	items := []value.Value{}
+	itemCh, cancel := enum.Enumerate()
+	defer cancel()
+
+	// skip the first item
+	<-itemCh
+	for item := range itemCh {
+		items = append(items, item)
 	}
-	return value.NewList(list.Items[1:]), nil
+
+	// TODO: here and elsewhere, use a Sequence/Seq value type to
+	// represent a lazy sequence of values, and use that instead of a
+	// List/Vector.
+	return value.NewList(items), nil
 }
 
 func notBuiltin(env value.Environment, args []value.Value) (value.Value, error) {
@@ -242,11 +263,11 @@ func emptyBuiltin(env value.Environment, args []value.Value) (value.Value, error
 	if len(args) != 1 {
 		return nil, fmt.Errorf("empty? expects 1 argument, got %v", len(args))
 	}
-	list, ok := args[0].(*value.List)
+	c, ok := args[0].(value.Counter)
 	if !ok {
-		return nil, fmt.Errorf("empty? expects a list, got %v", args[0])
+		return nil, fmt.Errorf("empty? expects an enumerable, got %v", args[0])
 	}
-	return value.NewBool(len(list.Items) == 0), nil
+	return value.NewBool(c.Count() == 0), nil
 }
 
 func notEmptyBuiltin(env value.Environment, args []value.Value) (value.Value, error) {

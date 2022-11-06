@@ -103,6 +103,8 @@ func (env *environment) Eval(n value.Value) (value.Value, error) {
 	switch v := n.(type) {
 	case *value.List:
 		return env.evalList(v)
+	case *value.Vector:
+		return env.evalVector(v)
 	default:
 		return env.evalScalar(n)
 	}
@@ -148,6 +150,18 @@ func (env *environment) evalList(n *value.List) (value.Value, error) {
 		res = append(res, v)
 	}
 	return env.applyFunc(res[0], res[1:])
+}
+
+func (env *environment) evalVector(n *value.Vector) (value.Value, error) {
+	var res []value.Value
+	for _, item := range n.Items {
+		v, err := env.Eval(item)
+		if err != nil {
+			return nil, err
+		}
+		res = append(res, v)
+	}
+	return &value.Vector{Section: n.Section, Items: res}, nil
 }
 
 func (env *environment) evalScalar(n value.Value) (value.Value, error) {
