@@ -1,6 +1,7 @@
 package value
 
 import (
+	"context"
 	"fmt"
 	"strconv"
 	"strings"
@@ -25,6 +26,34 @@ type Enumerable interface {
 	// Enumerate returns a channel that will yield all of the values
 	// in the compound value.
 	Enumerate() (values <-chan Value, cancel func())
+}
+
+// EnumerableFunc is a function that implements the Enumerable
+// interface.
+type EnumerableFunc func() (<-chan Value, func())
+
+func (f EnumerableFunc) Enumerate() (<-chan Value, func()) {
+	return f()
+}
+
+// EnumerateAll returns all values in the sequence. If the sequence is
+// infinite, this will never return unless the context is cancelled.
+func EnumerateAll(ctx context.Context, e Enumerable) ([]Value, error) {
+	ch, cancel := e.Enumerate()
+	defer cancel()
+
+	var values []Value
+	for {
+		select {
+		case v, ok := <-ch:
+			if !ok {
+				return values, nil
+			}
+			values = append(values, v)
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		}
+	}
 }
 
 // Counter is an interface for compound values whose elements can be
@@ -215,6 +244,61 @@ func (v *Vector) Apply(env Environment, args []Value) (Value, error) {
 		return args[1], nil
 	}
 	return v.Items[i], nil
+}
+
+// Seq is a lazy sequence of values.
+type Seq struct {
+	Enumerable
+}
+
+func (s *Seq) Equal(v Value) bool {
+	other, ok := v.(*Seq)
+	if !ok {
+		return false
+	}
+	e1, cancel1 := s.Enumerate()
+	defer cancel1()
+	e2, cancel2 := other.Enumerate()
+	defer cancel2()
+	for {
+		v1, ok1 := <-e1
+		v2, ok2 := <-e2
+		if ok1 != ok2 {
+			return false
+		}
+		if !ok1 {
+			return true
+		}
+		if !v1.Equal(v2) {
+			return false
+		}
+	}
+	return true
+}
+
+func (s *Seq) Pos() ast.Pos {
+	return ast.Pos{}
+}
+
+func (s *Seq) String() string {
+	b := strings.Builder{}
+	b.WriteString("(")
+	e, cancel := s.Enumerate()
+	defer cancel()
+	first := true
+	for {
+		v, ok := <-e
+		if !ok {
+			break
+		}
+		if !first {
+			b.WriteString(" ")
+		}
+		first = false
+		b.WriteString(v.String())
+	}
+	b.WriteString(")")
+	return b.String()
 }
 
 // Gen is a generator.
@@ -416,6 +500,27 @@ func (f *Func) Apply(env Environment, args []Value) (Value, error) {
 
 	var res Value
 	for _, expr := range f.Exprs.Items {
+		// // if i know that this is
+		// // - the last expression and
+		// // - a function call
+		// //
+		// // then i can skip the stack frame creation
+		// if i == len(f.Exprs.Items)-1 && isFunctionCall(expr) {
+		// 	var res []Value
+		// 	for _, item := range expr.(*List).Items {
+		// 		v, err := fnEnv.Eval(item)
+		// 		if err != nil {
+		// 			return nil, err
+		// 		}
+		// 		res = append(res, v)
+		// 	}
+		// 	if fn, ok := res[0].(*Func); ok {
+		// 		f = fn
+		// 		args = res[1:]
+		// 		goto Start
+		// 	}
+		// }
+		// fmt.Println(fnName, "- not a tail call", expr)
 		v, err := fnEnv.Eval(expr)
 		if err != nil {
 			return nil, errorWithStack(err, StackFrame{
@@ -427,6 +532,29 @@ func (f *Func) Apply(env Environment, args []Value) (Value, error) {
 	}
 	return res, nil
 }
+
+// func isFunctionCall(expr Value) bool {
+// 	list, ok := expr.(*List)
+// 	if !ok || len(list.Items) == 0 {
+// 		return false
+// 	}
+
+// 	sym, ok := list.Items[0].(*Symbol)
+// 	if ok && isSpecialForm(sym.Value) {
+// 		return false
+// 	}
+
+// 	return true
+// }
+
+// func isSpecialForm(name string) bool {
+// 	switch name {
+// 	// TODO: special forms with macros instead of special cases
+// 	case "def", "if", "case", "and", "or", "lambda", "fn", "quote", "let":
+// 		return true
+// 	}
+// 	return false
+// }
 
 // BuiltinFunc is a builtin function.
 type BuiltinFunc struct {

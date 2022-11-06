@@ -1,6 +1,7 @@
 package value
 
 import (
+	"context"
 	"io"
 
 	"github.com/jfhamlin/muscrat/internal/pkg/graph"
@@ -34,4 +35,7 @@ type Environment interface {
 
 	// Stdout returns the standard output stream for this environment.
 	Stdout() io.Writer
+
+	// Context returns the context associated with this environment.
+	Context() context.Context
 }

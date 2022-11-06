@@ -1,6 +1,7 @@
 package mratlang
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"math/rand"
@@ -13,6 +14,8 @@ import (
 )
 
 type environment struct {
+	ctx context.Context
+
 	graph *graph.Graph
 	scope *scope
 
@@ -21,14 +24,19 @@ type environment struct {
 	loadPath []string
 }
 
-func newEnvironment(stdout io.Writer) *environment {
+func newEnvironment(ctx context.Context, stdout io.Writer) *environment {
 	e := &environment{
+		ctx:    ctx,
 		graph:  &graph.Graph{},
 		scope:  newScope(),
 		stdout: stdout,
 	}
 	addBuiltins(e)
 	return e
+}
+
+func (env *environment) Context() context.Context {
+	return env.ctx
 }
 
 func (env *environment) String() string {

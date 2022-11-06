@@ -18,3 +18,5 @@
 
 (print (myvec 0))
 (print (myvec 2))
+
+(print (concat [1 2] [3 4]))

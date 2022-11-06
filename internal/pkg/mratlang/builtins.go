@@ -35,6 +35,7 @@ func init() {
 				funcSymbol("concat", concatBuiltin),
 				funcSymbol("first", firstBuiltin),
 				funcSymbol("rest", restBuiltin),
+				// funcSymbol("lazy-seq", nthBuiltin),
 				// math functions
 				funcSymbol("pow", powBuiltin),
 				funcSymbol("*", mulBuiltin),
@@ -171,24 +172,67 @@ func lengthBuiltin(env value.Environment, args []value.Value) (value.Value, erro
 		return value.NewNum(float64(c.Count())), nil
 	}
 
-	// TODO: try counting by enumerating instead
+	enum, ok := args[0].(value.Enumerable)
+	if !ok {
+		return nil, fmt.Errorf("length expects an enumerable, got %v", args[0])
+	}
 
-	return nil, fmt.Errorf("length expects an enumerable, got %v", args[0])
+	ch, cancel := enum.Enumerate()
+	defer cancel()
+
+	var count int
+	for range ch {
+		count++
+	}
+	return value.NewNum(float64(count)), nil
 }
 
 func concatBuiltin(env value.Environment, args []value.Value) (value.Value, error) {
-	var res []value.Value
-	for _, arg := range args {
-		switch arg := arg.(type) {
-		case *value.List:
-			res = append(res, arg.Items...)
-		case *value.Vector:
-			res = append(res, arg.Items...)
-		default:
-			return nil, fmt.Errorf("invalid type for concat: %v", arg)
+	enums := make([]value.Enumerable, len(args))
+	for i, arg := range args {
+		e, ok := arg.(value.Enumerable)
+		if !ok {
+			return nil, fmt.Errorf("concat arg %d is not enumerable: %v", i, arg)
 		}
+		enums[i] = e
 	}
-	return value.NewList(res), nil
+
+	enumerable := func() (<-chan value.Value, func()) {
+		ch := make(chan value.Value)
+		done := make(chan struct{})
+		cancel := func() {
+			close(done)
+		}
+
+		go func() {
+			defer close(ch)
+			for _, enum := range enums {
+				select {
+				case <-done:
+					return
+				default:
+				}
+
+				func() { // scope for defer
+					eCh, eCancel := enum.Enumerate()
+					defer eCancel()
+					for v := range eCh {
+						select {
+						case ch <- v:
+						case <-done:
+							return
+						}
+					}
+				}()
+			}
+		}()
+
+		return ch, cancel
+	}
+
+	return &value.Seq{
+		Enumerable: value.EnumerableFunc(enumerable),
+	}, nil
 }
 
 func firstBuiltin(env value.Environment, args []value.Value) (value.Value, error) {
@@ -263,11 +307,19 @@ func emptyBuiltin(env value.Environment, args []value.Value) (value.Value, error
 	if len(args) != 1 {
 		return nil, fmt.Errorf("empty? expects 1 argument, got %v", len(args))
 	}
-	c, ok := args[0].(value.Counter)
+	if c, ok := args[0].(value.Counter); ok {
+		return value.NewBool(c.Count() == 0), nil
+	}
+
+	e, ok := args[0].(value.Enumerable)
 	if !ok {
 		return nil, fmt.Errorf("empty? expects an enumerable, got %v", args[0])
 	}
-	return value.NewBool(c.Count() == 0), nil
+	ch, cancel := e.Enumerate()
+	defer cancel()
+	// TODO: take a context.Context to support cancelation/timeout.
+	_, ok = <-ch
+	return value.NewBool(!ok), nil
 }
 
 func notEmptyBuiltin(env value.Environment, args []value.Value) (value.Value, error) {
@@ -494,16 +546,20 @@ func applyBuiltin(env value.Environment, args []value.Value) (value.Value, error
 	if len(args) != 2 {
 		return nil, fmt.Errorf("apply expects 2 arguments, got %v", len(args))
 	}
-	// the first argument should be an applyer, the second a list
+	// the first argument should be an applyer, the second an enumerable
 	applyer, ok := args[0].(value.Applyer)
 	if !ok {
 		return nil, fmt.Errorf("apply expects a function as the first argument, got %v", args[0])
 	}
-	list, ok := args[1].(*value.List)
+	enum, ok := args[1].(value.Enumerable)
 	if !ok {
-		return nil, fmt.Errorf("apply expects a list as the second argument, got %v", args[1])
+		return nil, fmt.Errorf("apply expects an enumerable as the second argument, got %v", args[1])
 	}
-	return applyer.Apply(env, list.Items)
+	values, err := value.EnumerateAll(context.Background(), enum)
+	if err != nil {
+		return nil, err
+	}
+	return applyer.Apply(env, values)
 }
 
 func printBuiltin(env value.Environment, args []value.Value) (value.Value, error) {

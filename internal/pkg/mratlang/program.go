@@ -1,6 +1,7 @@
 package mratlang
 
 import (
+	"context"
 	"io"
 	"os"
 
@@ -50,7 +51,7 @@ func (p *Program) Eval(opts ...EvalOption) (*graph.Graph, []graph.SinkChan, erro
 
 	env := options.env
 	if env == nil {
-		env = newEnvironment(options.stdout)
+		env = newEnvironment(context.Background(), options.stdout)
 		env.loadPath = options.loadPath
 	}
 
