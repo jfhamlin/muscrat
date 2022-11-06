@@ -257,7 +257,6 @@ func bootstrapCycles(ctx context.Context, g *Graph, cfg generator.SampleConfig) 
 	satisfiedNodes := make(map[NodeID]struct{})
 	for len(queue) > 0 || len(blocked) > 0 {
 		if len(queue) == 0 {
-			fmt.Printf("blocked nodes: %v\n", blocked)
 			// all nodes are blocked. pick an unsatisfied dependency of the
 			// node with the most satisfied dependencies, and treat it as
 			// "satisfied," generating a buffer of zero samples for it.
@@ -269,10 +268,8 @@ func bootstrapCycles(ctx context.Context, g *Graph, cfg generator.SampleConfig) 
 				var unsatisfiedDep NodeID
 				for _, e := range g.IncomingEdges(id) {
 					if _, ok := satisfiedNodes[e.From]; ok {
-						fmt.Println("satisfied", e.From)
 						satisfiedDeps++
 					} else {
-						fmt.Println("unsatisfied dep", e.From)
 						unsatisfiedDep = e.From
 					}
 				}
@@ -285,16 +282,13 @@ func bootstrapCycles(ctx context.Context, g *Graph, cfg generator.SampleConfig) 
 			queue = append(queue, choice)
 			delete(blocked, choice)
 			zeros := make([]float64, bufferSize)
-			fmt.Println("chosen", choice)
 			for _, e := range g.OutgoingEdges(choice) {
-				fmt.Printf("bootstrap: %s(%s) -> %s\n", choice, g.Node(choice), e.To)
 				select {
 				case <-ctx.Done():
 					return
 				case e.Channel <- zeros:
 				}
 			}
-			fmt.Println("queue", queue)
 		}
 
 		var nodeID NodeID
