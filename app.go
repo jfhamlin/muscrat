@@ -17,6 +17,7 @@ import (
 
 	"github.com/fsnotify/fsnotify"
 	"github.com/mjibson/go-dsp/fft"
+	"github.com/wailsapp/wails/v2/pkg/runtime"
 	"golang.org/x/term"
 
 	"github.com/jfhamlin/muscrat/internal/pkg/generator"
@@ -288,6 +289,8 @@ func (a *App) getSamples(cfg *audio.AudioConfig, n int) []int {
 	case fftChan <- samples:
 	default:
 	}
+
+	go runtime.EventsEmit(a.ctx, "samples", samples)
 
 	samples = scaleSamples(samples, a.gain)
 	return transformSampleBuffer(cfg, samples)

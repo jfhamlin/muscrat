@@ -142,5 +142,4 @@
 ;; (def bass (let ((~sig (~pulse 100)))
 ;;               (* (~env (~pulse 1) '(0 1 1 0) '(0.01 0.1 0.05)) ~sig)))
 
-(mrat.core.io.out (~mixer 1 (~lores (~noise) (remap (~sin 0.1) 400 700) 0.6)))
-
+(mrat.core.io.out (~mixer 1 (~lores (~noise) 263 0.95)))
