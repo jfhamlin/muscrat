@@ -3,6 +3,7 @@
 (load-file "./examples/core.mrat")
 (load-file "./examples/notes.mrat")
 (load-file "./examples/welsh.mrat")
+(load-file "./examples/bell.mrat")
 
 (def myMetroConfig
   (list :osc (list (list :key :osc1
@@ -27,22 +28,6 @@
 (def myMetro (mkwelsh myMetroConfig))
 
 (def (second lst) (first (rest lst)))
-
-(def (even? n)
-  (let ((half (/ n 2)))
-    (= half (floor half))))
-(def (odd? n)
-  (not (even? n)))
-
-(def (~mixer)
-  (let ((mixerArgs $args))
-    (let ((weightSum (reduce +
-                             (map-idx (fn (val idx) (if (even? idx) val 0)) mixerArgs)
-                             0)))
-      (sum (map (fn (idx) (let ((weight (nth mixerArgs (* 2 idx)))
-                                (chan   (nth mixerArgs (+ (* 2 idx) 1))))
-                            (* (/ weight weightSum) chan)))
-                (range 0 (/ (length mixerArgs) 2)))))))
 
 (def (avg lst)
   (* (sum lst)
@@ -142,4 +127,8 @@
 ;; (def bass (let ((~sig (~pulse 100)))
 ;;               (* (~env (~pulse 1) '(0 1 1 0) '(0.01 0.1 0.05)) ~sig)))
 
-(mrat.core.io.out (~mixer 1 (~lores (~noise) 263 0.95)))
+(def bell-sig
+  (* (~env (~pulse 1) '(0 1 1 0) '(0.01 0.3 0.58)) (bell 263)))
+
+(mrat.core.io.out (~mixer 1 (* (decibels -10) bell-sig)))
+

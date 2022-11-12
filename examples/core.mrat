@@ -31,7 +31,12 @@
 
 (def rand mrat.math.rand.rand)
 
-(def count length) ;; alias
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Aliases
+
+(def count length)
+(def nil '())
+(def (nil? x) (eq? x nil))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Math helpers
@@ -41,6 +46,12 @@
   (+ min
      (/ (- max min) 2)
      (* (/ (- max min) 2) x)))
+
+(def (even? n)
+  (let ((half (/ n 2)))
+    (= half (floor half))))
+(def (odd? n)
+  (not (even? n)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Iteration
@@ -64,12 +75,14 @@
              (repeat-tail (reduce (fn (acc el) (conj acc el)) x suffix) (- n 1) x)))))
     (reverse (repeat-tail '() n x)))) ;; TODO: implement with sequences, not lists, so we don't have to reverse
 
-(def (nth coll index) ;; TODO: optimize for vectors
+(def (nth coll index)
   (if (empty? coll)
     nil
-    (if (eq? index 0)
-      (first coll)
-      (nth (rest coll) (- index 1)))))
+    (if (vector? coll)
+      (coll index)
+      (if (eq? index 0)
+        (first coll)
+        (nth (rest coll) (- index 1))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Functional helpers
@@ -108,3 +121,23 @@
         acc))
 
 (def (sum lst) (apply + lst))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Audio helpers
+
+(def (decibels db) (pow 10 (/ db 20)))
+
+(def (~mixer)
+  (let ((mixerArgs $args))
+    (let ((weightSum (reduce +
+                             (map-idx (fn (val idx) (if (even? idx) val 0)) mixerArgs)
+                             0)))
+      (sum (map (fn (idx) (let ((weight (nth mixerArgs (* 2 idx)))
+                                (chan   (nth mixerArgs (+ (* 2 idx) 1))))
+                            (* (/ weight weightSum) chan)))
+                (range 0 (/ (length mixerArgs) 2)))))))
+
+;;; TODO: move to a library for music theory.
+(def (cents x) (pow 2 (/ x 1200)))
+(def (semitones x) (pow 2 (/ x 12)))
+(def (octaves x) (pow 2 x))

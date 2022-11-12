@@ -55,6 +55,7 @@ func init() {
 				// test predicates
 				funcSymbol("eq?", eqBuiltin),
 				funcSymbol("list?", isListBuiltin),
+				funcSymbol("vector?", isVectorBuiltin),
 				funcSymbol("empty?", emptyBuiltin),
 				funcSymbol("not-empty?", notEmptyBuiltin),
 				// boolean functions
@@ -387,6 +388,14 @@ func isListBuiltin(env value.Environment, args []value.Value) (value.Value, erro
 		return nil, fmt.Errorf("list? expects 1 argument, got %v", len(args))
 	}
 	_, ok := args[0].(*value.List)
+	return value.NewBool(ok), nil
+}
+
+func isVectorBuiltin(env value.Environment, args []value.Value) (value.Value, error) {
+	if len(args) != 1 {
+		return nil, fmt.Errorf("vector? expects 1 argument, got %v", len(args))
+	}
+	_, ok := args[0].(*value.Vector)
 	return value.NewBool(ok), nil
 }
 

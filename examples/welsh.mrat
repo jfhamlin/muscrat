@@ -34,15 +34,6 @@
         (max 1))
     (~clip (apply ~saw (cons w (rest (rest $args)))) min max)))
 
-;;; TODO: move to a library for music theory.
-(def (cents x) (pow 2 (/ x 1200)))
-(def (semitones x) (pow 2 (/ x 12)))
-(def (octaves x) (pow 2 x))
-
-;;; These should be in the standard library.
-(def nil '())
-(def (nil? x) (eq? x nil))
-
 ;;; Helpers for grabbing key-value pairs from a list.
 (def (getval lst key)
   (if (nil? lst)
