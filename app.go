@@ -11,6 +11,7 @@ import (
 	"math/cmplx"
 	"math/rand"
 	"os"
+	"runtime/debug"
 	"strings"
 	"sync"
 	"time"
@@ -470,10 +471,10 @@ func transformSampleBuffer(cfg *audio.AudioConfig, buf []float64) []int {
 	for i, sample := range buf {
 		s := (sample + 1) * (maxValue / 2)
 		if s > maxValue {
-			//fmt.Println("XXX clipping high")
+			fmt.Printf("XXX clipping high (max=%v): %v (%v)\n", maxValue, s, sample)
 		}
 		if s < 0 {
-			//fmt.Println("XXX clipping low")
+			fmt.Printf("XXX clipping low (min=%v): %v (%v)\n", 0, s, sample)
 		}
 		s = math.Max(0, math.Ceil(s))
 		sout := int(math.Min(s, maxValue-1))
@@ -612,7 +613,9 @@ func (a *App) spectrumWorker() {
 				return
 			}
 
-			builder.WriteRune('\n')
+			if a.showOscilloscope {
+				builder.WriteRune('\n')
+			}
 			// truncate the length of samps to the nearest power of 2.
 			samps = samps[:1<<uint(math.Log2(float64(len(samps))))]
 
@@ -629,7 +632,7 @@ func (a *App) spectrumWorker() {
 			if a.showSpectrumHist {
 				builder.WriteString(renderSpectrumHist(x, width, height))
 			} else {
-				fmt.Println(renderSpectrumLine(x, width-2))
+				builder.WriteString(renderSpectrumLine(x, width-2))
 			}
 			fmt.Print(builder.String())
 		}()
@@ -646,7 +649,13 @@ func (a *App) getSamples(cfg *audio.AudioConfig, n int) []int {
 		}()
 	}
 
-	samples := <-a.outputChannel
+	var samples []float64
+	select {
+	case samples = <-a.outputChannel:
+		// return silence if we can't get samples fast enough.
+	case <-time.After(time.Duration(n) * time.Second / time.Duration(cfg.SampleRate)):
+		samples = make([]float64, n)
+	}
 
 	select {
 	case fftChan <- samples:
@@ -728,7 +737,14 @@ func (a *App) updateSignalGraphFromScriptFile(filename string) {
 	if err != nil {
 		panic(err)
 	}
-	g, sinkChannels, err := program.Eval(mratlang.WithLoadPath([]string{pwd}))
+	g, sinkChannels, err := func() (g *graph.Graph, sc []graph.SinkChan, err error) {
+		defer func() {
+			if r := recover(); r != nil {
+				err = fmt.Errorf("%v\n%s", r, debug.Stack())
+			}
+		}()
+		return program.Eval(mratlang.WithLoadPath([]string{pwd}))
+	}()
 	if err != nil {
 		fmt.Println("error generating graph:", err)
 		return

@@ -1,0 +1,110 @@
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; Comparisons
+
+(def (= a b) (eq? a b))
+
+(def (<= a b)
+  (or (< a b) (= a b)))
+
+(def (>= a b)
+  (or (> a b) (= a b)))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; Builtin functions
+
+(def print mrat.core.io.print)
+
+(def ~sin mrat.osc.sin)
+(def ~saw mrat.osc.saw)
+(def ~sqr mrat.osc.sqr)
+(def ~pulse mrat.osc.pulse)
+(def ~noise mrat.osc.noise)
+(def ~phasor mrat.osc.phasor)
+
+(def ~freeverb mrat.effects.freeverb)
+(def ~delay mrat.effects.delay)
+(def ~clip mrat.effects.clip)
+(def ~trand mrat.math.rand.trand)
+(def ~env mrat.effects.env)
+(def ~lores mrat.effects.~lores)
+
+(def rand mrat.math.rand.rand)
+
+(def count length) ;; alias
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; Math helpers
+
+(def (remap x min max)
+  ;;; Remap value x from [-1, 1] to [min, max]
+  (+ min
+     (/ (- max min) 2)
+     (* (/ (- max min) 2) x)))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; Iteration
+(def (range beg end)
+  (let ((beg (floor beg))
+        (end (floor end)))
+    (let ((range-tail
+           (fn range-tail (suffix beg end)
+             (if (>= beg end)
+               suffix
+               (range-tail (conj suffix (- end 1)) beg (- end 1))))))
+      (if (<= beg end)
+        (range-tail '() beg end)
+        '()))))
+
+(def (repeat n x)
+  (let ((repeat-tail
+         (fn repeat-tail (suffix n x)
+           (if (<= n 0)
+             suffix
+             (repeat-tail (reduce (fn (acc el) (conj acc el)) x suffix) (- n 1) x)))))
+    (reverse (repeat-tail '() n x)))) ;; TODO: implement with sequences, not lists, so we don't have to reverse
+
+(def (nth coll index) ;; TODO: optimize for vectors
+  (if (empty? coll)
+    nil
+    (if (eq? index 0)
+      (first coll)
+      (nth (rest coll) (- index 1)))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; Functional helpers
+
+(def (reverse l)
+  (let ((reverse-tail
+         (fn reverse-tail (suffix l)
+           (if (empty? l)
+             suffix
+             (reverse-tail (conj suffix (first l)) (rest l))))))
+    (reverse-tail '() l)))
+
+(def (map func lst)
+  (let ((map-tail (fn map-tail (prefix lst)
+                    (if (empty? lst)
+                      prefix
+                      (map-tail (conj prefix (func (first lst))) (rest lst))))))
+    (reverse (map-tail '() lst)))) ;; TODO: implement with sequences, not lists, so we don't have to reverse
+
+(def (zip arrs)
+  (if (empty? (first arrs))
+    '()
+    (cons (map first arrs)
+          (zip (map rest arrs)))))
+
+(def (maps func)
+  (let ((map-list (zip (rest $args))))
+    (map (fn (args) (apply func args)) map-list)))
+
+(def (map-idx func lst)
+  (maps (fn (val idx) (func val idx)) lst (range 0 (length lst))))
+
+(def (reduce func lst acc)
+    (if (not-empty? lst)
+        (reduce func (rest lst) (func acc (first lst)))
+        acc))
+
+(def (sum lst) (apply + lst))

@@ -5,6 +5,8 @@ go 1.18
 require (
 	github.com/bspaans/bleep v0.0.0-20220414232837-486f92844ed7
 	github.com/fsnotify/fsnotify v1.5.4
+	github.com/go-audio/audio v0.0.0-20181013203223-7b2a6ca21480
+	github.com/go-audio/wav v0.0.0-20181013172942-de841e69b884
 	github.com/mjibson/go-dsp v0.0.0-20180508042940-11479a337f12
 	github.com/stretchr/testify v1.8.0
 	github.com/wailsapp/wails/v2 v2.1.0
@@ -14,8 +16,6 @@ require (
 require (
 	github.com/bep/debounce v1.2.1 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
-	github.com/go-audio/audio v0.0.0-20181013203223-7b2a6ca21480 // indirect
-	github.com/go-audio/wav v0.0.0-20181013172942-de841e69b884 // indirect
 	github.com/go-ole/go-ole v1.2.6 // indirect
 	github.com/google/uuid v1.1.2 // indirect
 	github.com/imdario/mergo v0.3.12 // indirect

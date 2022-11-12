@@ -1,6 +1,7 @@
 (def (map func lst)
     (if (not-empty? lst)
         (concat (list (func (first lst))) (map func (rest lst)))
+;;                (concat (list (func (first lst))) (lazy-seq (map func (rest lst))))))
         '()))
 
 (def (zip arrs)

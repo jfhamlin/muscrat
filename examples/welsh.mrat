@@ -1,4 +1,4 @@
-(load-file "./functional.mrat")
+(load-file "./core.mrat")
 
 ;;; Make some functions easier to use.
 (def ~sin mrat.osc.sin)

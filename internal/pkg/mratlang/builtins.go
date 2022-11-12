@@ -6,10 +6,13 @@ import (
 	"io/ioutil"
 	"math"
 	"math/rand"
+	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
 
+	"github.com/go-audio/audio"
+	"github.com/go-audio/wav"
 	"github.com/jfhamlin/muscrat/internal/pkg/generator"
 	"github.com/jfhamlin/muscrat/internal/pkg/graph"
 	"github.com/jfhamlin/muscrat/internal/pkg/mratlang/value"
@@ -36,9 +39,11 @@ func init() {
 				funcSymbol("concat", concatBuiltin),
 				funcSymbol("first", firstBuiltin),
 				funcSymbol("rest", restBuiltin),
+				funcSymbol("subvec", subvecBuiltin),
 				// funcSymbol("lazy-seq", nthBuiltin),
 				// math functions
 				funcSymbol("pow", powBuiltin),
+				funcSymbol("floor", floorBuiltin),
 				funcSymbol("*", mulBuiltin),
 				funcSymbol("/", divBuiltin),
 				funcSymbol("+", addBuiltin),
@@ -57,6 +62,10 @@ func init() {
 				// plumbing
 				funcSymbol("~pipe", pipeBuiltin),
 				funcSymbol("pipeset", pipesetBuiltin),
+				// ugen
+				funcSymbol("ugen", ugenBuiltin),
+				// loading sample files
+				funcSymbol("open-file", openFileBuiltin),
 			},
 		},
 		&Package{
@@ -70,6 +79,7 @@ func init() {
 			Name: "mrat.math.rand",
 			Symbols: []*Symbol{
 				funcSymbol("trand", trandBuiltin),
+				funcSymbol("rand", randBuiltin),
 			},
 		},
 		&Package{
@@ -203,7 +213,10 @@ func conjBuiltin(env value.Environment, args []value.Value) (value.Value, error)
 		case *value.List:
 			return value.ConsList(arg, c), nil
 		case *value.Vector:
-			return value.NewVector(append(c.Items, arg)), nil
+			items := make([]value.Value, len(c.Items)+1)
+			copy(items, c.Items)
+			items[len(c.Items)] = arg
+			return value.NewVector(items), nil
 		default:
 			return nil, fmt.Errorf("conj expects a collection, got %v", args[0])
 		}
@@ -263,6 +276,21 @@ func firstBuiltin(env value.Environment, args []value.Value) (value.Value, error
 	if len(args) != 1 {
 		return nil, fmt.Errorf("first expects 1 argument, got %v", len(args))
 	}
+
+	if args[0] == nil {
+		return nil, nil
+	}
+
+	switch c := args[0].(type) {
+	case *value.List:
+		return c.Item(), nil
+	case *value.Vector:
+		if len(c.Items) == 0 {
+			return nil, nil
+		}
+		return c.Items[0], nil
+	}
+
 	enum, ok := args[0].(value.Enumerable)
 	if !ok {
 		return nil, fmt.Errorf("first expects an enumerable, got %v", args[0])
@@ -277,6 +305,19 @@ func firstBuiltin(env value.Environment, args []value.Value) (value.Value, error
 func restBuiltin(env value.Environment, args []value.Value) (value.Value, error) {
 	if len(args) != 1 {
 		return nil, fmt.Errorf("rest expects 1 argument, got %v", len(args))
+	}
+
+	switch c := args[0].(type) {
+	case *value.List:
+		if c.IsEmpty() {
+			return c, nil
+		}
+		return c.Next(), nil
+	case *value.Vector:
+		if len(c.Items) == 0 {
+			return c, nil
+		}
+		return value.NewVector(c.Items[1:]), nil
 	}
 
 	enum, ok := args[0].(value.Enumerable)
@@ -298,6 +339,36 @@ func restBuiltin(env value.Environment, args []value.Value) (value.Value, error)
 	// represent a lazy sequence of values, and use that instead of a
 	// List/Vector.
 	return value.NewList(items), nil
+}
+
+func subvecBuiltin(env value.Environment, args []value.Value) (value.Value, error) {
+	if len(args) != 3 {
+		return nil, fmt.Errorf("subvec expects 3 arguments, got %v", len(args))
+	}
+
+	v, ok := args[0].(*value.Vector)
+	if !ok {
+		return nil, fmt.Errorf("subvec expects a vector as its first argument, got %v", args[0])
+	}
+
+	start, ok := args[1].(*value.Num)
+	if !ok {
+		return nil, fmt.Errorf("subvec expects a number as its second argument, got %v", args[1])
+	}
+
+	end, ok := args[2].(*value.Num)
+	if !ok {
+		return nil, fmt.Errorf("subvec expects a number as its third argument, got %v", args[2])
+	}
+
+	startIdx := int(start.Value)
+	endIdx := int(end.Value)
+
+	if startIdx < 0 || startIdx > len(v.Items) || endIdx < 0 || endIdx > len(v.Items) {
+		return nil, fmt.Errorf("subvec indices out of bounds: %v %v", startIdx, endIdx)
+	}
+
+	return value.NewVector(v.Items[startIdx:endIdx]), nil
 }
 
 func notBuiltin(env value.Environment, args []value.Value) (value.Value, error) {
@@ -331,6 +402,14 @@ func emptyBuiltin(env value.Environment, args []value.Value) (value.Value, error
 	if len(args) != 1 {
 		return nil, fmt.Errorf("empty? expects 1 argument, got %v", len(args))
 	}
+
+	switch c := args[0].(type) {
+	case *value.List:
+		return value.NewBool(c.IsEmpty()), nil
+	case *value.Vector:
+		return value.NewBool(len(c.Items) == 0), nil
+	}
+
 	if c, ok := args[0].(value.Counter); ok {
 		return value.NewBool(c.Count() == 0), nil
 	}
@@ -367,6 +446,17 @@ func powBuiltin(env value.Environment, args []value.Value) (value.Value, error) 
 		return nil, fmt.Errorf("pow expects a number, got %v", args[1])
 	}
 	return value.NewNum(math.Pow(a.Value, b.Value)), nil
+}
+
+func floorBuiltin(env value.Environment, args []value.Value) (value.Value, error) {
+	if len(args) != 1 {
+		return nil, fmt.Errorf("floor expects 1 argument, got %v", len(args))
+	}
+	a, ok := args[0].(*value.Num)
+	if !ok {
+		return nil, fmt.Errorf("floor expects a number, got %v", args[0])
+	}
+	return value.NewNum(math.Floor(a.Value)), nil
 }
 
 func mulBuiltin(env value.Environment, args []value.Value) (value.Value, error) {
@@ -505,6 +595,17 @@ func gtBuiltin(env value.Environment, args []value.Value) (value.Value, error) {
 	}
 
 	return value.NewBool(a.Value > b.Value), nil
+}
+
+func ugenBuiltin(env value.Environment, args []value.Value) (value.Value, error) {
+	if len(args) != 1 {
+		return nil, fmt.Errorf("ugen expects 1 argument, got %v", len(args))
+	}
+	gen, ok := asGen(env, args[0])
+	if !ok {
+		return nil, fmt.Errorf("ugen expects a generator as the first argument, got %v", args[0])
+	}
+	return gen, nil
 }
 
 type pipe struct {
@@ -684,6 +785,14 @@ func trandBuiltin(env value.Environment, args []value.Value) (value.Value, error
 	return &value.Gen{
 		NodeID: nodeID,
 	}, nil
+}
+
+func randBuiltin(env value.Environment, args []value.Value) (value.Value, error) {
+	if len(args) != 0 {
+		return nil, fmt.Errorf("rand expects 0 arguments, got %v", len(args))
+	}
+
+	return &value.Num{Value: rand.Float64()}, nil
 }
 
 func phasorBuiltin(env value.Environment, args []value.Value) (value.Value, error) {
@@ -895,13 +1004,12 @@ func outBuiltin(env value.Environment, args []value.Value) (value.Value, error) 
 		sinks = append(sinks, env.Graph().AddSinkNode(graph.WithLabel("out")))
 	}
 	for _, arg := range args {
-		switch arg := arg.(type) {
-		case *value.Gen:
-			for _, sink := range sinks {
-				env.Graph().AddEdge(arg.NodeID, sink.ID(), arg.String())
-			}
-		default:
-			return nil, fmt.Errorf("invalid type for out: %v", arg)
+		gen, ok := asGen(env, arg)
+		if !ok {
+			return nil, fmt.Errorf("expected generator, got %v", arg)
+		}
+		for _, sink := range sinks {
+			env.Graph().AddEdge(gen.NodeID, sink.ID(), gen.String())
 		}
 	}
 	return nil, nil
@@ -1397,6 +1505,90 @@ func loresBuiltin(env value.Environment, args []value.Value) (value.Value, error
 	}, nil
 }
 
+func openFileBuiltin(env value.Environment, args []value.Value) (value.Value, error) {
+	if len(args) != 1 {
+		return nil, fmt.Errorf("open-file expects 1 argument, got %v", len(args))
+	}
+
+	filename, ok := args[0].(*value.Str)
+	if !ok {
+		return nil, fmt.Errorf("open-file expects a string as the first argument, got %v", args[0])
+	}
+
+	f, err := os.Open(filename.Value)
+	if err != nil {
+		return nil, fmt.Errorf("open-file: error opening file: %v", err)
+	}
+	defer f.Close()
+
+	dec := wav.NewDecoder(f)
+	if !dec.IsValidFile() {
+		return nil, fmt.Errorf("open-file: file '%s' is not a valid WAV file", filename.Value)
+	}
+
+	var intSamples []int
+	audioBuf := &audio.IntBuffer{Data: make([]int, 2048)}
+	for {
+		n, err := dec.PCMBuffer(audioBuf)
+		if err != nil {
+			return nil, fmt.Errorf("open-file: error reading PCM data: %v", err)
+		}
+		if n == 0 {
+			break
+		}
+		intSamples = append(intSamples, audioBuf.Data...)
+	}
+
+	bitDepth := dec.SampleBitDepth()
+
+	var sampleValues []value.Value
+	for _, s := range intSamples {
+		floatSample := float64(s) / float64(int(1)<<uint(bitDepth-1))
+		if floatSample > 1 {
+			floatSample = 1
+		} else if floatSample < -1 {
+			floatSample = -1
+		}
+		sampleValues = append(sampleValues, &value.Num{Value: floatSample})
+	}
+	// TODO: automatically resample to the current sample rate.
+	fmt.Println("rate", dec.SampleRate)
+	return value.NewVector(sampleValues), nil
+}
+
+func enumerableToGen(env value.Environment, enum value.Enumerable) *value.Gen {
+	ch, cancel := enum.Enumerate()
+	isDone := false
+	gf := generator.SampleGeneratorFunc(func(ctx context.Context, cfg generator.SampleConfig, n int) []float64 {
+		out := make([]float64, n)
+		for i := 0; i < n; i++ {
+			if isDone {
+				out[i] = 0
+				continue
+			}
+
+			if val, ok := <-ch; ok {
+				num, ok := val.(*value.Num)
+				if !ok {
+					out[i] = 0
+				} else {
+					out[i] = num.Value
+				}
+				continue
+			}
+			cancel()
+
+			isDone = true
+			out[i] = 0
+		}
+		return out
+	})
+
+	return &value.Gen{
+		NodeID: env.Graph().AddGeneratorNode(gf, graph.WithLabel(fmt.Sprintf("buffer"))),
+	}
+}
+
 func asGen(env value.Environment, v value.Value) (*value.Gen, bool) {
 	// asGen converts a Value to a Gen, if possible.
 	switch v := v.(type) {
@@ -1407,6 +1599,8 @@ func asGen(env value.Environment, v value.Value) (*value.Gen, bool) {
 		return &value.Gen{
 			NodeID: id,
 		}, true
+	case value.Enumerable:
+		return enumerableToGen(env, v), true
 	default:
 		return nil, false
 	}
