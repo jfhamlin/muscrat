@@ -60,7 +60,7 @@
 
 (def sample-rate 44100)
 
-;; (def niegalo-sample-raw (open-file "/Users/jfhamlin/Movies/Twitch Studio/niegalo_todo.wav"))
+;;(def niegalo-sample-raw (open-file "/Users/jfhamlin/Movies/Twitch Studio/niegalo_todo.wav"))
 
 ;; (def (buffer-time-range buffer start-time end-time)
 ;;   (let ((start-sample (floor (* start-time sample-rate)))
@@ -99,42 +99,48 @@
 ;;                                           0)))
 ;;                    ))
 
-(def bpm 120)
+;; (def bpm 120)
 
-(def aeolian [0 2 3 5 7 9 11])
-(def ionian [0 2 4 5 7 9 11])
-(def dorian [0 2 3 5 7 9 10])
-(def phrygian [0 1 3 5 7 8 10])
-(def lydian [0 2 4 6 7 9 11])
-(def mixolydian [0 2 4 5 7 9 10])
-(def locrian [0 1 3 5 6 8 10])
+;; (def aeolian [0 2 3 5 7 9 11])
+;; (def ionian [0 2 4 5 7 9 11])
+;; (def dorian [0 2 3 5 7 9 10])
+;; (def phrygian [0 1 3 5 7 8 10])
+;; (def lydian [0 2 4 6 7 9 11])
+;; (def mixolydian [0 2 4 5 7 9 10])
+;; (def locrian [0 1 3 5 6 8 10])
 
-(def (mode root intervals) (map (fn (x) (* root (semitones x))) intervals))
+;; (def (mode root intervals) (map (fn (x) (* root (semitones x))) intervals))
 
-(def root B2)
+;; (def root B2)
 
-(def (rotate n seq)
-  (let ((vec (apply vector seq)))
-    (concat (subvec vec n (length vec))
-            (subvec vec 0 n))))
+;; (def (rotate n seq)
+;;   (let ((vec (apply vector seq)))
+;;     (concat (subvec vec n (length vec))
+;;             (subvec vec 0 n))))
 
-(def (rand-rng beg end)
-  (+ beg (floor (* (rand) (- end beg)))))
+;; (def (rand-rng beg end)
+;;   (+ beg (floor (* (rand) (- end beg)))))
 
-(def seq (let ((notes (rotate (rand-rng 0 8) (conj aeolian 12))))
-             (concat [] (mode root notes))))
+;; (def seq (let ((notes (rotate (rand-rng 0 8) (conj aeolian 12))))
+;;              (concat [] (mode root notes))))
 
-(def triad (map (fn (w) (repeat (* 0.2 sample-rate) [w])) seq))
-(def arpeggio (apply concat triad))
-(def freqs (apply concat (repeat 100 [arpeggio])))
+;; (def triad (map (fn (w) (repeat (* 0.2 sample-rate) [w])) seq))
+;; (def arpeggio (apply concat triad))
+;; (def freqs (apply concat (repeat 100 [arpeggio])))
 
-(def (~sin-inst w gate)
-  (let ((~sig (~saw (* w (remap (~sin 2.4) (pow (cents 20) -1) (cents 20))) :duty (remap (~sin 10) 0.3 0.6)))
-        (~env (~env gate '(0 1 1 0) '(0.01 0.1 0.05))))
-    (* ~sig ~env)))
+;; (def (~sin-inst w gate)
+;;   (let ((~sig (~sin (* w (remap (~sin 2.4) (pow (cents 20) -1) (cents 20))) :duty (remap (~sin 10) 0.3 0.6)))
+;;         (~env (~env gate '(0 1 1 0) '(0.01 0.1 0.05))))
+;;     (* ~sig ~env)))
 
-(def dry-sig (+ ;; (* 0.8 (~env (~pulse 2) '(0 1 1 0) '(0.01 0.2 0.1)) (~sin root :duty 0.7))
-                (* 0.4 (~sin-inst (ugen freqs) (~pulse 5)))))
+;; (def dry-sig (+ ;;(* 0.8 (~env (~pulse 2) '(0 1 1 0) '(0.01 0.2 0.1)) (~sin root :duty 0.7))
+;;                 (* 0.4 (~sin-inst (ugen freqs) (~pulse 5)))))
 
-(mrat.core.io.out (~mixer 2 (~freeverb dry-sig)))
+;; (def hi-hat (let ((~sig (~noise)))
+;;               (* (~env (~pulse 2) '(0 1 1 0) '(0.01 0.1 0.05)) (~lores ~sig 20000 0))))
+
+;; (def bass (let ((~sig (~pulse 100)))
+;;               (* (~env (~pulse 1) '(0 1 1 0) '(0.01 0.1 0.05)) ~sig)))
+
+(mrat.core.io.out (~mixer 1 (~lores (~noise) (remap (~sin 0.1) 400 700) 0.6)))
 

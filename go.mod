@@ -7,10 +7,12 @@ require (
 	github.com/fsnotify/fsnotify v1.5.4
 	github.com/go-audio/audio v0.0.0-20181013203223-7b2a6ca21480
 	github.com/go-audio/wav v0.0.0-20181013172942-de841e69b884
+	github.com/kylelemons/godebug v1.1.0
 	github.com/mjibson/go-dsp v0.0.0-20180508042940-11479a337f12
 	github.com/stretchr/testify v1.8.0
 	github.com/wailsapp/wails/v2 v2.1.0
 	golang.org/x/term v0.0.0-20221017184919-83659145692c
+	src.elv.sh v0.18.0
 )
 
 require (
@@ -20,7 +22,6 @@ require (
 	github.com/google/uuid v1.1.2 // indirect
 	github.com/imdario/mergo v0.3.12 // indirect
 	github.com/jchv/go-winloader v0.0.0-20210711035445-715c2860da7e // indirect
-	github.com/kylelemons/godebug v1.1.0 // indirect
 	github.com/labstack/echo/v4 v4.9.0 // indirect
 	github.com/labstack/gommon v0.3.1 // indirect
 	github.com/leaanthony/go-ansi-parser v1.0.1 // indirect

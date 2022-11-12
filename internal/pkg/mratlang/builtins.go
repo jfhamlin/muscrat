@@ -208,17 +208,12 @@ func conjBuiltin(env value.Environment, args []value.Value) (value.Value, error)
 		return nil, fmt.Errorf("conj expects at least 2 arguments, got %v", len(args))
 	}
 
-	for _, arg := range args[1:] {
-		switch c := args[0].(type) {
-		case *value.List:
-			return value.ConsList(arg, c), nil
-		case *value.Vector:
-			return c.Conj(arg), nil
-		default:
-			return nil, fmt.Errorf("conj expects a collection, got %v", args[0])
-		}
+	conjer, ok := args[0].(value.Conjer)
+	if !ok {
+		return nil, fmt.Errorf("conj expects a conjer, got %v", args[0])
 	}
-	panic("unreachable")
+
+	return conjer.Conj(args[1:]...), nil
 }
 
 func concatBuiltin(env value.Environment, args []value.Value) (value.Value, error) {
@@ -1535,7 +1530,6 @@ func openFileBuiltin(env value.Environment, args []value.Value) (value.Value, er
 		}
 		intSamples = append(intSamples, audioBuf.Data...)
 	}
-
 	bitDepth := dec.SampleBitDepth()
 
 	var sampleValues []value.Value
@@ -1548,8 +1542,8 @@ func openFileBuiltin(env value.Environment, args []value.Value) (value.Value, er
 		}
 		sampleValues = append(sampleValues, &value.Num{Value: floatSample})
 	}
+
 	// TODO: automatically resample to the current sample rate.
-	fmt.Println("rate", dec.SampleRate)
 	return value.NewVector(sampleValues), nil
 }
 

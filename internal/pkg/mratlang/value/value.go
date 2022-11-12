@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/jfhamlin/muscrat/internal/pkg/graph"
+	"src.elv.sh/pkg/persistent/vector"
 )
 
 type Pos struct {
@@ -77,7 +78,7 @@ func EnumerateAll(ctx context.Context, e Enumerable) ([]Value, error) {
 // Conjer is an interface for values that can be conjed onto.
 type Conjer interface {
 	Value
-	Conj(Value) Conjer
+	Conj(...Value) Conjer
 }
 
 // Counter is an interface for compound values whose elements can be
@@ -171,6 +172,17 @@ func (l *List) Count() int {
 	return count
 }
 
+func (l *List) Conj(items ...Value) Conjer {
+	if len(items) == 0 {
+		return l
+	}
+
+	for _, item := range items {
+		l = ConsList(item, l)
+	}
+	return l
+}
+
 func (l *List) Enumerate() (<-chan Value, func()) {
 	return enumerateFunc(func() (v Value, ok bool) {
 		if l.IsEmpty() {
@@ -180,26 +192,6 @@ func (l *List) Enumerate() (<-chan Value, func()) {
 		l = l.next
 		return v, true
 	})
-}
-
-func enumerateItems(items []Value) (<-chan Value, func()) {
-	ch := make(chan Value)
-
-	done := make(chan struct{})
-	cancel := func() {
-		close(done)
-	}
-	go func() {
-		for _, v := range items {
-			select {
-			case ch <- v:
-			case <-done:
-				return
-			}
-		}
-		close(ch)
-	}()
-	return ch, cancel
 }
 
 func enumerateFunc(next func() (v Value, ok bool)) (<-chan Value, func()) {
@@ -281,7 +273,7 @@ func (l *List) Equal(v Value) bool {
 // Vector is a vector of values.
 type Vector struct {
 	Section
-	items []Value
+	vec vector.Vector
 }
 
 func NewVector(values []Value, opts ...Option) *Vector {
@@ -289,49 +281,66 @@ func NewVector(values []Value, opts ...Option) *Vector {
 	for _, opt := range opts {
 		opt(&o)
 	}
+
+	vec := vector.Empty
+	for _, v := range values {
+		vec = vec.Conj(v)
+	}
+
 	return &Vector{
 		Section: o.section,
-		items:   values,
+		vec:     vec,
 	}
 }
 
 func (v *Vector) Count() int {
-	return len(v.items)
+	return v.vec.Len()
 }
 
-func (v *Vector) Conj(item Value) Conjer {
-	// we can't append to the underlying array because it might be
-	// shared with other vectors. so we make a copy. TODO: use
-	// persistent data structures.
-	items := make([]Value, len(v.items)+1)
-	copy(items, v.items)
-	items[len(v.items)] = item
-	return &Vector{items: items}
+func (v *Vector) Conj(items ...Value) Conjer {
+	vec := v.vec
+	for _, item := range items {
+		vec = vec.Conj(item)
+	}
+	return &Vector{vec: vec}
 }
 
 func (v *Vector) ValueAt(i int) Value {
-	return v.items[i]
+	val, ok := v.vec.Index(i)
+	if !ok {
+		panic("index out of range")
+	}
+	return val.(Value)
 }
 
 func (v *Vector) SubVector(start, end int) *Vector {
-	return &Vector{items: v.items[start:end]}
+	return &Vector{vec: v.vec.SubVector(start, end)}
 }
 
 func (v *Vector) Enumerate() (<-chan Value, func()) {
-	return enumerateItems(v.items)
+	rest := v.vec
+	return enumerateFunc(func() (Value, bool) {
+		if rest.Len() == 0 {
+			return nil, false
+		}
+		val, _ := rest.Index(0)
+		rest = rest.SubVector(1, rest.Len())
+		return val.(Value), true
+	})
 }
 
 func (v *Vector) String() string {
 	b := strings.Builder{}
 
 	b.WriteString("[")
-	for i, el := range v.items {
+	for i := 0; i < v.Count(); i++ {
+		el := v.ValueAt(i)
 		if el == nil {
 			b.WriteString("()")
 		} else {
 			b.WriteString(el.String())
 		}
-		if i < len(v.items)-1 {
+		if i < v.Count()-1 {
 			b.WriteString(" ")
 		}
 	}
@@ -344,11 +353,11 @@ func (v *Vector) Equal(v2 Value) bool {
 	if !ok {
 		return false
 	}
-	if len(v.items) != len(other.items) {
+	if v.Count() != other.Count() {
 		return false
 	}
-	for i, v := range v.items {
-		if !v.Equal(other.items[i]) {
+	for i := 0; i < v.Count(); i++ {
+		if !v.ValueAt(i).Equal(other.ValueAt(i)) {
 			return false
 		}
 	}
@@ -366,13 +375,13 @@ func (v *Vector) Apply(env Environment, args []Value) (Value, error) {
 	}
 
 	i := int(index.Value)
-	if i < 0 || i >= len(v.items) && len(args) == 1 {
+	if i < 0 || i >= v.Count() && len(args) == 1 {
 		return nil, fmt.Errorf("index out of bounds")
 	}
-	if i >= len(v.items) {
+	if i >= v.Count() {
 		return args[1], nil
 	}
-	return v.items[i], nil
+	return v.ValueAt(i), nil
 }
 
 // Seq is a lazy sequence of values.
@@ -655,7 +664,7 @@ func (f *Func) ContinuationApply(env Environment, args []Value) (Value, Continua
 	}
 
 	fnEnv := f.Env.PushScope()
-	fnEnv.Define("$args", &Vector{items: args})
+	fnEnv.Define("$args", NewVector(args))
 	if f.LambdaName != "" {
 		// Define the function name in the environment.
 		fnEnv.Define(f.LambdaName, f)

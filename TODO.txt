@@ -22,11 +22,11 @@ Either:
 *** DONE let
 *** DONE case
 ** DONE Fix spectrograph frequency labels
-** TODO play from buffers
+** DONE play from buffers
 *** DONE add explicit vector type
 *** DONE load audio files into buffers
 *** DONE value structs don't export fields
-*** TODO drop duplicate implementations of data structures in value + ast?
+*** DONE drop duplicate implementations of data structures in value + ast?
 *** TODO lazily-evaluated seq/sequences
 ** TODO Synth will occasionally hang
 *** TODO Show timing stats for all gens
@@ -51,6 +51,10 @@ Either:
 *** DONE add support for an envelope signal generator
 *** TODO tools for sequencer
 ** TODO music theory libraries
+** TODO performance improvements
+*** Improve performance of initialization of large vectors
+*** Improve performance of concatenating large vectors
+*** Implement numpy-style vector manipulation
 ** TODO lisp language improvements
 *** DONE call stacks in runtime errors
 *** TODO better call stacks when tail calls are optimized
