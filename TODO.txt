@@ -25,8 +25,8 @@ Either:
 ** TODO play from buffers
 *** DONE add explicit vector type
 *** DONE load audio files into buffers
+*** DONE value structs don't export fields
 *** TODO drop duplicate implementations of data structures in value + ast?
-*** TODO value structs don't export fields
 *** TODO lazily-evaluated seq/sequences
 ** TODO Synth will occasionally hang
 *** TODO Show timing stats for all gens

@@ -4,8 +4,6 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
-
-	"github.com/jfhamlin/muscrat/internal/pkg/mratlang/ast"
 )
 
 // Stacker is an interface for retrieving stack traces.
@@ -21,7 +19,7 @@ type Error struct {
 
 type StackFrame struct {
 	FunctionName string
-	Pos          ast.Pos
+	Pos          Pos
 }
 
 // NewError creates a new error value.

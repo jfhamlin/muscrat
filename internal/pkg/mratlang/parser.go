@@ -3,8 +3,8 @@ package mratlang
 import (
 	"io"
 
-	"github.com/jfhamlin/muscrat/internal/pkg/mratlang/ast"
 	"github.com/jfhamlin/muscrat/internal/pkg/mratlang/reader"
+	"github.com/jfhamlin/muscrat/internal/pkg/mratlang/value"
 )
 
 type parseOptions struct {
@@ -38,12 +38,12 @@ func Parse(r io.RuneScanner, opts ...ParseOption) (*Program, error) {
 		return nil, err
 	}
 
-	return newProgramFromNode(nodes)
+	return newProgramFromValue(nodes)
 }
 
-func newProgramFromNode(nodes []ast.Node) (*Program, error) {
+func newProgramFromValue(values []value.Value) (*Program, error) {
 	p := &Program{
-		nodes: nodes,
+		nodes: values,
 	}
 
 	return p, nil

@@ -7,7 +7,7 @@ import (
 	"strconv"
 	"unicode"
 
-	"github.com/jfhamlin/muscrat/internal/pkg/mratlang/ast"
+	"github.com/jfhamlin/muscrat/internal/pkg/mratlang/value"
 )
 
 type trackingRuneScanner struct {
@@ -18,7 +18,7 @@ type trackingRuneScanner struct {
 	nextRuneColumn int
 
 	// keep track of the last two runes read, most recent last.
-	history []ast.Pos
+	history []value.Pos
 }
 
 func newTrackingRuneScanner(rs io.RuneScanner, filename string) *trackingRuneScanner {
@@ -30,7 +30,7 @@ func newTrackingRuneScanner(rs io.RuneScanner, filename string) *trackingRuneSca
 		filename:       filename,
 		nextRuneLine:   1,
 		nextRuneColumn: 1,
-		history:        make([]ast.Pos, 0, 2),
+		history:        make([]value.Pos, 0, 2),
 	}
 }
 
@@ -43,7 +43,7 @@ func (r *trackingRuneScanner) ReadRune() (rune, int, error) {
 		r.history[0] = r.history[1]
 		r.history = r.history[:1]
 	}
-	r.history = append(r.history, ast.Pos{
+	r.history = append(r.history, value.Pos{
 		Filename: r.filename,
 		Line:     r.nextRuneLine,
 		Column:   r.nextRuneColumn,
@@ -73,9 +73,9 @@ func (r *trackingRuneScanner) UnreadRune() error {
 }
 
 // pos returns the position of the next rune that will be read.
-func (r *trackingRuneScanner) pos() ast.Pos {
+func (r *trackingRuneScanner) pos() value.Pos {
 	if len(r.history) == 0 {
-		return ast.Pos{
+		return value.Pos{
 			Filename: r.filename,
 			Line:     r.nextRuneLine,
 			Column:   r.nextRuneColumn,
@@ -87,7 +87,7 @@ func (r *trackingRuneScanner) pos() ast.Pos {
 type Reader struct {
 	rs *trackingRuneScanner
 
-	posStack []ast.Pos
+	posStack []value.Pos
 }
 
 type options struct {
@@ -118,8 +118,8 @@ func New(r io.RuneScanner, opts ...Option) *Reader {
 // or io.EOF is reached. A final io.EOF will not be returned if the
 // input ends with a valid expression or if it contains no expressions
 // at all.
-func (r *Reader) ReadAll() ([]ast.Node, error) {
-	var nodes []ast.Node
+func (r *Reader) ReadAll() ([]value.Value, error) {
+	var nodes []value.Value
 	for {
 		_, err := r.next()
 		if errors.Is(err, io.EOF) {
@@ -148,8 +148,8 @@ func (r *Reader) error(format string, args ...interface{}) error {
 
 // popSection returns the last section read, ending at the current
 // input, and pops it off the stack.
-func (r *Reader) popSection() ast.Section {
-	sec := ast.Section{
+func (r *Reader) popSection() value.Section {
+	sec := value.Section{
 		StartPos: r.posStack[len(r.posStack)-1],
 		EndPos:   r.rs.pos(),
 	}
@@ -189,7 +189,7 @@ func (r *Reader) next() (rune, error) {
 	}
 }
 
-func (r *Reader) readExpr() (ast.Node, error) {
+func (r *Reader) readExpr() (value.Value, error) {
 	rune, err := r.next()
 	if err != nil {
 		return nil, err
@@ -223,8 +223,8 @@ func (r *Reader) readExpr() (ast.Node, error) {
 	}
 }
 
-func (r *Reader) readList() (ast.Node, error) {
-	var nodes []ast.Node
+func (r *Reader) readList() (value.Value, error) {
+	var nodes []value.Value
 	for {
 		rune, err := r.next()
 		if err != nil {
@@ -244,11 +244,11 @@ func (r *Reader) readList() (ast.Node, error) {
 		}
 		nodes = append(nodes, node)
 	}
-	return ast.NewList(nodes, r.popSection()), nil
+	return value.NewList(nodes, value.WithSection(r.popSection())), nil
 }
 
-func (r *Reader) readVector() (ast.Node, error) {
-	var nodes []ast.Node
+func (r *Reader) readVector() (value.Value, error) {
+	var nodes []value.Value
 	for {
 		rune, err := r.next()
 		if err != nil {
@@ -268,10 +268,10 @@ func (r *Reader) readVector() (ast.Node, error) {
 		}
 		nodes = append(nodes, node)
 	}
-	return ast.NewVector(nodes, r.popSection()), nil
+	return value.NewVector(nodes, value.WithSection(r.popSection())), nil
 }
 
-func (r *Reader) readString() (ast.Node, error) {
+func (r *Reader) readString() (value.Value, error) {
 	var str string
 	for {
 		rune, _, err := r.rs.ReadRune()
@@ -303,23 +303,23 @@ func (r *Reader) readString() (ast.Node, error) {
 		}
 		str += string(rune)
 	}
-	return ast.NewString(str, r.popSection()), nil
+	return value.NewStr(str, value.WithSection(r.popSection())), nil
 }
 
-func (r *Reader) readQuote() (ast.Node, error) {
+func (r *Reader) readQuote() (value.Value, error) {
 	node, err := r.readExpr()
 	if err != nil {
 		return nil, err
 	}
 	section := r.popSection()
-	items := []ast.Node{
-		ast.NewSymbol("quote", ast.Section{StartPos: section.StartPos, EndPos: node.Pos()}),
+	items := []value.Value{
+		value.NewSymbol("quote", value.WithSection(value.Section{StartPos: section.StartPos, EndPos: node.Pos()})),
 		node,
 	}
-	return ast.NewList(items, section), nil
+	return value.NewList(items, value.WithSection(section)), nil
 }
 
-func (r *Reader) readDispatch() (ast.Node, error) {
+func (r *Reader) readDispatch() (value.Value, error) {
 	rn, _, err := r.rs.ReadRune()
 	if err != nil {
 		return nil, r.error("error reading dispatch: %w", err)
@@ -328,9 +328,9 @@ func (r *Reader) readDispatch() (ast.Node, error) {
 	case '(':
 		return nil, r.error("vector dispatch not implemented")
 	case 't':
-		return ast.NewBool(true, r.popSection()), nil
+		return value.NewBool(true, value.WithSection(r.popSection())), nil
 	case 'f':
-		return ast.NewBool(false, r.popSection()), nil
+		return value.NewBool(false, value.WithSection(r.popSection())), nil
 	case '\\':
 		return nil, r.error("character dispatch not implemented")
 	case '"':
@@ -340,7 +340,7 @@ func (r *Reader) readDispatch() (ast.Node, error) {
 	}
 }
 
-func (r *Reader) readSymbol() (ast.Node, error) {
+func (r *Reader) readSymbol() (value.Value, error) {
 	var sym string
 	for {
 		rn, _, err := r.rs.ReadRune()
@@ -355,13 +355,13 @@ func (r *Reader) readSymbol() (ast.Node, error) {
 	}
 	// check if symbol is a number
 	if num, err := strconv.ParseFloat(sym, 64); err == nil {
-		return ast.NewNumber(num, r.popSection()), nil
+		return value.NewNum(num, value.WithSection(r.popSection())), nil
 	}
 
-	return ast.NewSymbol(sym, r.popSection()), nil
+	return value.NewSymbol(sym, value.WithSection(r.popSection())), nil
 }
 
-func (r *Reader) readKeyword() (ast.Node, error) {
+func (r *Reader) readKeyword() (value.Value, error) {
 	var sym string
 	for {
 		rn, _, err := r.rs.ReadRune()
@@ -374,5 +374,5 @@ func (r *Reader) readKeyword() (ast.Node, error) {
 		}
 		sym += string(rn)
 	}
-	return ast.NewKeyword(sym, r.popSection()), nil
+	return value.NewKeyword(sym, value.WithSection(r.popSection())), nil
 }

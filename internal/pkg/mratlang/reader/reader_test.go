@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/jfhamlin/muscrat/internal/pkg/mratlang/ast"
+	"github.com/jfhamlin/muscrat/internal/pkg/mratlang/value"
 )
 
 func TestRead(t *testing.T) {
@@ -192,33 +192,35 @@ func (ra *runeArray2D) SetString(row, col int, s string) {
 	}
 }
 
-func printExprAtPosition(ra *runeArray2D, n ast.Node) {
+func printExprAtPosition(ra *runeArray2D, n value.Value) {
 	switch v := n.(type) {
-	case *ast.List:
+	case *value.List:
 		start, end := v.Pos(), v.End()
 		// special case for quoted values
-		if len(v.Items) == 2 {
-			if sym, ok := v.Items[0].(*ast.Symbol); ok && sym.Value == "quote" && v.End() == v.Items[1].End() {
+		if v.Count() == 2 {
+			if sym, ok := v.Item().(*value.Symbol); ok && sym.Value == "quote" && v.End() == v.Next().Item().End() {
 				ra.Set(start.Line-1, start.Column-1, '\'')
-				printExprAtPosition(ra, v.Items[1])
+				printExprAtPosition(ra, v.Next().Item())
 				return
 			}
 		}
 
 		ra.Set(start.Line-1, start.Column-1, '(')
 		ra.Set(end.Line-1, end.Column-1, ')')
-		for _, item := range v.Items {
+		ch, cancel := v.Enumerate()
+		defer cancel()
+		for item := range ch {
 			printExprAtPosition(ra, item)
 		}
-	case *ast.Symbol:
+	case *value.Symbol:
 		ra.SetString(v.Pos().Line-1, v.Pos().Column-1, v.String())
-	case *ast.String:
+	case *value.Str:
 		ra.SetString(v.Pos().Line-1, v.Pos().Column-1, v.String())
-	case *ast.Bool:
+	case *value.Bool:
 		ra.SetString(v.Pos().Line-1, v.Pos().Column-1, v.String())
-	case *ast.Keyword:
+	case *value.Keyword:
 		ra.SetString(v.Pos().Line-1, v.Pos().Column-1, v.String())
-	case *ast.Number:
+	case *value.Num:
 		// the exact formatting of the number is not retained, so any test
 		// cases that do anything more interesting than integers may fail.
 		ra.SetString(v.Pos().Line-1, v.Pos().Column-1, v.String())

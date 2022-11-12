@@ -213,10 +213,7 @@ func conjBuiltin(env value.Environment, args []value.Value) (value.Value, error)
 		case *value.List:
 			return value.ConsList(arg, c), nil
 		case *value.Vector:
-			items := make([]value.Value, len(c.Items)+1)
-			copy(items, c.Items)
-			items[len(c.Items)] = arg
-			return value.NewVector(items), nil
+			return c.Conj(arg), nil
 		default:
 			return nil, fmt.Errorf("conj expects a collection, got %v", args[0])
 		}
@@ -285,10 +282,10 @@ func firstBuiltin(env value.Environment, args []value.Value) (value.Value, error
 	case *value.List:
 		return c.Item(), nil
 	case *value.Vector:
-		if len(c.Items) == 0 {
+		if c.Count() == 0 {
 			return nil, nil
 		}
-		return c.Items[0], nil
+		return c.ValueAt(0), nil
 	}
 
 	enum, ok := args[0].(value.Enumerable)
@@ -314,10 +311,10 @@ func restBuiltin(env value.Environment, args []value.Value) (value.Value, error)
 		}
 		return c.Next(), nil
 	case *value.Vector:
-		if len(c.Items) == 0 {
+		if c.Count() == 0 {
 			return c, nil
 		}
-		return value.NewVector(c.Items[1:]), nil
+		return c.SubVector(1, c.Count()), nil
 	}
 
 	enum, ok := args[0].(value.Enumerable)
@@ -364,11 +361,11 @@ func subvecBuiltin(env value.Environment, args []value.Value) (value.Value, erro
 	startIdx := int(start.Value)
 	endIdx := int(end.Value)
 
-	if startIdx < 0 || startIdx > len(v.Items) || endIdx < 0 || endIdx > len(v.Items) {
+	if startIdx < 0 || startIdx > v.Count() || endIdx < 0 || endIdx > v.Count() {
 		return nil, fmt.Errorf("subvec indices out of bounds: %v %v", startIdx, endIdx)
 	}
 
-	return value.NewVector(v.Items[startIdx:endIdx]), nil
+	return v.SubVector(startIdx, endIdx), nil
 }
 
 func notBuiltin(env value.Environment, args []value.Value) (value.Value, error) {
@@ -407,7 +404,7 @@ func emptyBuiltin(env value.Environment, args []value.Value) (value.Value, error
 	case *value.List:
 		return value.NewBool(c.IsEmpty()), nil
 	case *value.Vector:
-		return value.NewBool(len(c.Items) == 0), nil
+		return value.NewBool(c.Count() == 0), nil
 	}
 
 	if c, ok := args[0].(value.Counter); ok {

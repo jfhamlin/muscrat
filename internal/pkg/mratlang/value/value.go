@@ -7,8 +7,25 @@ import (
 	"strings"
 
 	"github.com/jfhamlin/muscrat/internal/pkg/graph"
-	"github.com/jfhamlin/muscrat/internal/pkg/mratlang/ast"
 )
+
+type Pos struct {
+	Filename string
+	Line     int
+	Column   int
+}
+
+func (p Pos) Valid() bool {
+	return p.Line != 0 && p.Column != 0
+}
+
+type Section struct {
+	StartPos, EndPos Pos
+	// TODO: consider adding information about whitespace and comments.
+}
+
+func (p Section) Pos() Pos { return p.StartPos }
+func (p Section) End() Pos { return p.EndPos }
 
 // Value is the interface that all values in the language implement.
 type Value interface {
@@ -17,7 +34,8 @@ type Value interface {
 
 	// Pos returns the position in the source code where the value was
 	// created or defined.
-	Pos() ast.Pos
+	Pos() Pos
+	End() Pos
 }
 
 // Enumerable is an interface for compound values that support
@@ -56,6 +74,12 @@ func EnumerateAll(ctx context.Context, e Enumerable) ([]Value, error) {
 	}
 }
 
+// Conjer is an interface for values that can be conjed onto.
+type Conjer interface {
+	Value
+	Conj(Value) Conjer
+}
+
 // Counter is an interface for compound values whose elements can be
 // counted.
 type Counter interface {
@@ -64,7 +88,7 @@ type Counter interface {
 
 type options struct {
 	// where the value was defined
-	section ast.Section
+	section Section
 }
 
 // Option represents an option that can be passed to Value
@@ -72,7 +96,7 @@ type options struct {
 type Option func(*options)
 
 // WithSection returns an Option that sets the section of the value.
-func WithSection(s ast.Section) Option {
+func WithSection(s Section) Option {
 	return func(o *options) {
 		o.section = s
 	}
@@ -80,7 +104,7 @@ func WithSection(s ast.Section) Option {
 
 // List is a list of values.
 type List struct {
-	ast.Section
+	Section
 
 	// the empty list is represented by a nil item and a nil next. all
 	// other lists have a non-nil item and a non-nil next.
@@ -256,8 +280,8 @@ func (l *List) Equal(v Value) bool {
 
 // Vector is a vector of values.
 type Vector struct {
-	ast.Section
-	Items []Value
+	Section
+	items []Value
 }
 
 func NewVector(values []Value, opts ...Option) *Vector {
@@ -267,29 +291,47 @@ func NewVector(values []Value, opts ...Option) *Vector {
 	}
 	return &Vector{
 		Section: o.section,
-		Items:   values,
+		items:   values,
 	}
 }
 
 func (v *Vector) Count() int {
-	return len(v.Items)
+	return len(v.items)
+}
+
+func (v *Vector) Conj(item Value) Conjer {
+	// we can't append to the underlying array because it might be
+	// shared with other vectors. so we make a copy. TODO: use
+	// persistent data structures.
+	items := make([]Value, len(v.items)+1)
+	copy(items, v.items)
+	items[len(v.items)] = item
+	return &Vector{items: items}
+}
+
+func (v *Vector) ValueAt(i int) Value {
+	return v.items[i]
+}
+
+func (v *Vector) SubVector(start, end int) *Vector {
+	return &Vector{items: v.items[start:end]}
 }
 
 func (v *Vector) Enumerate() (<-chan Value, func()) {
-	return enumerateItems(v.Items)
+	return enumerateItems(v.items)
 }
 
 func (v *Vector) String() string {
 	b := strings.Builder{}
 
 	b.WriteString("[")
-	for i, el := range v.Items {
+	for i, el := range v.items {
 		if el == nil {
 			b.WriteString("()")
 		} else {
 			b.WriteString(el.String())
 		}
-		if i < len(v.Items)-1 {
+		if i < len(v.items)-1 {
 			b.WriteString(" ")
 		}
 	}
@@ -302,11 +344,11 @@ func (v *Vector) Equal(v2 Value) bool {
 	if !ok {
 		return false
 	}
-	if len(v.Items) != len(other.Items) {
+	if len(v.items) != len(other.items) {
 		return false
 	}
-	for i, v := range v.Items {
-		if !v.Equal(other.Items[i]) {
+	for i, v := range v.items {
+		if !v.Equal(other.items[i]) {
 			return false
 		}
 	}
@@ -324,17 +366,18 @@ func (v *Vector) Apply(env Environment, args []Value) (Value, error) {
 	}
 
 	i := int(index.Value)
-	if i < 0 || i >= len(v.Items) && len(args) == 1 {
+	if i < 0 || i >= len(v.items) && len(args) == 1 {
 		return nil, fmt.Errorf("index out of bounds")
 	}
-	if i >= len(v.Items) {
+	if i >= len(v.items) {
 		return args[1], nil
 	}
-	return v.Items[i], nil
+	return v.items[i], nil
 }
 
 // Seq is a lazy sequence of values.
 type Seq struct {
+	Section
 	Enumerable
 }
 
@@ -363,8 +406,8 @@ func (s *Seq) Equal(v Value) bool {
 	return true
 }
 
-func (s *Seq) Pos() ast.Pos {
-	return ast.Pos{}
+func (s *Seq) Pos() Pos {
+	return Pos{}
 }
 
 func (s *Seq) String() string {
@@ -390,7 +433,7 @@ func (s *Seq) String() string {
 
 // Gen is a generator.
 type Gen struct {
-	ast.Section
+	Section
 	NodeID graph.NodeID
 }
 
@@ -408,7 +451,7 @@ func (g *Gen) Equal(v Value) bool {
 
 // Bool is a boolean value.
 type Bool struct {
-	ast.Section
+	Section
 	Value bool
 }
 
@@ -440,7 +483,7 @@ func (b *Bool) Equal(v Value) bool {
 
 // Num is a number.
 type Num struct {
-	ast.Section
+	Section
 	Value float64
 }
 
@@ -469,7 +512,7 @@ func (n *Num) Equal(v Value) bool {
 
 // Str is a string.
 type Str struct {
-	ast.Section
+	Section
 	Value string
 }
 
@@ -499,7 +542,7 @@ func (s *Str) Equal(v Value) bool {
 // Keyword represents a keyword. Syyntactically, a keyword is a symbol
 // that starts with a colon and evaluates to itself.
 type Keyword struct {
-	ast.Section
+	Section
 	Value string
 }
 
@@ -528,7 +571,7 @@ func (k *Keyword) Equal(v Value) bool {
 
 // Func is a function.
 type Func struct {
-	ast.Section
+	Section
 	LambdaName string
 	Variadic   bool
 	ArgNames   []string
@@ -612,7 +655,7 @@ func (f *Func) ContinuationApply(env Environment, args []Value) (Value, Continua
 	}
 
 	fnEnv := f.Env.PushScope()
-	fnEnv.Define("$args", &Vector{Items: args})
+	fnEnv.Define("$args", &Vector{items: args})
 	if f.LambdaName != "" {
 		// Define the function name in the environment.
 		fnEnv.Define(f.LambdaName, f)
@@ -663,7 +706,7 @@ func (f *Func) ContinuationApply(env Environment, args []Value) (Value, Continua
 
 // BuiltinFunc is a builtin function.
 type BuiltinFunc struct {
-	ast.Section
+	Section
 	Applyer
 	Name     string
 	variadic bool
@@ -694,7 +737,7 @@ func (f *BuiltinFunc) Apply(env Environment, args []Value) (Value, error) {
 }
 
 type Symbol struct {
-	ast.Section
+	Section
 	Value string
 }
 

@@ -6,12 +6,11 @@ import (
 	"os"
 
 	"github.com/jfhamlin/muscrat/internal/pkg/graph"
-	"github.com/jfhamlin/muscrat/internal/pkg/mratlang/ast"
 	"github.com/jfhamlin/muscrat/internal/pkg/mratlang/value"
 )
 
 type Program struct {
-	nodes []ast.Node
+	nodes []value.Value
 }
 
 type evalOptions struct {
@@ -56,7 +55,7 @@ func (p *Program) Eval(opts ...EvalOption) (*graph.Graph, []graph.SinkChan, erro
 	}
 
 	for _, node := range p.nodes {
-		_, err := env.Eval(value.FromAST(node))
+		_, err := env.Eval(node)
 		if err != nil {
 			return nil, nil, err
 		}

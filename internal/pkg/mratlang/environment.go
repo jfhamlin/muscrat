@@ -9,7 +9,6 @@ import (
 	"path/filepath"
 
 	"github.com/jfhamlin/muscrat/internal/pkg/graph"
-	"github.com/jfhamlin/muscrat/internal/pkg/mratlang/ast"
 	"github.com/jfhamlin/muscrat/internal/pkg/mratlang/value"
 )
 
@@ -87,7 +86,7 @@ func (env *environment) ResolveFile(filename string) (string, bool) {
 }
 
 type poser interface {
-	Pos() ast.Pos
+	Pos() value.Pos
 }
 
 func (env *environment) errorf(n poser, format string, args ...interface{}) error {
@@ -194,14 +193,15 @@ func (env *environment) evalList(n *value.List) (value.Value, value.Continuation
 
 func (env *environment) evalVector(n *value.Vector) (value.Value, error) {
 	var res []value.Value
-	for _, item := range n.Items {
+	for i := 0; i < n.Count(); i++ {
+		item := n.ValueAt(i)
 		v, err := env.Eval(item)
 		if err != nil {
 			return nil, err
 		}
 		res = append(res, v)
 	}
-	return &value.Vector{Section: n.Section, Items: res}, nil
+	return value.NewVector(res, value.WithSection(n.Section)), nil
 }
 
 func (env *environment) evalScalar(n value.Value) (value.Value, error) {
