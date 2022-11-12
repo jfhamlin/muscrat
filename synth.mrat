@@ -121,20 +121,20 @@
 (def (rand-rng beg end)
   (+ beg (floor (* (rand) (- end beg)))))
 
-(def seq (let ((notes (rotate (rand-rng 0 8) (conj ionian 12))))
-             (concat [0 0 0 0] (mode root notes))))
+(def seq (let ((notes (rotate (rand-rng 0 8) (conj aeolian 12))))
+             (concat [] (mode root notes))))
 
 (def triad (map (fn (w) (repeat (* 0.2 sample-rate) [w])) seq))
 (def arpeggio (apply concat triad))
 (def freqs (apply concat (repeat 100 [arpeggio])))
 
 (def (~sin-inst w gate)
-  (let ((~sin (~sin (* w (remap (~sin 2.4) (pow (cents 20) -1) (cents 20))) :duty (remap (~sin 10) 0.3 0.6)))
+  (let ((~sig (~saw (* w (remap (~sin 2.4) (pow (cents 20) -1) (cents 20))) :duty (remap (~sin 10) 0.3 0.6)))
         (~env (~env gate '(0 1 1 0) '(0.01 0.1 0.05))))
-    (* ~sin ~env)))
+    (* ~sig ~env)))
 
-(def dry-sig (+ (* 0.8 (~env (~pulse 2) '(0 1 1 0) '(0.01 0.2 0.1)) (~sin root :duty 0.7))
+(def dry-sig (+ ;; (* 0.8 (~env (~pulse 2) '(0 1 1 0) '(0.01 0.2 0.1)) (~sin root :duty 0.7))
                 (* 0.4 (~sin-inst (ugen freqs) (~pulse 5)))))
 
-(mrat.core.io.out (~mixer 2 (~freeverb dry-sig)
-                          1 dry-sig))
+(mrat.core.io.out (~mixer 2 (~freeverb dry-sig)))
+

@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/kylelemons/godebug/diff"
 )
 
 func TestParse(t *testing.T) {
@@ -60,6 +62,7 @@ func TestParse(t *testing.T) {
 
 			if got, want := stdout.String(), tc.output; got != want {
 				t.Errorf("\n=== got ====\n%s============\n=== want ===\n%s============", got, want)
+				t.Errorf("diff (-want,+got):\n%s", diff.Diff(want, got))
 			}
 		})
 	}
