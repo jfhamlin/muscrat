@@ -9,7 +9,8 @@ import {
   EventsOff,
 } from '../wailsjs/runtime';
 
-import './App.css';
+import logo from './assets/images/muscrat.svg';
+
 import {
   SetGain,
   GraphDot,
@@ -24,10 +25,12 @@ import Graphviz from 'graphviz-react';
 import styled from 'styled-components';
 
 import Inspector from './components/Inspector';
+// import UGenGraph from './components/UGenGraph';
 
 const AppContainer = styled.div`
   display: flex;
   flex-direction: column;
+  background-color: #fff;
 `;
 
 const StyledContainer = styled.div`
@@ -36,6 +39,22 @@ const StyledContainer = styled.div`
   justify-content: space-between;
   align-items: stretch;
 `;
+
+const graph = {
+  nodes: [
+    { id: 1, label: "Node 1", title: "node 1 tootip text" },
+    { id: 2, label: "Node 2", title: "node 2 tootip text" },
+    { id: 3, label: "Node 3", title: "node 3 tootip text" },
+    { id: 4, label: "Node 4", title: "node 4 tootip text" },
+    { id: 5, label: "Node 5", title: "node 5 tootip text" }
+  ],
+  edges: [
+    { from: 1, to: 2 },
+    { from: 1, to: 3 },
+    { from: 2, to: 4 },
+    { from: 2, to: 5 }
+  ]
+};
 
 function App() {
   const [graphSeqNum, setGraphSeqNum] = useState(0);
@@ -70,28 +89,30 @@ function App() {
 
   return (
     <AppContainer id="App">
-      <h2>Synthesizer</h2>
+      <img src={logo} className="App-logo" alt="logo" style={{
+        maxHeight: '100px',
+        objectFit: 'contain',
+      }} />
       <StyledContainer>
         <div>
-          {/* {graphDot && <Graphviz options={{width: 1000}} dot={graphDot} />} */}
-          OK
+          {/* <UGenGraph graph={graph} /> */}
         </div>
         <Inspector
           volume={gain}
           setVolume={handleGainChange}
           signals={[
-          {
-            id: "output",
-            label: "Output",
-            sampleRate: sampleRate,
-            samplesCallback: (cb) => {
-              EventsOn("samples", cb);
-              return () => {
-                EventsOff("samples");
-              };
+            {
+              id: "output",
+              label: "Output",
+              sampleRate: sampleRate,
+              samplesCallback: (cb) => {
+                EventsOn("samples", cb);
+                return () => {
+                  EventsOff("samples");
+                };
+              },
             },
-          },
-        ]} />
+          ]} />
       </StyledContainer>
     </AppContainer>
   )

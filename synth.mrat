@@ -43,9 +43,9 @@
       (let ((~lfo (~sins lfo-rate)))
         (~saw (remap ~lfo 100 1000) :duty (remap ~lfo 0.1 0.9))))))
 
-(def sample-rate 44100)
+(def sample-rate 44100) ;; TODO: read from config
 
-;;(def niegalo-sample-raw (open-file "/Users/jfhamlin/Movies/Twitch Studio/niegalo_todo.wav"))
+(def niegalo-sample-raw (open-file "/Users/jfhamlin/Movies/Twitch Studio/niegalo_todo.wav"))
 
 ;; (def (buffer-time-range buffer start-time end-time)
 ;;   (let ((start-sample (floor (* start-time sample-rate)))
@@ -60,15 +60,19 @@
 ;;                  (/ (+ samp1 samp2) 2)))
 ;;        (range 0 (- (* 2 (length samples)) 1))))
 
+
 ;; (def (tri-delay ~in freq)
 ;;   (~delay ~in (remap (~tri freq) 0 1)))
+
 
 ;; (def delayed-niegalo-sample
 ;;   (sum (map (fn (freq) (tri-delay niegalo-sample freq))
 ;;      '(0.01 0.02 0.04))))
 
+
 ;; (def cutoff (remap (~sin 0.01) 400 2000))
 ;; (def resonance 0.75)
+
 
 ;; (def filtered-sample (~lores (ugen niegalo-sample) cutoff resonance))
 
@@ -130,5 +134,5 @@
 (def bell-sig
   (* (~env (~pulse 1) '(0 1 1 0) '(0.01 0.3 0.58)) (bell 263)))
 
-(mrat.core.io.out (~mixer 1 (* (decibels -10) bell-sig)))
+(mrat.core.io.out niegalo-sample-raw)
 

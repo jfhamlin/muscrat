@@ -17,14 +17,14 @@ function fromDecibels(decibels: number) {
 }
 
 export default function VolumeSlider(props: VolumeSliderProps) {
-  const handleChange = (event: React.ChangeEvent<{}>, value: number | number[]) => {
+  const handleChange = (event: Event, value: number | number[]) => {
     // convert decibels to linear scale
-    const volume = Math.pow(10, value / 20);
+    const volume = Math.pow(10, (value as number) / 20);
     props.onChange(volume);
   };
 
   return <LabeledSlider
-    label="Volume"
+    label="Volume (dB)"
     value={toDecibels(props.volume)}
     onChange={handleChange}
     min={-30}

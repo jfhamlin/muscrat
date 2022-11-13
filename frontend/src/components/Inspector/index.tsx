@@ -109,16 +109,16 @@ function SignalInspector(props: { signal: SignalInfo }) {
   const [oscilloscopeWindow, setOscilloscopeWindow] = useState(0.01);
   const [oscilloscopeFreq, setOscilloscopeFreq] = useState(1);
   const handleOscilloscopeFreqChange = (
-    event: React.ChangeEvent<{}>,
-    newValue: number | number[],
+    event: Event,
+    newValue: number | Array<number>,
   ) => {
     setOscilloscopeFreq(newValue as number);
   };
 
   const [fftFreq, setFftFreq] = useState(4);
   const handleFftFreqChange = (
-    event: React.ChangeEvent<{}>,
-    newValue: number | number[],
+    event: Event,
+    newValue: number | Array<number>,
   ) => {
     setFftFreq(newValue as number);
   };
@@ -182,9 +182,7 @@ function SignalInspector(props: { signal: SignalInfo }) {
            onChange={handleOscilloscopeFreqChange}
            min={0.5}
            max={10}
-           step={0.5}
-           marks
-           valueLabelDisplay="auto" />
+           step={0.5} />
          <LineChart samples={samples} />
        </ChartBox> :
        null}
@@ -198,9 +196,7 @@ function SignalInspector(props: { signal: SignalInfo }) {
            onChange={handleFftFreqChange}
            min={1}
            max={15}
-           step={1}
-           marks
-           valueLabelDisplay="auto" />
+           step={1} />
          <Histogram bins={freqBins} labels={freqBinLabels} />
        </ChartBox> :
        null}
@@ -214,7 +210,7 @@ function LabeledSlider(props: {
   max: number;
   step: number;
   value: number;
-  onChange: (event: React.ChangeEvent<{}>, newValue: number | number[]) => void;
+  onChange: (event: Event, newValue: number | Array<number>) => void;
 }) {
   return (
     <Box>
@@ -232,7 +228,7 @@ function LabeledSlider(props: {
   );
 }
 
-function LineChart(props: {samples: [number]}) {
+function LineChart(props: {samples: number[]}) {
   const options = {
     responsive: true,
     plugins: {
@@ -259,7 +255,7 @@ function LineChart(props: {samples: [number]}) {
   return <Line options={options} data={data} updateMode="none" />;
 }
 
-function Histogram(props: {labels: [number]|undefined, bins: [number]}) {
+function Histogram(props: {labels: number[] | undefined, bins: number[]}) {
   const options = {
     responsive: true,
     plugins: {

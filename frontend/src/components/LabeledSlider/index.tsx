@@ -8,7 +8,7 @@ export default function LabeledSlider(props: {
   max: number;
   step: number;
   value: number;
-  onChange: (event: React.ChangeEvent<{}>, newValue: number | number[]) => void;
+  onChange: (event: Event, newValue: number | Array<number>) => void;
 }) {
   return (
     <Box>
