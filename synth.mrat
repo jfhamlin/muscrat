@@ -45,7 +45,7 @@
 
 (def sample-rate 44100) ;; TODO: read from config
 
-(def niegalo-sample-raw (open-file "/Users/jfhamlin/Movies/Twitch Studio/niegalo_todo.wav"))
+;;(def niegalo-sample-raw (open-file "/Users/jfhamlin/Movies/Twitch Studio/niegalo_todo.wav"))
 
 ;; (def (buffer-time-range buffer start-time end-time)
 ;;   (let ((start-sample (floor (* start-time sample-rate)))
@@ -131,8 +131,22 @@
 ;; (def bass (let ((~sig (~pulse 100)))
 ;;               (* (~env (~pulse 1) '(0 1 1 0) '(0.01 0.1 0.05)) ~sig)))
 
-(def bell-sig
-  (* (~env (~pulse 1) '(0 1 1 0) '(0.01 0.3 0.58)) (bell 263)))
+(def mixer~ ~mixer)
+(def lores~ ~lores)
 
-(mrat.core.io.out niegalo-sample-raw)
+(def (~sig freq)
+  (~mixer 1 (~sin freq)
+          0.7 (~tri (* freq (cents 10)))))
 
+(mrat.core.io.out (* 0.18
+                     (~mixer 1 (~sig Eb3)
+                             1 (~sig C3)
+                             1 (~sig Bb3)
+                             2 (let [note D4]
+                                     (~freeverb (* (remap (~sin 3) (decibels -2) 1)
+                                                   (lores~ (mixer~ 1 (~saw note :duty 0.4)
+                                                                   1 (~tri note :sync (~pulse (* note (cents 10)))))
+                                                           (* note (/ Bb5 D5)) 0.7))))
+                      )))
+
+(print (decibels -10) (decibels 0))

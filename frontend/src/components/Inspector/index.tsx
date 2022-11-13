@@ -131,8 +131,11 @@ function SignalInspector(props: { signal: SignalInfo }) {
   const lastUpdate = useRef<number>(0);
   const lastFftUpdate = useRef<number>(0);
 
+  const fftSamples = useRef<number[]>([]);
+
   const samplesCallback = signal.samplesCallback;
   useEffect(() => {
+    const MAX_FFT_SAMPLES = 4096;
     return samplesCallback((newSamples) => {
       const now = Date.now();
       if (inspectorModeState[0].includes('time') && now - lastUpdate.current > (1000.0 / oscilloscopeFreq)) {
@@ -140,10 +143,14 @@ function SignalInspector(props: { signal: SignalInfo }) {
         lastUpdate.current = now;
       }
 
+      fftSamples.current = fftSamples.current.concat(newSamples);
+      if (fftSamples.current.length > MAX_FFT_SAMPLES) {
+        fftSamples.current = fftSamples.current.slice(-MAX_FFT_SAMPLES);
+      }
       if (inspectorModeState[0].includes('frequency') && now - lastFftUpdate.current > (1000.0 / fftFreq)) {
         // apply a hann window
-        const fftSamps = newSamples.map(
-          (s: number, i: number) => s * (0.5 - 0.5 * Math.cos(2 * Math.PI * i / newSamples.length))
+        const fftSamps = fftSamples.current.map(
+          (s: number, i: number) => s * (0.5 - 0.5 * Math.cos(2 * Math.PI * i / fftSamples.current.length))
         );
 
         const bins = fft(fftSamps);
@@ -288,6 +295,7 @@ function Histogram(props: {labels: number[] | undefined, bins: number[]}) {
       backgroundColor: 'rgba(53, 162, 235, 0.5)',
       pointStyle: 'cross',
       radius: 0,
+      cubicInterpolationMode: 'monotone',
     }]
   }
   //@ts-ignore

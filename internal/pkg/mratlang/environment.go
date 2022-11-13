@@ -511,59 +511,48 @@ func (env *environment) evalQuote(n *value.List) (value.Value, error) {
 
 // essential syntax: let <bindings> <body>
 //
-// Syntax: <Bindings> should have the form
+// Two forms are supported. The first is the standard let form:
+//==============================================================================
+// Syntax: <bindings> should have the form:
 //
-// ((<variable 1> <init 1>) ...),
+// ((<symbol 1> <init 1>) ...),
 //
 // where each <init> is an expression, and <body> should be a sequence
-// of one or more expressions. It is an error for a <variable> to
-// appear more than once in the list of variables being bound.
+// of one or more expressions. It is an error for a <symbol> to
+// appear more than once in the list of symbols being bound.
 //
 // Semantics: The <init>s are evaluated in the current environment (in
-// some unspecified order), the <variable>s are bound to fresh
+// some unspecified order), the <symbol>s are bound to fresh
 // locations holding the results, the <body> is evaluated in the
 // extended environment, and the value of the last expression of
-// <body> is returned. Each binding of a <variable> has <body> as its
+// <body> is returned. Each binding of a <symbol> has <body> as its
 // region.
+//==============================================================================
+// The second form is the clojure
+// (https://clojuredocs.org/clojure.core/let) let form:
+//
+// Syntax: <bindings> should have the form:
+//
+// [<symbol 1> <init 1> ... <symbol n> <init n>]
+//
+// Semantics: Semantics are as above, except that the <init>s are
+// evaluated in order, and all preceding <init>s are available to
+// subsequent <init>s.
 func (env *environment) evalLet(n *value.List) (value.Value, value.Continuation, error) {
 	items := listAsSlice(n)
 	if len(items) < 3 {
 		return nil, nil, env.errorf(n, "invalid let, need bindings and body")
 	}
 
-	bindingList, ok := items[1].(*value.List)
-	if !ok {
-		return nil, nil, env.errorf(items[1], "invalid let, bindings must be a list")
-	}
-	bindings := listAsSlice(bindingList)
-
-	// shuffle the bindings to evaluate them in a random order. this
-	// prevents users from relying on the order of evaluation.
-	shuffled := make([]*value.List, len(bindings))
-	for i, j := range rand.Perm(len(bindings)) {
-		item, ok := bindings[i].(*value.List)
-		if !ok || item.Count() != 2 {
-			return nil, nil, env.errorf(bindings[i], "invalid let, bindings must be a list of lists of length 2")
-		}
-		shuffled[j] = item
-	}
-
-	// evaluate the bindings in a random order
-	bindingsMap := make(map[string]value.Value)
-	for _, binding := range shuffled {
-		nameValue := binding.Item()
-		name, ok := nameValue.(*value.Symbol)
-		if !ok {
-			return nil, nil, env.errorf(nameValue, "invalid let, binding name must be a symbol")
-		}
-		if _, ok := bindingsMap[name.Value]; ok {
-			return nil, nil, env.errorf(nameValue, "invalid let, duplicate binding name")
-		}
-		val, err := env.Eval(binding.Next().Item())
-		if err != nil {
-			return nil, nil, err
-		}
-		bindingsMap[name.Value] = val
+	var bindingsMap map[string]value.Value
+	var err error
+	switch bindings := items[1].(type) {
+	case *value.List:
+		bindingsMap, err = env.evalListBindings(bindings)
+	case *value.Vector:
+		bindingsMap, err = env.evalVectorBindings(bindings)
+	default:
+		return nil, nil, env.errorf(items[1], "invalid let, bindings must be a list or vector")
 	}
 
 	// create a new environment with the bindings
@@ -573,7 +562,6 @@ func (env *environment) evalLet(n *value.List) (value.Value, value.Continuation,
 	}
 
 	// evaluate the body
-	var err error
 	for _, item := range items[2 : len(items)-1] {
 		_, err = newEnv.Eval(item)
 		if err != nil {
@@ -584,6 +572,67 @@ func (env *environment) evalLet(n *value.List) (value.Value, value.Continuation,
 	return nil, func() (value.Value, value.Continuation, error) {
 		return newEnv.eval(items[len(items)-1])
 	}, nil
+}
+
+func (env *environment) evalListBindings(bindingList *value.List) (map[string]value.Value, error) {
+	bindings := listAsSlice(bindingList)
+
+	// shuffle the bindings to evaluate them in a random order. this
+	// prevents users from relying on the order of evaluation.
+	shuffled := make([]*value.List, len(bindings))
+	for i, j := range rand.Perm(len(bindings)) {
+		item, ok := bindings[i].(*value.List)
+		if !ok || item.Count() != 2 {
+			return nil, env.errorf(bindings[i], "invalid let, bindings must be a list of lists of length 2")
+		}
+		shuffled[j] = item
+	}
+
+	// evaluate the bindings in a random order
+	bindingsMap := make(map[string]value.Value)
+	for _, binding := range shuffled {
+		nameValue := binding.Item()
+		name, ok := nameValue.(*value.Symbol)
+		if !ok {
+			return nil, env.errorf(nameValue, "invalid let, binding name must be a symbol")
+		}
+		if _, ok := bindingsMap[name.Value]; ok {
+			return nil, env.errorf(nameValue, "invalid let, duplicate binding name")
+		}
+		val, err := env.Eval(binding.Next().Item())
+		if err != nil {
+			return nil, err
+		}
+		bindingsMap[name.Value] = val
+	}
+	return bindingsMap, nil
+}
+
+func (env *environment) evalVectorBindings(bindings *value.Vector) (map[string]value.Value, error) {
+	if bindings.Count()%2 != 0 {
+		return nil, env.errorf(bindings, "invalid let, bindings must be a vector of even length")
+	}
+
+	newEnv := env.PushScope().(*environment)
+	bindingsMap := make(map[string]value.Value)
+	for i := 0; i < bindings.Count(); i += 2 {
+		nameValue := bindings.ValueAt(i)
+		name, ok := nameValue.(*value.Symbol)
+		if !ok {
+			return nil, env.errorf(nameValue, "invalid let, binding name must be a symbol")
+		}
+		if _, ok := bindingsMap[name.Value]; ok {
+			return nil, env.errorf(nameValue, "invalid let, duplicate binding name")
+		}
+		val, err := newEnv.Eval(bindings.ValueAt(i + 1))
+		if err != nil {
+			return nil, err
+		}
+		bindingsMap[name.Value] = val
+		newEnv.Define(name.Value, val)
+	}
+
+	return bindingsMap, nil
 }
 
 // Helpers
