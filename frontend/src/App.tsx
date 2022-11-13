@@ -14,6 +14,7 @@ import logo from './assets/images/muscrat.svg';
 import {
   SetGain,
   GraphDot,
+  GraphJSON,
   SetShowSpectrum,
   SetShowSpectrumHist,
   SetShowOscilloscope,
@@ -21,11 +22,10 @@ import {
   SetOscilloscopeFreq,
 } from "../wailsjs/go/main/App";
 
-import Graphviz from 'graphviz-react';
 import styled from 'styled-components';
 
 import Inspector from './components/Inspector';
-// import UGenGraph from './components/UGenGraph';
+import UGenGraph from './components/UGenGraph';
 
 const AppContainer = styled.div`
   display: flex;
@@ -38,23 +38,50 @@ const StyledContainer = styled.div`
   flex-direction: row;
   justify-content: space-between;
   align-items: stretch;
+  justify-items: stretch;
+`;
+
+const StyledGraph = styled.div`
+  width: 100%;
+  height: 1000;
 `;
 
 const graph = {
   nodes: [
-    { id: 1, label: "Node 1", title: "node 1 tootip text" },
-    { id: 2, label: "Node 2", title: "node 2 tootip text" },
-    { id: 3, label: "Node 3", title: "node 3 tootip text" },
-    { id: 4, label: "Node 4", title: "node 4 tootip text" },
-    { id: 5, label: "Node 5", title: "node 5 tootip text" }
+    { id: '1', position: { x: 0, y: 0 }, data: { label: '1' }},
+    { id: '2', position: { x: 0, y: 100 }, data: { label: '2' }},
   ],
   edges: [
-    { from: 1, to: 2 },
-    { from: 1, to: 3 },
-    { from: 2, to: 4 },
-    { from: 2, to: 5 }
+    { id: 'e1-2', source: '1', target: '2' },
   ]
 };
+
+function ugenGraphJsonToGraph(json: string): any {
+  const graph = JSON.parse(json);
+
+  const result = {
+    nodes: [],
+    edges: [],
+  };
+
+  (graph.nodes ?? []).forEach((node: any) => {
+    result.nodes.push({
+      id: String(node.id),
+      data: {
+        label: `[${node.type}] ${node.label}`,
+      },
+    });
+  });
+  (graph.edges ?? []).forEach((edge: any) => {
+    result.edges.push({
+      id: `e${edge.from}-${edge.to}-${edge.toPort}`,
+      source: String(edge.from),
+      target: String(edge.to),
+    });
+  });
+
+  return result;
+}
 
 function App() {
   const [graphSeqNum, setGraphSeqNum] = useState(0);
@@ -87,6 +114,22 @@ function App() {
     SetGain(gain);
   };
 
+  const [graphUpdateSeqNum, setGraphUpdateSeqNum] = useState(0);
+  const [graphJSON, setGraphJSON] = useState<string>("{}");
+  const [graph, setGraph] = useState<any>({ edges: [], nodes: [] });
+
+  useEffect(() => {
+    const updateGraph = async () => {
+      const json = await GraphJSON();
+      if (json !== graphJSON) {
+        setGraphJSON(json);
+        setGraph(ugenGraphJsonToGraph(json));
+      }
+      setTimeout(() => setGraphUpdateSeqNum((n) => n + 1), 1000);
+    };
+    updateGraph();
+  }, [graphUpdateSeqNum]);
+
   return (
     <AppContainer id="App">
       <img src={logo} className="App-logo" alt="logo" style={{
@@ -94,9 +137,9 @@ function App() {
         objectFit: 'contain',
       }} />
       <StyledContainer>
-        <div>
-          {/* <UGenGraph graph={graph} /> */}
-        </div>
+        <StyledGraph>
+          <UGenGraph graph={graph} />
+        </StyledGraph>
         <Inspector
           volume={gain}
           setVolume={handleGainChange}

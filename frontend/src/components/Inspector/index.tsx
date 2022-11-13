@@ -8,6 +8,7 @@ import { Line, Bar } from 'react-chartjs-2';
 import {
   Chart as ChartJS,
   CategoryScale,
+  Filler,
   LinearScale,
   LogarithmicScale,
   PointElement,
@@ -20,6 +21,7 @@ import {
 
 ChartJS.register(
   CategoryScale,
+  Filler,
   LinearScale,
   LogarithmicScale,
   PointElement,
@@ -253,6 +255,7 @@ function LineChart(props: {samples: number[]}) {
     datasets: [{
       label: "Samples",
       data: props.samples,
+      borderWidth: 1,
       borderColor: 'rgb(53, 162, 235)',
       backgroundColor: 'rgba(53, 162, 235, 0.5)',
       pointStyle: 'cross',
@@ -271,7 +274,7 @@ function Histogram(props: {labels: number[] | undefined, bins: number[]}) {
       },
       title: {
         display: true,
-        text: 'Frequency Bins',
+        text: 'Frequency Spectrum',
       },
     },
     scales: {
@@ -289,13 +292,15 @@ function Histogram(props: {labels: number[] | undefined, bins: number[]}) {
   const data = {
     labels: props.labels ?? props.bins.map((_, i) => i),
     datasets: [{
-      label: "Frequency Bins",
+      label: "Frequency Spectrum",
       data: props.bins,
       borderColor: 'rgb(53, 162, 235)',
       backgroundColor: 'rgba(53, 162, 235, 0.5)',
       pointStyle: 'cross',
+      borderWidth: 1,
       radius: 0,
       cubicInterpolationMode: 'monotone',
+      fill: true,
     }]
   }
   //@ts-ignore

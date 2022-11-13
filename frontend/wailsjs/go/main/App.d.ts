@@ -6,6 +6,8 @@ export function GetNotes():Promise<Array<string>>;
 
 export function GraphDot():Promise<string>;
 
+export function GraphJSON():Promise<string>;
+
 export function RegisterWaveformCallback(arg1:main.WaveformCallback):Promise<void>;
 
 export function SetGain(arg1:number):Promise<void>;

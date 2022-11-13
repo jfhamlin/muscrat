@@ -138,15 +138,28 @@
   (~mixer 1 (~sin freq)
           0.7 (~tri (* freq (cents 10)))))
 
-(mrat.core.io.out (* 0.18
-                     (~mixer 1 (~sig Eb3)
-                             1 (~sig C3)
-                             1 (~sig Bb3)
-                             2 (let [note D4]
-                                     (~freeverb (* (remap (~sin 3) (decibels -2) 1)
-                                                   (lores~ (mixer~ 1 (~saw note :duty 0.4)
-                                                                   1 (~tri note :sync (~pulse (* note (cents 10)))))
-                                                           (* note (/ Bb5 D5)) 0.7))))
-                      )))
+(def second (semitones 2))
+(def minor-third (semitones 3))
+(def major-third (semitones 4))
+(def perfect-fourth (semitones 5))
+(def perfect-fifth (semitones 7))
+(def minor-seventh (semitones 10))
+
+(mrat.core.io.out (* 0.25
+                     (let [root    (* C3 (+ (~clip (~sin 0.1 :duty 0.5) 0 1) 1))
+                           third   (* root minor-third)
+                           fifth   (* root perfect-fifth)
+                           seventh (* root minor-seventh)
+                           second  (* 2 root second) ;; second an octave up
+                           ]
+                       (mixer~ 1 (~sig root)
+                               1 (~sig third)
+                               1 (~sig seventh)
+                               2 (let [note second]
+                                   (~freeverb (* (remap (~sin 3) (decibels -2) 1)
+                                                 (lores~ (mixer~ 1 (~saw note :duty 0.4)
+                                                                 1 (~tri note :sync (~pulse (* note (cents 10)))))
+                                                         (* note (/ Bb5 D5)) 0.7))))
+                               ))))
 
 (print (decibels -10) (decibels 0))

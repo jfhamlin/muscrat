@@ -2,6 +2,7 @@ package graph
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"runtime/debug"
 	"strconv"
@@ -27,6 +28,8 @@ type Node interface {
 	Run(ctx context.Context, g *Graph, cfg generator.SampleConfig, numSamples int)
 
 	String() string
+
+	json.Marshaler
 }
 
 type nodeOptions struct {
@@ -85,6 +88,10 @@ func (n *GeneratorNode) String() string {
 	return n.ID().String()
 }
 
+func (n *GeneratorNode) MarshalJSON() ([]byte, error) {
+	return []byte(fmt.Sprintf(`{"id":%d,"type":"generator","label":"%s"}`, n.id, n.String())), nil
+}
+
 type SinkNode struct {
 	id     NodeID
 	output chan []float64
@@ -134,6 +141,10 @@ func (n *SinkNode) String() string {
 	return n.ID().String()
 }
 
+func (n *SinkNode) MarshalJSON() ([]byte, error) {
+	return []byte(fmt.Sprintf(`{"id":%d,"type":"sink","label":"%s"}`, n.id, n.String())), nil
+}
+
 type Edge struct {
 	From    NodeID
 	To      NodeID
@@ -141,10 +152,14 @@ type Edge struct {
 	Channel chan []float64
 }
 
+func (e *Edge) MarshalJSON() ([]byte, error) {
+	return []byte(fmt.Sprintf(`{"from":%d,"to":%d,"toPort":"%s"}`, e.From, e.To, e.ToPort)), nil
+}
+
 // Graph is a graph of SampleGenerators.
 type Graph struct {
-	Nodes []Node
-	Edges []*Edge
+	Nodes []Node  `json:"nodes"`
+	Edges []*Edge `json:"edges"`
 }
 
 func (g *Graph) AddEdge(from, to NodeID, port string) {

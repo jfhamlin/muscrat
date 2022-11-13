@@ -10,6 +10,10 @@ export function GraphDot() {
   return window['go']['main']['App']['GraphDot']();
 }
 
+export function GraphJSON() {
+  return window['go']['main']['App']['GraphJSON']();
+}
+
 export function RegisterWaveformCallback(arg1) {
   return window['go']['main']['App']['RegisterWaveformCallback'](arg1);
 }

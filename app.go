@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/sha256"
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -487,6 +488,21 @@ func (a *App) GraphDot() string {
 		return ""
 	}
 	return a.graph.Dot()
+}
+
+func (a *App) GraphJSON() string {
+	a.mtx.Lock()
+	defer a.mtx.Unlock()
+
+	if a.graph == nil {
+		return ""
+	}
+
+	buf, err := json.Marshal(a.graph)
+	if err != nil {
+		panic(err)
+	}
+	return string(buf)
 }
 
 func (a *App) SetShowSpectrum(showSpectrum bool) {

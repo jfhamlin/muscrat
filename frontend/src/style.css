@@ -1,5 +1,6 @@
 html {
     text-align: center;
+    height: 100%;
 }
 
 body {
@@ -8,6 +9,7 @@ body {
     font-family: "Nunito", -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto",
     "Oxygen", "Ubuntu", "Cantarell", "Fira Sans", "Droid Sans", "Helvetica Neue",
     sans-serif;
+    height: 100%;
 }
 
 @font-face {
@@ -21,4 +23,7 @@ body {
 #app {
     height: 100vh;
     text-align: center;
+}
+
+#root {
 }
