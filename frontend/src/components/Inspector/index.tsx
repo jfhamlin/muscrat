@@ -38,6 +38,8 @@ import Slider from '@mui/material/Slider';
 import Typography from '@mui/material/Typography';
 import Box from '@mui/material/Box';
 
+import VolumeSlider from '../VolumeSlider';
+
 // @ts-ignore
 import { fft, util as fftUtil } from 'fft-js';
 
@@ -50,6 +52,8 @@ interface SignalInfo {
 
 interface InspectorProps {
   signals: SignalInfo[];
+  volume: number;
+  setVolume: (volume: number) => void;
 }
 
 const StyledContainer = styled.div`
@@ -81,7 +85,7 @@ function ChartBox(props: any) {
 export default function Inspector(props: InspectorProps) {
   return (
     <StyledContainer>
-      
+      <VolumeSlider volume={props.volume} onChange={props.setVolume} />
       {props.signals.map((signal) => (
         <SignalInspector key={signal.id} signal={signal} />
       ))}

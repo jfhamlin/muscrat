@@ -61,21 +61,25 @@ function App() {
     };
   }, [graphSeqNum]);
 
+  const [gain, setGain] = useState(0.5);
+
   const handleGainChange = (gain: number) => {
+    setGain(gain);
     SetGain(gain);
   };
 
   return (
     <AppContainer id="App">
       <h2>Synthesizer</h2>
-      <label>Output Gain</label>
-      <FloatInput onValueChange={handleGainChange} />
       <StyledContainer>
         <div>
           {/* {graphDot && <Graphviz options={{width: 1000}} dot={graphDot} />} */}
           OK
         </div>
-        <Inspector signals={[
+        <Inspector
+          volume={gain}
+          setVolume={handleGainChange}
+          signals={[
           {
             id: "output",
             label: "Output",
