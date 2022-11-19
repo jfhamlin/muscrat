@@ -7,7 +7,7 @@ import (
 	"strings"
 
 	"github.com/jfhamlin/muscrat/internal/pkg/graph"
-	"src.elv.sh/pkg/persistent/vector"
+	"github.com/jfhamlin/muscrat/internal/pkg/persistent/vector"
 )
 
 type Pos struct {
@@ -282,10 +282,11 @@ func NewVector(values []Value, opts ...Option) *Vector {
 		opt(&o)
 	}
 
-	vec := vector.Empty
-	for _, v := range values {
-		vec = vec.Conj(v)
+	vals := make([]interface{}, len(values))
+	for i, v := range values {
+		vals[i] = v
 	}
+	vec := vector.New(vals...)
 
 	return &Vector{
 		Section: o.section,

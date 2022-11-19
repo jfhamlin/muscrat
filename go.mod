@@ -12,7 +12,6 @@ require (
 	github.com/stretchr/testify v1.8.0
 	github.com/wailsapp/wails/v2 v2.1.0
 	golang.org/x/term v0.0.0-20221017184919-83659145692c
-	src.elv.sh v0.18.0
 )
 
 require (
