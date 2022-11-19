@@ -2,11 +2,16 @@ package vector
 
 // New returns a new Vector with the given elements.
 func New(elems ...interface{}) Vector {
-	t := newTransient(Empty.(*vector))
+	// res := Empty
+	// for _, e := range elems {
+	// 	res = res.Conj(e)
+	// }
+	// return res
+	trans := newTransient(&vector{})
 	for _, e := range elems {
-		t = t.conj(e)
+		trans.conj(e)
 	}
-	return t.persistent()
+	return trans.persistent()
 }
 
 type transient struct {
@@ -99,6 +104,6 @@ func (t *transient) persistent() *vector {
 		count:  int(t.count),
 		height: t.height,
 		root:   t.root,
-		tail:   t.tail[:],
+		tail:   t.tail[:t.count-t.tailoff()],
 	}
 }

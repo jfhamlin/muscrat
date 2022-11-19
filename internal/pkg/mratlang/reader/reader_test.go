@@ -198,15 +198,36 @@ func printExprAtPosition(ra *runeArray2D, n value.Value) {
 		start, end := v.Pos(), v.End()
 		// special case for quoted values
 		if v.Count() == 2 {
-			if sym, ok := v.Item().(*value.Symbol); ok && sym.Value == "quote" && v.End() == v.Next().Item().End() {
-				ra.Set(start.Line-1, start.Column-1, '\'')
-				printExprAtPosition(ra, v.Next().Item())
+			if sym, ok := v.Item().(*value.Symbol); ok && v.End() == v.Next().Item().End() {
+				switch sym.Value {
+				case "quote":
+					ra.Set(start.Line-1, start.Column-1, '\'')
+					printExprAtPosition(ra, v.Next().Item())
+				case "quasiquote":
+					ra.Set(start.Line-1, start.Column-1, '`')
+					printExprAtPosition(ra, v.Next().Item())
+				case "unquote":
+					ra.Set(start.Line-1, start.Column-1, '~')
+					printExprAtPosition(ra, v.Next().Item())
+				case "splice-unquote":
+					ra.SetString(start.Line-1, start.Column-1, "~@")
+					printExprAtPosition(ra, v.Next().Item())
+				}
 				return
 			}
 		}
 
 		ra.Set(start.Line-1, start.Column-1, '(')
 		ra.Set(end.Line-1, end.Column-1, ')')
+		ch, cancel := v.Enumerate()
+		defer cancel()
+		for item := range ch {
+			printExprAtPosition(ra, item)
+		}
+	case *value.Vector:
+		start, end := v.Pos(), v.End()
+		ra.Set(start.Line-1, start.Column-1, '[')
+		ra.Set(end.Line-1, end.Column-1, ']')
 		ch, cancel := v.Enumerate()
 		defer cancel()
 		for item := range ch {

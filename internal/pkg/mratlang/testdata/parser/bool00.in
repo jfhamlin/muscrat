@@ -24,7 +24,7 @@
 
 (print "### AND")
 (testTable tbl
-           (fn (bools)
+           (fn [bools]
              (print bools "=>" (testAnd bools))))
 
 ;;; OR
@@ -38,7 +38,7 @@
 (print)
 (print "### OR")
 (testTable tbl
-           (fn (bools)
+           (fn [bools]
              (print bools "=>" (testOr bools))))
 
 ;; bool conversion

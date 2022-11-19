@@ -21,3 +21,12 @@ func TestTransient(t *testing.T) {
 		}
 	}
 }
+
+func TestTransientNew(t *testing.T) {
+	vec := New()
+
+	vec = vec.Conj(1)
+	if val, ok := vec.Index(0); !ok || val != 1 {
+		t.Errorf("Index 0 has value %v, expected 1", val)
+	}
+}

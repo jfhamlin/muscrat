@@ -12,7 +12,7 @@
 
 (def (range beg end)
   (let ((range-tail
-         (fn range-tail (suffix beg end)
+         (fn range-tail [suffix beg end]
            (if (>= beg end)
              suffix
              (range-tail (conj suffix (- end 1)) beg (- end 1))))))

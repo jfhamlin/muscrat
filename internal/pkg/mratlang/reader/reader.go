@@ -210,8 +210,10 @@ func (r *Reader) readExpr() (value.Value, error) {
 	case '\'':
 		return r.readQuote()
 	case '`':
-		return nil, r.error("quasiquote not implemented")
-	case ',':
+		return r.readQuasiquote()
+	case '~':
+		return r.readUnquote()
+	case ',': // TODO: treat as whitespace, as in Clojure
 		return nil, r.error("unquote not implemented")
 	case '#':
 		return r.readDispatch()
@@ -306,17 +308,38 @@ func (r *Reader) readString() (value.Value, error) {
 	return value.NewStr(str, value.WithSection(r.popSection())), nil
 }
 
-func (r *Reader) readQuote() (value.Value, error) {
+func (r *Reader) readQuoteType(form string) (value.Value, error) {
 	node, err := r.readExpr()
 	if err != nil {
 		return nil, err
 	}
 	section := r.popSection()
 	items := []value.Value{
-		value.NewSymbol("quote", value.WithSection(value.Section{StartPos: section.StartPos, EndPos: node.Pos()})),
+		value.NewSymbol(form, value.WithSection(value.Section{StartPos: section.StartPos, EndPos: node.Pos()})),
 		node,
 	}
 	return value.NewList(items, value.WithSection(section)), nil
+}
+
+func (r *Reader) readQuote() (value.Value, error) {
+	return r.readQuoteType("quote")
+}
+
+func (r *Reader) readQuasiquote() (value.Value, error) {
+	return r.readQuoteType("quasiquote")
+}
+
+func (r *Reader) readUnquote() (value.Value, error) {
+	rn, _, err := r.rs.ReadRune()
+	if err != nil {
+		return nil, r.error("error reading input: %w", err)
+	}
+	if rn == '@' {
+		return r.readQuoteType("splice-unquote")
+	}
+
+	r.rs.UnreadRune()
+	return r.readQuoteType("unquote")
 }
 
 func (r *Reader) readDispatch() (value.Value, error) {
@@ -347,7 +370,7 @@ func (r *Reader) readSymbol() (value.Value, error) {
 		if err != nil {
 			return nil, r.error("error reading symbol: %w", err)
 		}
-		if unicode.IsSpace(rn) || rn == ')' || rn == ']' {
+		if unicode.IsSpace(rn) || rn == '(' || rn == ')' || rn == '[' || rn == ']' {
 			r.rs.UnreadRune()
 			break
 		}

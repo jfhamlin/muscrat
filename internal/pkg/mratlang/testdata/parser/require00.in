@@ -5,7 +5,7 @@
 (def print mrat.core.io.print)
 
 ;; map should now be defined
-(apply print (map (fn (x) (* x 100)) (list 1 2 3)))
+(apply print (map (fn [x] (* x 100)) (list 1 2 3)))
 
 (def numList (list 1 2 3 4 5 6 7 8 9 10))
 

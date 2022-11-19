@@ -7,6 +7,8 @@ import (
 	"math/rand"
 	"os"
 	"path/filepath"
+	"strconv"
+	"strings"
 
 	"github.com/jfhamlin/muscrat/internal/pkg/graph"
 	"github.com/jfhamlin/muscrat/internal/pkg/mratlang/value"
@@ -18,6 +20,10 @@ type environment struct {
 	graph *graph.Graph
 	scope *scope
 
+	macros map[string]*value.Func
+
+	gensymCounter int
+
 	stdout io.Writer
 
 	loadPath []string
@@ -28,6 +34,7 @@ func newEnvironment(ctx context.Context, stdout io.Writer) *environment {
 		ctx:    ctx,
 		graph:  &graph.Graph{},
 		scope:  newScope(),
+		macros: make(map[string]*value.Func),
 		stdout: stdout,
 	}
 	addBuiltins(e)
@@ -43,7 +50,12 @@ func (env *environment) String() string {
 }
 
 func (env *environment) Define(name string, value value.Value) {
+	// TODO: define should define globally!
 	env.scope.define(name, value)
+}
+
+func (env *environment) DefineMacro(name string, fn *value.Func) {
+	env.macros[name] = fn
 }
 
 func (env *environment) lookup(name string) (value.Value, bool) {
@@ -170,8 +182,17 @@ func (env *environment) evalList(n *value.List) (value.Value, value.Continuation
 			return asContinuationResult(env.evalFn(n))
 		case "quote":
 			return asContinuationResult(env.evalQuote(n))
+		case "quasiquote":
+			return asContinuationResult(env.evalQuasiquote(n))
 		case "let":
 			return env.evalLet(n)
+		case "defmacro":
+			return asContinuationResult(env.evalDefMacro(n))
+		}
+
+		// handle macros
+		if macro, ok := env.macros[sym.Value]; ok {
+			return env.applyMacro(macro, n.Next())
 		}
 	}
 
@@ -258,31 +279,27 @@ func (env *environment) evalDef(n *value.List) (value.Value, error) {
 		}
 		env.Define(v.Value, val)
 		return nil, nil
-	case *value.List:
+	case *value.List: // scheme-style definition
 		if v.Count() == 0 {
 			return nil, env.errorf(n, "invalid function definition, no name")
 		}
 		sym, ok := v.Item().(*value.Symbol)
 		if !ok {
-			return nil, env.errorf(n, "invalid function definition, name is not a symbol")
+			return nil, env.errorf(n, "invalid function definition, name is not a symbol: %v (%T)", v.Item(), v.Item())
 		}
-		argNames := make([]string, 0, v.Count()-1)
+		var args []value.Value
 		for cur := v.Next(); !cur.IsEmpty(); cur = cur.Next() {
 			item := cur.Item()
-			argSym, ok := item.(*value.Symbol)
-			if !ok {
-				return nil, env.errorf(n, "invalid function definition, argument is not a symbol")
-			}
-			argNames = append(argNames, argSym.Value)
+			args = append(args, item)
 		}
 		env.Define(sym.Value, &value.Func{
 			// TODO: Section (here and elsewhere in this file) isn't quite
 			// right, but close enough for now for useful errors.
-			Section:    n.Section,
-			LambdaName: sym.Value,
-			ArgNames:   argNames,
-			Exprs:      n.Next().Next(),
-			Env:        env,
+			Section:     n.Section,
+			LambdaName:  sym.Value,
+			BindingForm: value.NewVector(args, value.WithSection(n.Section)),
+			Exprs:       n.Next().Next(),
+			Env:         env,
 		})
 		return nil, nil
 	}
@@ -299,15 +316,16 @@ func (env *environment) evalLambda(n *value.List) (value.Value, error) {
 		return nil, env.errorf(n, "invalid lambda, args must be a list")
 	}
 
-	argNames, err := nodeAsStringList(args)
-	if err != nil {
-		return nil, err
+	var argVals []value.Value
+	for cur := args; !cur.IsEmpty(); cur = cur.Next() {
+		item := cur.Item()
+		argVals = append(argVals, item)
 	}
 	return &value.Func{
-		Section:  n.Section,
-		ArgNames: argNames,
-		Exprs:    n.Next().Next(),
-		Env:      env,
+		Section:     n.Section,
+		BindingForm: value.NewVector(argVals, value.WithSection(n.Section)),
+		Exprs:       n.Next().Next(),
+		Env:         env,
 	}, nil
 }
 
@@ -334,20 +352,16 @@ func (env *environment) evalFn(n *value.List) (value.Value, error) {
 		return nil, env.errorf(n, "invalid fn expression, need args and body")
 	}
 
-	args, ok := items[0].(*value.List)
+	bindings, ok := items[0].(*value.Vector)
 	if !ok {
-		return nil, env.errorf(n, "invalid fn expression, args must be a list")
-	}
-	argNames, err := nodeAsStringList(args)
-	if err != nil {
-		return nil, err
+		return nil, env.errorf(n, "invalid fn expression, bindings must be a vector")
 	}
 	return &value.Func{
-		Section:    n.Section,
-		LambdaName: fnName,
-		ArgNames:   argNames,
-		Exprs:      value.NewList(items[1:]),
-		Env:        env,
+		Section:     n.Section,
+		LambdaName:  fnName,
+		BindingForm: bindings,
+		Exprs:       value.NewList(items[1:]),
+		Env:         env,
 	}, nil
 }
 
@@ -509,6 +523,110 @@ func (env *environment) evalQuote(n *value.List) (value.Value, error) {
 	return n.Next().Item(), nil
 }
 
+func (env *environment) evalQuasiquote(n *value.List) (value.Value, error) {
+	listLength := n.Count()
+	if listLength != 2 {
+		return nil, env.errorf(n, "invalid quasiquote, need 1 argument")
+	}
+
+	// symbolNameMap tracks the names of symbols that have been renamed.
+	// symbols that end with a '#' have '#' replaced with a unique
+	// suffix.
+	symbolNameMap := make(map[string]string)
+	return env.evalQuasiquoteItem(symbolNameMap, n.Next().Item())
+}
+
+func (env *environment) evalQuasiquoteItem(symbolNameMap map[string]string, item value.Value) (value.Value, error) {
+	switch item := item.(type) {
+	case *value.List:
+		if item.IsEmpty() {
+			return item, nil
+		}
+		if item.Item().Equal(value.SymbolUnquote) {
+			return env.Eval(item.Next().Item())
+		}
+		if item.Item().Equal(value.SymbolSpliceUnquote) {
+			return nil, env.errorf(item, "splice-unquote not in list")
+		}
+
+		var resultValues []value.Value
+		for cur := item; !cur.IsEmpty(); cur = cur.Next() {
+			if lst, ok := cur.Item().(*value.List); ok && !lst.IsEmpty() && lst.Item().Equal(value.SymbolSpliceUnquote) {
+				res, err := env.Eval(lst.Next().Item())
+				if err != nil {
+					return nil, err
+				}
+				vals, ok := res.(value.Nther)
+				if !ok {
+					return nil, env.errorf(lst, "splice-unquote did not return an enumerable")
+				}
+				for i := 0; ; i++ {
+					v, ok := vals.Nth(i)
+					if !ok {
+						break
+					}
+					resultValues = append(resultValues, v)
+				}
+				continue
+			}
+
+			result, err := env.evalQuasiquoteItem(symbolNameMap, cur.Item())
+			if err != nil {
+				return nil, err
+			}
+			resultValues = append(resultValues, result)
+		}
+		return value.NewList(resultValues), nil
+	case *value.Vector:
+		if item.Count() == 0 {
+			return item, nil
+		}
+
+		var resultValues []value.Value
+		for i := 0; i < item.Count(); i++ {
+			cur := item.ValueAt(i)
+			if lst, ok := cur.(*value.List); ok && !lst.IsEmpty() && lst.Item().Equal(value.SymbolSpliceUnquote) {
+				res, err := env.Eval(lst.Next().Item())
+				if err != nil {
+					return nil, err
+				}
+				vals, ok := res.(value.Nther)
+				if !ok {
+					return nil, env.errorf(lst, "splice-unquote did not return an enumerable")
+				}
+				for j := 0; ; j++ {
+					v, ok := vals.Nth(j)
+					if !ok {
+						break
+					}
+					resultValues = append(resultValues, v)
+				}
+				continue
+			}
+
+			result, err := env.evalQuasiquoteItem(symbolNameMap, cur)
+			if err != nil {
+				return nil, err
+			}
+			resultValues = append(resultValues, result)
+		}
+		return value.NewVector(resultValues), nil
+	case *value.Symbol:
+		if !strings.HasSuffix(item.Value, "#") {
+			return item, nil
+		}
+		newName, ok := symbolNameMap[item.Value]
+		if !ok {
+			newName = item.Value[:len(item.Value)-1] + "__" + strconv.Itoa(env.gensymCounter) + "__auto__"
+			symbolNameMap[item.Value] = newName
+			env.gensymCounter++
+		}
+		return value.NewSymbol(newName), nil
+	default:
+		return item, nil
+	}
+}
+
 // essential syntax: let <bindings> <body>
 //
 // Two forms are supported. The first is the standard let form:
@@ -636,6 +754,62 @@ func (env *environment) evalVectorBindings(bindings *value.Vector) (map[string]v
 	}
 
 	return bindingsMap, nil
+}
+
+func (env *environment) evalDefMacro(n *value.List) (value.Value, error) {
+	if n.Count() < 3 {
+		return nil, env.errorf(n, "invalid defmacro, need name and body")
+	}
+
+	n = n.Next()
+
+	sym, ok := n.Item().(*value.Symbol)
+	if !ok {
+		return nil, env.errorf(n.Item(), "invalid defmacro, name must be a symbol")
+	}
+
+	n = n.Next()
+
+	bindings, ok := n.Item().(*value.Vector)
+	if !ok {
+		return nil, env.errorf(n.Item(), "invalid defmacro, bindings must be a vector")
+	}
+
+	n = n.Next()
+
+	env.DefineMacro(sym.Value, &value.Func{
+		// TODO: Section (here and elsewhere in this file) isn't quite
+		// right, but close enough for now for useful errors.
+		Section:     n.Section,
+		LambdaName:  sym.Value,
+		BindingForm: bindings,
+		Exprs:       n,
+		Env:         env,
+	})
+	return nil, nil
+}
+
+func (env *environment) applyMacro(fn *value.Func, argList *value.List) (value.Value, value.Continuation, error) {
+	args := listAsSlice(argList)
+	res, c, err := env.applyFunc(fn, args)
+	if err != nil {
+		return nil, nil, err
+	}
+	if c == nil {
+		return nil, func() (value.Value, value.Continuation, error) {
+			return env.eval(res)
+		}, nil
+	}
+
+	// continue evaluating until we get a result
+	for c != nil && err == nil {
+		res, c, err = c()
+	}
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return env.eval(res)
 }
 
 // Helpers

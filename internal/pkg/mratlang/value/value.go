@@ -87,6 +87,12 @@ type Counter interface {
 	Count() int
 }
 
+// Nther is an interface for compound values whose elements can be
+// accessed by index.
+type Nther interface {
+	Nth(int) (v Value, ok bool)
+}
+
 type options struct {
 	// where the value was defined
 	section Section
@@ -183,6 +189,20 @@ func (l *List) Conj(items ...Value) Conjer {
 	return l
 }
 
+func (l *List) Nth(i int) (v Value, ok bool) {
+	if i < 0 {
+		return nil, false
+	}
+	for !l.IsEmpty() {
+		if i == 0 {
+			return l.item, true
+		}
+		i--
+		l = l.next
+	}
+	return nil, false
+}
+
 func (l *List) Enumerate() (<-chan Value, func()) {
 	return enumerateFunc(func() (v Value, ok bool) {
 		if l.IsEmpty() {
@@ -224,12 +244,24 @@ func (l *List) String() string {
 	// special case for quoted values
 	if l.Count() == 2 {
 		// TODO: only do this if it used quote shorthand when read.
-		if sym, ok := l.item.(*Symbol); ok && sym.Value == "quote" {
-			b.WriteString("'")
+		if sym, ok := l.item.(*Symbol); ok {
+			switch sym.Value {
+			case "quote":
+				b.WriteString("'")
+			case "quasiquote":
+				b.WriteString("`")
+			case "unquote":
+				b.WriteString("~")
+			case "splice-unquote":
+				b.WriteString("~@")
+			default:
+				goto NoQuote
+			}
 			b.WriteString(l.next.item.String())
 			return b.String()
 		}
 	}
+NoQuote:
 
 	b.WriteString("(")
 	for cur := l; !cur.IsEmpty(); cur = cur.next {
@@ -311,7 +343,17 @@ func (v *Vector) ValueAt(i int) Value {
 	if !ok {
 		panic("index out of range")
 	}
+	if val == nil {
+		return nil
+	}
 	return val.(Value)
+}
+
+func (v *Vector) Nth(i int) (val Value, ok bool) {
+	if i < 0 || i >= v.Count() {
+		return nil, false
+	}
+	return v.ValueAt(i), true
 }
 
 func (v *Vector) SubVector(start, end int) *Vector {
@@ -358,7 +400,11 @@ func (v *Vector) Equal(v2 Value) bool {
 		return false
 	}
 	for i := 0; i < v.Count(); i++ {
-		if !v.ValueAt(i).Equal(other.ValueAt(i)) {
+		vVal, oVal := v.ValueAt(i), other.ValueAt(i)
+		if vVal == nil || oVal == nil {
+			return vVal == oVal
+		}
+		if !vVal.Equal(oVal) {
 			return false
 		}
 	}
@@ -582,11 +628,11 @@ func (k *Keyword) Equal(v Value) bool {
 // Func is a function.
 type Func struct {
 	Section
-	LambdaName string
-	Variadic   bool
-	ArgNames   []string
-	Env        Environment
-	Exprs      *List
+	LambdaName  string
+	Variadic    bool
+	BindingForm *Vector
+	Env         Environment
+	Exprs       *List
 }
 
 func (f *Func) String() string {
@@ -596,21 +642,9 @@ func (f *Func) String() string {
 		b.WriteString(" ")
 		b.WriteString(f.LambdaName)
 	}
-	b.WriteString(" (")
-	for i, arg := range f.ArgNames {
-		if i > 0 {
-			b.WriteString(" ")
-		}
-		b.WriteString(arg)
-	}
-	if f.Variadic {
-		if len(f.ArgNames) > 0 {
-			b.WriteString(" ")
-		}
-		b.WriteString("&")
-		b.WriteString(f.ArgNames[len(f.ArgNames)-1])
-	}
-	b.WriteString(") ")
+	b.WriteRune(' ')
+	b.WriteString(f.BindingForm.String())
+	b.WriteRune(' ')
 	for cur := f.Exprs; !cur.IsEmpty(); cur = cur.Next() {
 		if cur != f.Exprs {
 			b.WriteString(" ")
@@ -665,22 +699,22 @@ func (f *Func) ContinuationApply(env Environment, args []Value) (Value, Continua
 	}
 
 	fnEnv := f.Env.PushScope()
-	fnEnv.Define("$args", NewVector(args))
+	fnEnv.Define("$args", NewVector(args)) // TODO: drop this in favor of destructuring
 	if f.LambdaName != "" {
 		// Define the function name in the environment.
 		fnEnv.Define(f.LambdaName, f)
 	}
 
-	for i, argName := range f.ArgNames {
-		if i >= len(args) {
-			return nil, nil, fmt.Errorf("too few arguments to function")
-		}
-		fnEnv.Define(argName, args[i])
+	bindings, err := Bind(f.BindingForm, NewList(args))
+	if err != nil {
+		return nil, nil, errorWithStack(err, StackFrame{
+			FunctionName: fnName,
+			Pos:          f.Pos(),
+		})
 	}
-	if f.Variadic {
-		for i := len(f.ArgNames); i < len(args); i++ {
-			fnEnv.Define(fmt.Sprintf("$%d", i), args[i])
-		}
+	for i := 0; i < len(bindings); i += 2 {
+		sym := bindings[i].(*Symbol)
+		fnEnv.Define(sym.Value, bindings[i+1])
 	}
 
 	var exprs []Value

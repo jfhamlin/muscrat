@@ -13,7 +13,7 @@
 ;; The above is a shorthand for defining a symbol whose value is an
 ;; anonymous lambda (the "fn" special form).
 (def testFn
-    (fn ()
+    (fn []
         (print 3)
         (print 4)))
 (testFn)
