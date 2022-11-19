@@ -26,6 +26,7 @@ import styled from 'styled-components';
 
 import Inspector from './components/Inspector';
 import UGenGraph from './components/UGenGraph';
+import type { Graph } from './components/UGenGraph';
 
 const AppContainer = styled.div`
   display: flex;
@@ -59,7 +60,7 @@ const graph = {
 function ugenGraphJsonToGraph(json: string): any {
   const graph = JSON.parse(json);
 
-  const result = {
+  const result: Graph = {
     nodes: [],
     edges: [],
   };
@@ -67,6 +68,10 @@ function ugenGraphJsonToGraph(json: string): any {
   (graph.nodes ?? []).forEach((node: any) => {
     result.nodes.push({
       id: String(node.id),
+      position: {
+        x: 0,
+        y: 0,
+      },
       data: {
         label: `[${node.type}] ${node.label}`,
       },

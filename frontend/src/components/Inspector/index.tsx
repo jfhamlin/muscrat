@@ -109,6 +109,13 @@ function SignalInspector(props: { signal: SignalInfo }) {
   };
 
   const [oscilloscopeWindow, setOscilloscopeWindow] = useState(0.01);
+  const handleOscilloscopeWindowChange = (
+    event: Event,
+    newValue: number | number[],
+  ) => {
+    setOscilloscopeWindow(newValue as number);
+  };
+
   const [oscilloscopeFreq, setOscilloscopeFreq] = useState(1);
   const handleOscilloscopeFreqChange = (
     event: Event,
@@ -133,6 +140,8 @@ function SignalInspector(props: { signal: SignalInfo }) {
   const lastUpdate = useRef<number>(0);
   const lastFftUpdate = useRef<number>(0);
 
+  const numOscSamples = signal.sampleRate * oscilloscopeWindow;
+  const oscSamples = useRef<number[]>([]);
   const fftSamples = useRef<number[]>([]);
 
   const samplesCallback = signal.samplesCallback;
@@ -140,8 +149,13 @@ function SignalInspector(props: { signal: SignalInfo }) {
     const MAX_FFT_SAMPLES = 4096;
     return samplesCallback((newSamples) => {
       const now = Date.now();
+
+      oscSamples.current = oscSamples.current.concat(newSamples);
+      if (oscSamples.current.length > numOscSamples) {
+        oscSamples.current = oscSamples.current.slice(-numOscSamples);
+      }
       if (inspectorModeState[0].includes('time') && now - lastUpdate.current > (1000.0 / oscilloscopeFreq)) {
-        setSamples(newSamples);
+        setSamples(oscSamples.current);
         lastUpdate.current = now;
       }
 
@@ -162,7 +176,7 @@ function SignalInspector(props: { signal: SignalInfo }) {
         lastFftUpdate.current = now;
       }
     });
-  }, [samplesCallback]);
+  }, [samplesCallback, numOscSamples, oscilloscopeFreq, fftFreq, signal.sampleRate]);
 
   return (
     <div>
@@ -186,7 +200,14 @@ function SignalInspector(props: { signal: SignalInfo }) {
       {inspectorMode.includes('time') ?
        <ChartBox>
          <LabeledSlider
-           label="Update Frequency"
+           label="Window Width (s)"
+           value={oscilloscopeWindow}
+           onChange={handleOscilloscopeWindowChange}
+           min={0.001}
+           max={0.5}
+           step={0.001} />
+         <LabeledSlider
+           label="Update Frequency (Hz)"
            value={oscilloscopeFreq}
            onChange={handleOscilloscopeFreqChange}
            min={0.5}
@@ -200,7 +221,7 @@ function SignalInspector(props: { signal: SignalInfo }) {
       {inspectorMode.includes('frequency') ?
        <ChartBox>
          <LabeledSlider
-           label="Update Frequency"
+           label="Update Frequency (Hz)"
            value={fftFreq}
            onChange={handleFftFreqChange}
            min={1}

@@ -33,7 +33,7 @@ interface Edge {
   target: any;
 }
 
-interface Graph {
+export interface Graph {
   nodes: Node[];
   edges: Edge[];
 }
@@ -63,7 +63,7 @@ export default function UGenGraph(props: UGenGraphProps) {
    * console.log('edges', edges); */
 
   // do nothing
-  const onConnect = useCallback((params) => {})//setEdges((eds) => addEdge(params, eds)), [setEdges]);
+  const onConnect = useCallback(() => {}, [])//setEdges((eds) => addEdge(params, eds)), [setEdges]);
 
   {/* onEdgesChange={onEdgesChange}
       onConnect={onConnect} */}
@@ -81,19 +81,19 @@ export default function UGenGraph(props: UGenGraphProps) {
   );
 }
 
-function layoutNodes(nodes, edges) {
-  const simNodes = nodes.map((d, i) => ({ id: d.id, x: 0, y: 0 }));
-  const simEdges = edges.map((d) => ({ source: d.source, target: d.target }));
+function layoutNodes(nodes: Node[], edges: Edge[]) {
+  const simNodes = nodes.map((d: Node, i: number) => ({ id: d.id, x: 0, y: 0 }));
+  const simEdges = edges.map((d: Edge) => ({ source: d.source, target: d.target }));
 
   const nodeWidth = 200;
   const nodeHeight = 50;
 
-  const simNodesById = simNodes.reduce((acc, d) => {
+  const simNodesById = simNodes.reduce((acc: any, d) => {
     acc[d.id] = d;
     return acc;
   }, {});
 
-  const edgesBySource = edges.reduce((acc, d) => {
+  const edgesBySource = edges.reduce((acc: any, d) => {
     if (!acc[d.source]) {
       acc[d.source] = [];
     }
@@ -101,7 +101,7 @@ function layoutNodes(nodes, edges) {
     return acc;
   }, {});
 
-  const edgesByTarget = edges.reduce((acc, d) => {
+  const edgesByTarget = edges.reduce((acc: any, d) => {
     if (!acc[d.target]) {
       acc[d.target] = [];
     }
@@ -110,16 +110,38 @@ function layoutNodes(nodes, edges) {
   }, {});
 
   // dumb position initialization, iterating over all edges multiple
-  // times and placing source nodes above target nodes. note that y increases
-  // downwards in SVG coordinates.
-  for (let i = 0; i < 100; ++i) {
-    simEdges.forEach((d) => {
-      const source = simNodesById[d.source];
-      const target = simNodesById[d.target];
-      if (source.y < target.y - 100) {
-        return;
+  // times and placing source nodes above target nodes and target
+  // nodes as close as possible to but below their lowest source
+  // nodes. note that y increases downwards in SVG coordinates.
+  for (let i = 0; i < 1000; ++i) {
+    simNodes.forEach((node) => {
+      const sources = edgesByTarget[node.id];
+      let sourceTarget = node.y;
+      if (sources) {
+        const lowestSource = sources.reduce((acc: any, d: any) => {
+          const source = simNodesById[d.source];
+          if (source.y > acc.y) {
+            return source;
+          }
+          return acc;
+        }, { y: -Infinity });
+        sourceTarget = lowestSource.y + 100;
       }
-      source.y = 0.5 * (source.y + target.y - 100);
+
+      const targets = edgesBySource[node.id];
+      let targetSource = node.y;
+      if (targets) {
+        const highestTarget = targets.reduce((acc: any, d: any) => {
+          const target = simNodesById[d.target];
+          if (target.y < acc.y) {
+            return target;
+          }
+          return acc;
+        }, { y: Infinity });
+        targetSource = highestTarget.y - 100;
+      }
+
+      node.y = 0.5 * (sourceTarget + targetSource);
     });
   }
 
@@ -128,18 +150,22 @@ function layoutNodes(nodes, edges) {
   const nodeTargetX = (id: string) => {
     const sourceEdges = edgesBySource[id] ?? [];
     const targetEdges = edgesByTarget[id] ?? [];
-    const sourceX = sourceEdges.reduce((acc, d) => acc + simNodesById[d.target].x, 0) / sourceEdges.length;
-    const targetX = targetEdges.reduce((acc, d) => acc + simNodesById[d.source].x, 0) / targetEdges.length;
+    const sourceX = (sourceEdges.length > 0) ?
+                    sourceEdges.reduce((acc: any, d: Edge) => acc + simNodesById[d.target].x, 0) / sourceEdges.length :
+                    0;
+    const targetX = (targetEdges.length > 0) ?
+                    targetEdges.reduce((acc: any, d: Edge) => acc + simNodesById[d.source].x, 0) / targetEdges.length :
+                    0;
     return 0.5 * (sourceX + targetX);
   };
 
   // spread out nodes at nearby y values horizontally
-  for (let i = 0; i < 1; ++i) {
+  for (let i = 0; i < 100; ++i) {
     simNodes.forEach((d) => {
       const nearby = simNodes.filter((d2) => Math.abs(d2.y - d.y) < nodeHeight);
       const sorted = nearby.sort((a, b) => nodeTargetX(a.id) - nodeTargetX(b.id));
       const sortedTargetX = sorted.map((d2) => nodeTargetX(d2.id));
-      console.log('sortedTargetX', sortedTargetX);
+
       // distribute nodes near their target x position, but avoid collisions
       for (let j = 0; j < 10; ++j) {
         sorted.forEach((d2, i) => {
@@ -152,41 +178,18 @@ function layoutNodes(nodes, edges) {
         })
       }
       sorted.forEach((d2, i) => {
-        //d2.x = sortedTargetX[i];
+        d2.x = sortedTargetX[i];
       });
-
-      // distribute nodes evenly along the x axis around the center
-      // sort by target x position
-
-      /* 
-       * const rowWidth = nearby.length * nodeWidth; */
-      /* sorted.forEach((d2, i) => {
-       *   d2.x = (centerX - 0.5 * rowWidth) + i * nodeWidth;
-       * }); */
-      //d.x = nodeTargetX(d.id);
     });
   }
 
-  /* const forceNode = d3.forceManyBody();
-   * const forceLink = d3.forceLink(simEdges).id((d) => d.id); */
-
-  /* const simulation = forceSimulation(simNodes)
-   *   //.force('link', forceLink)
-   *   .force('charge', d3.forceManyBody())
-   *   .force('center', d3.forceCenter(nodeWidth / 2, nodeHeight / 2))
-   *   .force('collide', d3.forceCollide(10));
-   * simulation.stop();
-
-
-   * for (let i = 0; i < 1000; ++i) simulation.tick(); */
-
   return nodes.map((node, i) => {
     return {
+      ...node,
       position: {
         x: simNodesById[node.id].x,
         y: simNodesById[node.id].y,
       },
-      ...node,
     };
   });
 }
