@@ -554,6 +554,9 @@ func (env *environment) evalLet(n *value.List) (value.Value, value.Continuation,
 	default:
 		return nil, nil, env.errorf(items[1], "invalid let, bindings must be a list or vector")
 	}
+	if err != nil {
+		return nil, nil, err
+	}
 
 	// create a new environment with the bindings
 	newEnv := env.PushScope().(*environment)
