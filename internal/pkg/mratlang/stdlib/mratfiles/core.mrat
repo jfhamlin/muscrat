@@ -31,6 +31,13 @@
   [name & bindings-and-body]
   `(def ~name (fn ~name ~@bindings-and-body)))
 
+(defmacro do
+  ;; "Evaluates exprs in order, and returns the value of the last
+  ;; expression. (do) returns nil."
+  ([] nil)
+  ([x] x)
+  ([& exprs] `(let [] ~@exprs)))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Comparisons
 
@@ -92,6 +99,17 @@
 
 (defn cons [car cdr] (concat (list car) cdr))
 
+(defn sequential? [x]
+  (or (list? x)
+      (vector? x)
+      (seq? x)))
+
+(defn flatten [coll]
+  (let [flat-mapper (fn [el] (if (sequential? el) (flatten el) (list el)))]
+    (if (sequential? coll)
+      (apply concat (map flat-mapper coll))
+      (concat))))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Iteration
 (defn range [beg end]
@@ -111,7 +129,7 @@
          (fn repeat-tail [suffix n x]
            (if (<= n 0)
              suffix
-             (repeat-tail (reduce (fn [acc el] (conj acc el)) x suffix) (- n 1) x)))))
+             (repeat-tail (reduce (fn [acc el] (conj acc el)) suffix x) (- n 1) x)))))
     (reverse (repeat-tail '() n x)))) ;; TODO: implement with sequences, not lists, so we don't have to reverse
 
 (defn nth [coll index]
@@ -155,10 +173,25 @@
 (defn map-idx [func lst]
   (maps (fn [val idx] (func val idx)) lst (range 0 (length lst))))
 
-(defn reduce [func lst acc]
-    (if (not-empty? lst)
-        (reduce func (rest lst) (func acc (first lst)))
-        acc))
+(defn reduce
+  ;; "f should be a function of 2 arguments. If val is not supplied,
+  ;; returns the result of applying f to the first 2 items in coll, then
+  ;; applying f to that result and the 3rd item, etc. If coll contains no
+  ;; items, f must accept no arguments as well, and reduce returns the
+  ;; result of calling f with no arguments.  If coll has only 1 item, it
+  ;; is returned and f is not called.  If val is supplied, returns the
+  ;; result of applying f to val and the first item in coll, then
+  ;; applying f to that result and the 2nd item, etc. If coll contains no
+  ;; items, returns val and f is not called."
+  ([f coll]
+   (case (count coll)
+     0 (f)
+     1 (first coll)
+     (reduce f (first coll) (rest coll))))
+  ([f val coll]
+   (if (empty? coll)
+     val
+     (reduce f (f val (first coll)) (rest coll)))))
 
 (defn sum [lst] (apply + lst))
 
@@ -170,9 +203,8 @@
 (def *mixer
   (fn [& args]
     (let ((mixerArgs args))
-      (let ((weightSum (reduce +
-                               (map-idx (fn [val idx] (if (even? idx) val 0)) mixerArgs)
-                               0)))
+      (let ((weightSum (reduce + 0
+                               (map-idx (fn [val idx] (if (even? idx) val 0)) mixerArgs))))
         (sum (map (fn [idx] (let ((weight (nth mixerArgs (* 2 idx)))
                                   (chan   (nth mixerArgs (+ (* 2 idx) 1))))
                               (* (/ weight weightSum) chan)))

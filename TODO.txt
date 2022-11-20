@@ -63,7 +63,10 @@ Either:
 - nth for strings (and any other string helpers)
 - associative destructuring
 - reject too many/too few arguments
-- :as all
+- metadata (can be used to tie ugens to where they were defined in code)
+- :as all for destructuring
+- destructuring for lets
+- docstrings for defn/def
 - etc.
 *** TODO implement special forms as macros
 *** TODO include whitespace and comment information in output from reader

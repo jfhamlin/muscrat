@@ -1,26 +1,3 @@
-;;; Make some functions easier to use.
-(def *sin mrat.osc.sin)
-(def *saw mrat.osc.saw)
-(def *sqr mrat.osc.sqr)
-(def *tri mrat.osc.tri)
-(def *phasor mrat.osc.phasor)
-(def *noise mrat.osc.noise)
-
-(def *lores mrat.effects.*lores)
-(def *env mrat.effects.env)
-(def *clip mrat.effects.clip)
-
-(def print mrat.core.io.print)
-
-(defn cons [car cdr] (concat (list car) cdr))
-
-(defn flatten [lst]
-  (if (empty? lst)
-    lst
-    (if (list? (first lst))
-      (concat (flatten (first lst)) (flatten (rest lst)))
-      (cons (first lst) (flatten (rest lst))))))
-
 (defn oscrng [osc min max]
   (+ min
      (/ (- max min) 2)
@@ -137,7 +114,7 @@
 (defn getsyncargs [cfg phasors]
   (let ((syncosc (getval cfg :sync)))
     (if (nil? syncosc)
-      nil
+      '()
       (let ((syncph (getval phasors syncosc)))
         (list :sync syncph)))))
 

@@ -40,7 +40,6 @@ func init() {
 				funcSymbol("first", firstBuiltin),
 				funcSymbol("rest", restBuiltin),
 				funcSymbol("subvec", subvecBuiltin),
-				// funcSymbol("lazy-seq", nthBuiltin),
 				// math functions
 				funcSymbol("pow", powBuiltin),
 				funcSymbol("floor", floorBuiltin),
@@ -56,6 +55,8 @@ func init() {
 				funcSymbol("eq?", eqBuiltin),
 				funcSymbol("list?", isListBuiltin),
 				funcSymbol("vector?", isVectorBuiltin),
+				funcSymbol("seq?", isSeqBuiltin),
+				funcSymbol("seqable?", isSeqableBuiltin),
 				funcSymbol("empty?", emptyBuiltin),
 				funcSymbol("not-empty?", notEmptyBuiltin),
 				// boolean functions
@@ -399,6 +400,22 @@ func isVectorBuiltin(env value.Environment, args []value.Value) (value.Value, er
 		return nil, fmt.Errorf("vector? expects 1 argument, got %v", len(args))
 	}
 	_, ok := args[0].(*value.Vector)
+	return value.NewBool(ok), nil
+}
+
+func isSeqBuiltin(env value.Environment, args []value.Value) (value.Value, error) {
+	if len(args) != 1 {
+		return nil, fmt.Errorf("seq? expects 1 argument, got %v", len(args))
+	}
+	_, ok := args[0].(*value.Seq)
+	return value.NewBool(ok), nil
+}
+
+func isSeqableBuiltin(env value.Environment, args []value.Value) (value.Value, error) {
+	if len(args) != 1 {
+		return nil, fmt.Errorf("seqable? expects 1 argument, got %v", len(args))
+	}
+	_, ok := args[0].(value.Enumerable)
 	return value.NewBool(ok), nil
 }
 
