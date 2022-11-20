@@ -44,7 +44,8 @@ func init() {
 type App struct {
 	ctx context.Context
 
-	gain float64
+	gain       float64
+	targetGain float64
 
 	generator     generator.SampleGenerator
 	nextGenerator generator.SampleGenerator
@@ -79,6 +80,7 @@ func NewApp() *App {
 		outputChannel: make(chan []float64, 4), // buffer four packets of samples
 		synthFileName: "synth.mrat",
 		gain:          0.25,
+		targetGain:    0.25,
 		// showSpectrum:             true,
 		showSpectrumHist: true,
 		// showOscilloscope:         true,
@@ -117,14 +119,6 @@ func transformSampleBuffer(cfg *audio.AudioConfig, buf []float64) []int {
 	}
 
 	return out
-}
-
-func scaleSamples(buf []float64, gain float64) []float64 {
-	res := make([]float64, len(buf))
-	for i := 0; i < len(buf); i++ {
-		res[i] = buf[i] * gain
-	}
-	return res
 }
 
 var (
@@ -293,7 +287,19 @@ func (a *App) getSamples(cfg *audio.AudioConfig, n int) []int {
 
 	go runtime.EventsEmit(a.ctx, "samples", samples)
 
-	samples = scaleSamples(samples, a.gain)
+	// update gain to approach target gain.
+	{
+		newSamples := make([]float64, len(samples))
+		target := a.targetGain
+		gainStep := (target - a.gain) / float64(len(samples))
+		for i, s := range samples {
+			newSamples[i] = s * a.gain
+			a.gain += gainStep
+		}
+		samples = newSamples
+		a.gain = target
+	}
+
 	return transformSampleBuffer(cfg, samples)
 }
 
@@ -454,7 +460,7 @@ func (a *App) updateSignalGraphFromScriptFile(filename string) {
 }
 
 func (a *App) SetGain(gain float64) {
-	a.gain = math.Max(0, math.Min(gain, 1))
+	a.targetGain = math.Max(0, math.Min(gain, 1))
 }
 
 func (a *App) GetNotes() []string {

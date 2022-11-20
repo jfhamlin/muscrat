@@ -1,26 +1,28 @@
 (load-file "./examples/notes.mrat")
 (load-file "./examples/welsh.mrat")
 
-(def noise (*lores (*noise) (remap (*sin 0.1) 350 400) 0.5))
+;; (def noise (*lores (*noise) (remap (*sin 0.1) 350 400) 0.5))
 
-(def hum-sins
-  (let [root 270]
-    (map (fn [x] (*sin x))
-         [root
-          (* root (semitones 2))
-          (* root (semitones -4))
-          (* root (semitones -11))
-          ])))
+;; (def hum-sins
+;;   (let [root 270]
+;;     (map (fn [x] (*sin x))
+;;          [root
+;;           (* root (semitones 2))
+;;           (* root (semitones -4))
+;;           (* root (semitones -11))
+;;           ])))
 
-(def gate (*sqr .5))
-(def punch-env (*env gate '(0 1 1 0) '(0.02 0.1 0.05)))
-(def punch (bongo (* C1 (semitones -12)) gate))
+;; (def gate (*sqr .5))
+;; (def punch-env (*env gate '(0 1 1 0) '(0.02 0.1 0.05)))
+;; (def punch (bongo (* C1 (semitones -12)) gate))
 
-(mrat.core.io.out
- (* 0.25
-    (+
-     (* (+ 1 (* -1 punch-env)) (* 0.3
-                                  (*mixer 1 noise
-                                          5 (sum hum-sins))))
-     punch
-     )))
+;; (mrat.core.io.out
+;;  (* 0.25
+;;     (+
+;;      (* (+ 1 (* -1 punch-env)) (* 0.3
+;;                                   (*mixer 1 noise
+;;                                           5 (sum hum-sins))))
+;;      punch
+;;      )))
+
+(mrat.core.io/out (*sin 440))

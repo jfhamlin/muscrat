@@ -113,11 +113,12 @@ func init() {
 func addBuiltins(env *environment) {
 	for _, pkg := range builtinPackages {
 		for _, sym := range pkg.Symbols {
-			name := pkg.Name + "." + sym.Name
+			name := pkg.Name + "/" + sym.Name
 			if pkg.Name == "mrat.core" {
 				// core symbols are available in the global namespace.
 				name = sym.Name
 			}
+			fmt.Println("adding builtin", name)
 			env.Define(name, sym.Value)
 		}
 	}
