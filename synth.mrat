@@ -25,4 +25,17 @@
 ;;      punch
 ;;      )))
 
-(mrat.core.io/out (*sin 440))
+(def sig0 (*sin 440))
+(def sig1 (*sin 880))
+
+(defn sin01 [freq] (remap (*sin freq) 0 1))
+
+(defn sig-pan-osc [freq sig0 sig1]
+  (let [t (sin01 freq)]
+    (+ (* t sig0) (* (+ t -1) sig1))))
+
+(def left (sig-pan-osc 0.5 sig0 sig1))
+(def right (sig-pan-osc 0.2 sig0 sig1))
+
+(mrat.core.io/out left right);; (* 0.2 (*sin 440)))
+

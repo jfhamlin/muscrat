@@ -118,7 +118,6 @@ func addBuiltins(env *environment) {
 				// core symbols are available in the global namespace.
 				name = sym.Name
 			}
-			fmt.Println("adding builtin", name)
 			env.Define(name, sym.Value)
 		}
 	}
@@ -1021,18 +1020,20 @@ func pulseBuiltin(env value.Environment, args []value.Value) (value.Value, error
 }
 
 func outBuiltin(env value.Environment, args []value.Value) (value.Value, error) {
-	sinks := env.Graph().Sinks()
-	if len(sinks) == 0 {
-		sinks = append(sinks, env.Graph().AddSinkNode(graph.WithLabel("out")))
-	}
-	for _, arg := range args {
+	// add a new sink node for every argument. each sink represents an output channel.
+	numSinks := len(env.Graph().Sinks())
+	// if len(sinks) == 0 {
+	// 	sinks = append(sinks, env.Graph().AddSinkNode(graph.WithLabel("out")))
+	// }
+	for i, arg := range args {
 		gen, ok := asGen(env, arg)
 		if !ok {
 			return nil, fmt.Errorf("expected generator, got %v", arg)
 		}
-		for _, sink := range sinks {
-			env.Graph().AddEdge(gen.NodeID, sink.ID(), gen.String())
-		}
+
+		chanID := i + numSinks
+		sink := env.Graph().AddSinkNode(graph.WithLabel(fmt.Sprintf("out%d", chanID)))
+		env.Graph().AddEdge(gen.NodeID, sink.ID(), "w")
 	}
 	return nil, nil
 }

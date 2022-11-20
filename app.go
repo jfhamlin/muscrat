@@ -60,8 +60,10 @@ type App struct {
 
 	waveformCallback WaveformCallback
 
-	outputChannel      chan []float64
-	graphOutputChannel <-chan []float64
+	// output channel is a channel of sample buffers, one for each audio
+	// channel.
+	outputChannel      chan [][]float64
+	graphOutputChannel <-chan [][]float64
 
 	synthFileName string
 	sampleRate    int
@@ -77,7 +79,7 @@ type App struct {
 // NewApp creates a new App application struct
 func NewApp() *App {
 	return &App{
-		outputChannel: make(chan []float64, 4), // buffer four packets of samples
+		outputChannel: make(chan [][]float64, 4), // buffer four packets of samples
 		synthFileName: "synth.mrat",
 		gain:          0.25,
 		targetGain:    0.25,
@@ -89,17 +91,16 @@ func NewApp() *App {
 	}
 }
 
-func transformSampleBuffer(cfg *audio.AudioConfig, buf []float64) []int {
-	maxValue := float64(int(1) << cfg.BitDepth)
-
+func transformSampleBuffer(cfg *audio.AudioConfig, buf [][]float64) []int {
 	var out []int
 	if cfg.Stereo {
-		out = make([]int, 2*len(buf))
+		out = make([]int, 2*len(buf[0]))
 	} else {
-		out = make([]int, len(buf))
+		out = make([]int, len(buf[0]))
 	}
 
-	for i, sample := range buf {
+	maxValue := float64(int(1) << cfg.BitDepth)
+	transformSample := func(sample float64) int {
 		s := (sample + 1) * (maxValue / 2)
 		if s > maxValue {
 			//fmt.Printf("XXX clipping high (max=%v): %v (%v)\n", maxValue, s, sample)
@@ -108,13 +109,20 @@ func transformSampleBuffer(cfg *audio.AudioConfig, buf []float64) []int {
 			//fmt.Printf("XXX clipping low (min=%v): %v (%v)\n", 0, s, sample)
 		}
 		s = math.Max(0, math.Ceil(s))
-		sout := int(math.Min(s, maxValue-1))
+		return int(math.Min(s, maxValue-1))
+	}
 
+	zeroSample := transformSample(0)
+	for i := range buf[0] {
 		if cfg.Stereo {
-			out[2*i] = sout
-			out[2*i+1] = sout
+			out[2*i] = transformSample(buf[0][i])
+			if len(buf) > 1 {
+				out[2*i+1] = transformSample(buf[1][i])
+			} else {
+				out[2*i+1] = zeroSample
+			}
 		} else {
-			out[i] = sout
+			out[i] = transformSample(buf[0][i])
 		}
 	}
 
@@ -262,6 +270,25 @@ func (a *App) spectrumWorker() {
 	}
 }
 
+// averageBuffers returns the average of the N buffers. If the buffers
+// are not the same length, the result is undefined, and may panic.
+func averageBuffers(bufs [][]float64) []float64 {
+	if len(bufs) == 1 {
+		return bufs[0]
+	}
+
+	avg := make([]float64, len(bufs[0]))
+	for i := 0; i < len(bufs); i++ {
+		for j := 0; j < len(bufs[0]); j++ {
+			avg[j] += bufs[i][j]
+		}
+	}
+	for i := 0; i < len(avg); i++ {
+		avg[i] /= float64(len(bufs))
+	}
+	return avg
+}
+
 func (a *App) getSamples(cfg *audio.AudioConfig, n int) []int {
 	if timingOn {
 		start := time.Now()
@@ -272,23 +299,24 @@ func (a *App) getSamples(cfg *audio.AudioConfig, n int) []int {
 		}()
 	}
 
-	var samples []float64
+	var channelSamples [][]float64
 	select {
-	case samples = <-a.outputChannel:
+	case channelSamples = <-a.outputChannel:
 		// return silence if we can't get samples fast enough.
 	case <-time.After(time.Duration(n) * time.Second / time.Duration(cfg.SampleRate)):
-		samples = make([]float64, n)
+		channelSamples = [][]float64{make([]float64, n)}
 	}
 
+	avgSamples := averageBuffers(channelSamples)
 	select {
-	case fftChan <- samples:
+	case fftChan <- avgSamples:
 	default:
 	}
 
-	go runtime.EventsEmit(a.ctx, "samples", samples)
+	go runtime.EventsEmit(a.ctx, "samples", avgSamples)
 
 	// update gain to approach target gain.
-	{
+	for i, samples := range channelSamples {
 		newSamples := make([]float64, len(samples))
 		target := a.targetGain
 		gainStep := (target - a.gain) / float64(len(samples))
@@ -296,11 +324,11 @@ func (a *App) getSamples(cfg *audio.AudioConfig, n int) []int {
 			newSamples[i] = s * a.gain
 			a.gain += gainStep
 		}
-		samples = newSamples
 		a.gain = target
+		channelSamples[i] = newSamples
 	}
 
-	return transformSampleBuffer(cfg, samples)
+	return transformSampleBuffer(cfg, channelSamples)
 }
 
 // startup is called when the app starts. The context is saved
@@ -390,7 +418,6 @@ func (a *App) updateSignalGraphFromScriptFile(filename string) {
 		fmt.Println("no sink channels found")
 		return
 	}
-	graphOutputChannel := sinkChannels[0]
 
 	// if we already have a graph, stop it, then start the new one.
 	a.mtx.Lock()
@@ -406,6 +433,23 @@ func (a *App) updateSignalGraphFromScriptFile(filename string) {
 		graph.RunGraph(graphCtx, g, generator.SampleConfig{SampleRateHz: a.sampleRate})
 	}()
 
+	graphOutputChannel := make(chan [][]float64)
+	go func() {
+		defer close(graphOutputChannel)
+		for {
+			output := make([][]float64, 0, 2)
+			for _, sinkChan := range sinkChannels {
+				select {
+				case samps := <-sinkChan:
+					output = append(output, samps)
+				case <-graphCtx.Done():
+					return
+				}
+			}
+			graphOutputChannel <- output
+		}
+	}()
+
 	if a.graph != nil {
 		// stop the old sink goroutine
 		a.cancelSink()
@@ -417,15 +461,38 @@ func (a *App) updateSignalGraphFromScriptFile(filename string) {
 		for time.Since(startTime) < fadeTime {
 			sinceStart := time.Since(startTime)
 
-			samplesOld := <-a.graphOutputChannel
-			samplesNew := <-graphOutputChannel
+			samplesOldChannels := <-a.graphOutputChannel
+			samplesNewChannels := <-graphOutputChannel
 
-			samplesMixed := make([]float64, len(samplesOld))
-			for i := range samplesOld {
-				samplesMixed[i] = samplesOld[i]*(1-sinceStart.Seconds()/fadeTime.Seconds()) + samplesNew[i]*(sinceStart.Seconds()/fadeTime.Seconds())
+			samplesMixedChannels := make([][]float64, int(math.Max(float64(len(samplesOldChannels)), float64(len(samplesNewChannels)))))
+
+			zeros := make([]float64, len(samplesOldChannels[0]))
+			for channelIndex := 0; channelIndex < len(samplesMixedChannels); channelIndex++ {
+				var oldSamples []float64
+				var newSamples []float64
+				if channelIndex < len(samplesOldChannels) {
+					oldSamples = samplesOldChannels[channelIndex]
+				} else {
+					oldSamples = zeros
+				}
+				if channelIndex < len(samplesNewChannels) {
+					newSamples = samplesNewChannels[channelIndex]
+				} else {
+					newSamples = zeros
+				}
+
+				samplesMixedChannels[channelIndex] = make([]float64, len(oldSamples))
+				for i := range oldSamples {
+					oldS := oldSamples[i]
+					newS := newSamples[i]
+					t := sinceStart.Seconds() / fadeTime.Seconds()
+					samplesMixedChannels[channelIndex][i] = oldS*(1-t) + newS*t
+				}
 			}
-			a.outputChannel <- samplesMixed
+			fmt.Println("sending mixed samples")
+			a.outputChannel <- samplesMixedChannels
 		}
+		fmt.Println("fade complete")
 
 		// stop the old graph and wait for it to finish
 		a.cancelGraph()
@@ -437,11 +504,11 @@ func (a *App) updateSignalGraphFromScriptFile(filename string) {
 			select {
 			case <-sinkCtx.Done():
 				return
-			case samples, ok := <-a.graphOutputChannel:
+			case sampleChannels, ok := <-a.graphOutputChannel:
 				if !ok {
 					return
 				}
-				a.outputChannel <- samples
+				a.outputChannel <- sampleChannels
 			}
 		}
 	}()
