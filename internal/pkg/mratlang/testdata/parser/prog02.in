@@ -9,14 +9,14 @@
      (list 0 1 0)
      ))
 
-(def (testTable tbl)
+(defn testTable [tbl]
     (if (eq? tbl (list))
         #t ;; done
         (list
          (runTest (first tbl))
          (testTable (rest tbl)))))
 
-(def (runTest test)
+(defn runTest [test]
     (print
      (first test)
      (if (first test)

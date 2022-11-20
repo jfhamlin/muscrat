@@ -126,8 +126,8 @@
 ;;(start-ambient)
 ;;(mrat.core.io.out (*sin 440))
 
-;; (let [notes (range 400 500)]
-;;   (mrat.core.io.out (* (/ 1 (count notes)) (sum (map *sin notes)))))
+(let [notes (range 430 450)]
+  (mrat.core.io.out (* (/ 1 (count notes)) (sum (map *sin notes)))))
 
 (def niegalo-sample-raw (open-file "/Users/jfhamlin/Movies/Twitch Studio/niegalo_todo.wav"))
 
@@ -140,4 +140,4 @@
     (apply concat (map (fn [i] (nth grains (floor (* i (/ grain-count out-grain-count)))))
                        (range 0 out-grain-count)))))
 
-(mrat.core.io.out (ugen (buf-scale niegalo-sample-raw 2)))
+;;(mrat.core.io.out (ugen (buf-scale niegalo-sample-raw 2)))

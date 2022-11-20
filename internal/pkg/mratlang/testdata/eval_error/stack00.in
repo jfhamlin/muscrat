@@ -6,6 +6,6 @@
 
 (def add
   (fn [a b] (+ a b)))
-(def (bad-use x)
+(defn bad-use [x]
   (add x "hello"))
 (bad-use 1)

@@ -2,15 +2,15 @@
 
 (def print mrat.core.io.print)
 
-(def (= a b) (eq? a b))
+(defn = [a b] (eq? a b))
 
-(def (<= a b)
+(defn <= [a b]
   (or (< a b) (= a b)))
 
-(def (>= a b)
+(defn >= [a b]
   (or (> a b) (= a b)))
 
-(def (range beg end)
+(defn range [beg end]
   (let ((range-tail
          (fn range-tail [suffix beg end]
            (if (>= beg end)
@@ -20,7 +20,7 @@
       (range-tail '() beg end)
       '())))
 
-(def (add a b)
+(defn add [a b]
   (+ a b))
 
 (print (length (range 0 10)))

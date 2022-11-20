@@ -13,14 +13,14 @@
     (#t nil)
     (#f nil)))
 
-(def (pret val)
+(defn pret [val]
   ;; print val then return it
   (print "eval" val)
   val)
 
 ;;; AND
 
-(def (testAnd bools)
+(defn testAnd [bools]
   (if (empty? bools)
     #t
     (and (pret (first bools))
@@ -33,7 +33,7 @@
 
 ;;; OR
 
-(def (testOr bools)
+(defn testOr [bools]
   (if (empty? bools)
     #f
     (or (pret (first bools))

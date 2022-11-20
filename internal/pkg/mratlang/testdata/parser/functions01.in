@@ -2,12 +2,12 @@
 
 (def print mrat.core.io.print)
 
-(def (fib n)
+(defn fib [n]
   (if (< n 2)
     1
     (+ (fib (- n 1)) (fib (- n 2)))))
 
-(def (range n)
+(defn range [n]
   (if (eq? n 0)
     '()
     (concat (range (- n 1)) (list n))))

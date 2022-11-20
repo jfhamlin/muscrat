@@ -23,17 +23,17 @@
      6.796
      8.215))
 
-(def (map fn lst)
+(defn map [fn lst]
     (if (eq? (length lst) 0)
         (concat (list (fn (first lst))) (map fn (rest lst)))
         (list)))
 
-(def (reduce fn lst acc)
+(defn reduce [fn lst acc]
     (if (eq? (length lst) 0)
         (reduce fn (rest lst) (fn acc (first lst)))
         acc))
-(def (sum lst) (apply + lst))
-(def (bell freq)
+(defn sum [lst] (apply + lst))
+(defn bell [freq]
     (apply mixer (map sin (map (lambda (r) (* r freq)) bellRatios))))
 
 ;; the frequencies for a gothic church organ chord

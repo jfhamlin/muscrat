@@ -262,47 +262,19 @@ func (env *environment) evalDef(n *value.List) (value.Value, error) {
 		return nil, env.errorf(n, "invalid definition, too few items")
 	}
 
-	switch v := n.Next().Item().(type) {
-	case *value.Symbol:
-		if listLength != 3 {
-			return nil, env.errorf(n, "invalid definition, too many items")
-		}
-		val, err := env.Eval(n.Next().Next().Item())
-		if err != nil {
-			return nil, err
-		}
-		env.Define(v.Value, val)
-		return nil, nil
-	case *value.List: // scheme-style definition
-		if v.Count() == 0 {
-			return nil, env.errorf(n, "invalid function definition, no name")
-		}
-		sym, ok := v.Item().(*value.Symbol)
-		if !ok {
-			return nil, env.errorf(n, "invalid function definition, name is not a symbol: %v (%T)", v.Item(), v.Item())
-		}
-		var args []value.Value
-		for cur := v.Next(); !cur.IsEmpty(); cur = cur.Next() {
-			item := cur.Item()
-			args = append(args, item)
-		}
-		env.Define(sym.Value, &value.Func{
-			// TODO: Section (here and elsewhere in this file) isn't quite
-			// right, but close enough for now for useful errors.
-			Section:    n.Section,
-			LambdaName: sym.Value,
-			Env:        env,
-			Arities: []value.FuncArity{
-				{
-					BindingForm: value.NewVector(args, value.WithSection(n.Section)),
-					Exprs:       n.Next().Next(),
-				},
-			},
-		})
-		return nil, nil
+	v, ok := n.Next().Item().(*value.Symbol)
+	if !ok {
+		return nil, env.errorf(n, "invalid definition, first item is not a symbol")
 	}
-
-	return nil, env.errorf(n, "invalid definition, first item is not a symbol")
+	if listLength != 3 {
+		return nil, env.errorf(n, "invalid definition, too many items")
+	}
+	val, err := env.Eval(n.Next().Next().Item())
+	if err != nil {
+		return nil, err
+	}
+	env.Define(v.Value, val)
+	return nil, nil
 }
 
 func (env *environment) evalFn(n *value.List) (value.Value, error) {
