@@ -381,6 +381,11 @@ func (r *Reader) readSymbol() (value.Value, error) {
 		return value.NewNum(num, value.WithSection(r.popSection())), nil
 	}
 
+	// check if symbol is nil
+	if sym == "nil" {
+		return value.NewNil(value.WithSection(r.popSection())), nil
+	}
+
 	return value.NewSymbol(sym, value.WithSection(r.popSection())), nil
 }
 

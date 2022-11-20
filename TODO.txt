@@ -59,6 +59,12 @@ Either:
 *** DONE call stacks in runtime errors
 *** TODO better call stacks when tail calls are optimized
 *** TODO macro support
+*** TODO support for more clojure language features
+- nth for strings (and any other string helpers)
+- associative destructuring
+- reject too many/too few arguments
+- :as all
+- etc.
 *** TODO implement special forms as macros
 *** TODO include whitespace and comment information in output from reader
 This allows us to modify the AST programmatically and output a file

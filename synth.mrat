@@ -1,30 +1,28 @@
 ;; for map, reduce, etc.
-;;(load-file "./examples/functional.mrat")
-(load-file "./examples/core.mrat")
 (load-file "./examples/notes.mrat")
 (load-file "./examples/welsh.mrat")
-(load-file "./examples/bell.mrat")
+;; (load-file "./examples/bell.mrat")
 
 (def sample-rate 44100) ;; TODO: read from config
 
 ;;(def niegalo-sample-raw (open-file "/Users/jfhamlin/Movies/Twitch Studio/niegalo_todo.wav"))
-
-;; (def (buffer-time-range buffer start-time end-time)
-;;   (let ((start-sample (floor (* start-time sample-rate)))
-;;         (end-sample (floor (* end-time sample-rate))))
-;;     (subvec buffer start-sample end-sample)))
+(defn buffer-time-range [ buffer start-time end-time]
+  (let ((start-sample (floor (* start-time sample-rate)))
+        (end-sample (floor (* end-time sample-rate))))
+    (subvec buffer start-sample end-sample)))
 
 ;; (def niegalo-sample (buffer-time-range niegalo-sample-raw 18 126))
 
-;; (def (half-speed samples)
+;; (defn half-speed [ samples]
 ;;   (map (fn (i) (let ((samp1 (samples (floor (/ i 2))))
 ;;                      (samp2 (samples (floor (/ (+ i 1) 2)))))
 ;;                  (/ (+ samp1 samp2) 2)))
 ;;        (range 0 (- (* 2 (length samples)) 1))))
 
 
-;; (def (tri-delay ~in freq)
-;;   (~delay ~in (remap (~tri freq) 0 1)))
+
+;; (defn tri-delay [ *in freq]
+;;   (*delay *in (remap (*tri freq) 0 1)))
 
 
 ;; (def delayed-niegalo-sample
@@ -32,20 +30,20 @@
 ;;      '(0.01 0.02 0.04))))
 
 
-;; (def cutoff (remap (~sin 0.01) 400 2000))
+;; (def cutoff (remap (*sin 0.01) 400 2000))
 ;; (def resonance 0.75)
 
 
-;; (def filtered-sample (~lores (ugen niegalo-sample) cutoff resonance))
+;; (def filtered-sample (*lores (ugen niegalo-sample) cutoff resonance))
 
 ;; ;; (mrat.core.io.out [0])
-;; (mrat.core.io.out (~mixer
+;; (mrat.core.io.out (*mixer
 ;;                    1       filtered-sample
-;;                    1       (~lores delayed-niegalo-sample cutoff resonance)
-;;                    1       (~freeverb filtered-sample)
-;;                    0.02    (~lores (~noise) 600 0.5)
-;;                    0.25    (let ((phase-in (~phasor 0.001)))
-;;                              (* phase-in (~lores (sum (map ~pulse '(30 60 120)))
+;;                    1       (*lores delayed-niegalo-sample cutoff resonance)
+;;                    1       (*freeverb filtered-sample)
+;;                    0.02    (*lores (*noise) 600 0.5)
+;;                    0.25    (let ((phase-in (*phasor 0.001)))
+;;                              (* phase-in (*lores (sum (map *pulse '(30 60 120)))
 ;;                                           (+ (* 400 phase-in) 100)
 ;;                                           0)))
 ;;                    ))
@@ -60,16 +58,16 @@
 ;; (def mixolydian [0 2 4 5 7 9 10])
 ;; (def locrian [0 1 3 5 6 8 10])
 
-;; (def (mode root intervals) (map (fn (x) (* root (semitones x))) intervals))
+;; (defn mode [ root intervals] (map (fn (x) (* root (semitones x))) intervals))
 
 ;; (def root B2)
 
-;; (def (rotate n seq)
+;; (defn rotate [ n seq]
 ;;   (let ((vec (apply vector seq)))
 ;;     (concat (subvec vec n (length vec))
 ;;             (subvec vec 0 n))))
 
-;; (def (rand-rng beg end)
+;; (defn rand-rng [ beg end]
 ;;   (+ beg (floor (* (rand) (- end beg)))))
 
 ;; (def seq (let ((notes (rotate (rand-rng 0 8) (conj aeolian 12))))
@@ -79,26 +77,26 @@
 ;; (def arpeggio (apply concat triad))
 ;; (def freqs (apply concat (repeat 100 [arpeggio])))
 
-;; (def (~sin-inst w gate)
-;;   (let ((~sig (~sin (* w (remap (~sin 2.4) (pow (cents 20) -1) (cents 20))) :duty (remap (~sin 10) 0.3 0.6)))
-;;         (~env (~env gate '(0 1 1 0) '(0.01 0.1 0.05))))
-;;     (* ~sig ~env)))
+;; (defn *sin-inst [ w gate]
+;;   (let ((*sig (*sin (* w (remap (*sin 2.4) (pow (cents 20) -1) (cents 20))) :duty (remap (*sin 10) 0.3 0.6)))
+;;         (*env (*env gate '(0 1 1 0) '(0.01 0.1 0.05))))
+;;     (* *sig *env)))
 
-;; (def dry-sig (+ ;;(* 0.8 (~env (~pulse 2) '(0 1 1 0) '(0.01 0.2 0.1)) (~sin root :duty 0.7))
-;;                 (* 0.4 (~sin-inst (ugen freqs) (~pulse 5)))))
+;; (def dry-sig (+ ;;(* 0.8 (*env (*pulse 2) '(0 1 1 0) '(0.01 0.2 0.1)) (*sin root :duty 0.7))
+;;                 (* 0.4 (*sin-inst (ugen freqs) (*pulse 5)))))
 
-;; (def hi-hat (let ((~sig (~noise)))
-;;               (* (~env (~pulse 2) '(0 1 1 0) '(0.01 0.1 0.05)) (~lores ~sig 20000 0))))
+;; (def hi-hat (let ((*sig (*noise)))
+;;               (* (*env (*pulse 2) '(0 1 1 0) '(0.01 0.1 0.05)) (*lores *sig 20000 0))))
 
-;; (def bass (let ((~sig (~pulse 100)))
-;;               (* (~env (~pulse 1) '(0 1 1 0) '(0.01 0.1 0.05)) ~sig)))
+;; (def bass (let ((*sig (*pulse 100)))
+;;               (* (*env (*pulse 1) '(0 1 1 0) '(0.01 0.1 0.05)) *sig)))
 
-(def mixer~ ~mixer)
-(def lores~ ~lores)
+(def mixer* *mixer)
+(def lores* *lores)
 
-(def (~sig freq)
-  (~mixer 1 (~sin freq)
-          0.7 (~tri (* freq (cents 10)))))
+(defn *sig [ freq]
+  (*mixer 1 (*sin freq)
+          0.7 (*tri (* freq (cents 10)))))
 
 (def second (semitones 2))
 (def minor-third (semitones 3))
@@ -107,24 +105,39 @@
 (def perfect-fifth (semitones 7))
 (def minor-seventh (semitones 10))
 
-(def (start-ambient)
+(defn start-ambient []
   (mrat.core.io.out (* 0.25
-                       (let [root    (* B2 (+ (~clip (~sin 0.05 :duty 0.5) 0 1) 1))
+                       (let [root    (* C3 (+ (*clip (*sin 0.05 :duty 0.5) 0 1) 1))
                              third   (* root minor-third)
                              fifth   (* root perfect-fifth)
                              seventh (* root minor-seventh)
                              second  (* 2 root second) ;; second an octave up
                              ]
-                         (mixer~ 1 (~sig root)
-                                 1 (~sig third)
-                                 1 (~sig seventh)
+                         (mixer* 1 (*sig root)
+                                 1 (*sig third)
+                                 1 (*sig seventh)
                                  2 (let [note second]
-                                     (~freeverb (* (remap (~sin 3) (decibels -2) 1)
-                                                   (lores~ (mixer~ 1 (~saw note :duty 0.4)
-                                                                   1 (~tri note :sync (~pulse (* note (cents 10)))))
+                                     (*freeverb (* (remap (*sin 3) (decibels -2) 1)
+                                                   (lores* (mixer* 1 (*saw note :duty 0.4)
+                                                                   1 (*tri note :sync (*pulse (* note (cents 10)))))
                                                            (* note (/ Bb5 D5)) 0.7))))
                                  )))))
 
-(start-ambient)
-;;(mrat.core.io.out (* 0.2 (+ (~saw 260) (~sin 440))))
+;;(start-ambient)
+;;(mrat.core.io.out (*sin 440))
 
+;; (let [notes (range 400 500)]
+;;   (mrat.core.io.out (* (/ 1 (count notes)) (sum (map *sin notes)))))
+
+(def niegalo-sample-raw (open-file "/Users/jfhamlin/Movies/Twitch Studio/niegalo_todo.wav"))
+
+(defn buf-scale [ buf scale]
+  (let [grain-size (* 0.1 sample-rate)
+        grain-count (floor (/ (count buf) grain-size))
+        out-grain-count (floor (/ grain-count scale))
+        grains (map (fn [i] (subvec buf (* i grain-size) (* (+ i 1) grain-size)))
+                    (range 0 grain-count))]
+    (apply concat (map (fn [i] (nth grains (floor (* i (/ grain-count out-grain-count)))))
+                       (range 0 out-grain-count)))))
+
+(mrat.core.io.out (ugen (buf-scale niegalo-sample-raw 2)))

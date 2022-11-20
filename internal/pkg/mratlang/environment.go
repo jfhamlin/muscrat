@@ -172,12 +172,6 @@ func (env *environment) evalList(n *value.List) (value.Value, value.Continuation
 			return env.evalIf(n)
 		case "case":
 			return env.evalCase(n)
-		case "and":
-			return env.evalAnd(n)
-		case "or":
-			return env.evalOr(n)
-		case "lambda":
-			return asContinuationResult(env.evalLambda(n))
 		case "fn":
 			return asContinuationResult(env.evalFn(n))
 		case "quote":
@@ -295,11 +289,15 @@ func (env *environment) evalDef(n *value.List) (value.Value, error) {
 		env.Define(sym.Value, &value.Func{
 			// TODO: Section (here and elsewhere in this file) isn't quite
 			// right, but close enough for now for useful errors.
-			Section:     n.Section,
-			LambdaName:  sym.Value,
-			BindingForm: value.NewVector(args, value.WithSection(n.Section)),
-			Exprs:       n.Next().Next(),
-			Env:         env,
+			Section:    n.Section,
+			LambdaName: sym.Value,
+			Env:        env,
+			Arities: []value.FuncArity{
+				{
+					BindingForm: value.NewVector(args, value.WithSection(n.Section)),
+					Exprs:       n.Next().Next(),
+				},
+			},
 		})
 		return nil, nil
 	}
@@ -307,37 +305,15 @@ func (env *environment) evalDef(n *value.List) (value.Value, error) {
 	return nil, env.errorf(n, "invalid definition, first item is not a symbol")
 }
 
-func (env *environment) evalLambda(n *value.List) (value.Value, error) {
-	if n.Count() < 3 {
-		return nil, env.errorf(n, "invalid lambda, need args and body")
-	}
-	args, ok := n.Next().Item().(*value.List)
-	if !ok {
-		return nil, env.errorf(n, "invalid lambda, args must be a list")
-	}
-
-	var argVals []value.Value
-	for cur := args; !cur.IsEmpty(); cur = cur.Next() {
-		item := cur.Item()
-		argVals = append(argVals, item)
-	}
-	return &value.Func{
-		Section:     n.Section,
-		BindingForm: value.NewVector(argVals, value.WithSection(n.Section)),
-		Exprs:       n.Next().Next(),
-		Env:         env,
-	}, nil
-}
-
 func (env *environment) evalFn(n *value.List) (value.Value, error) {
 	listLength := n.Count()
-	if listLength < 3 {
-		return nil, env.errorf(n, "invalid fn expression, need args and body")
-	}
-
 	items := make([]value.Value, 0, listLength-1)
 	for cur := n.Next(); !cur.IsEmpty(); cur = cur.Next() {
 		items = append(items, cur.Item())
+	}
+
+	if len(items) < 2 {
+		return nil, env.errorf(n, "invalid fn expression, need args and body")
 	}
 
 	var fnName string
@@ -348,20 +324,51 @@ func (env *environment) evalFn(n *value.List) (value.Value, error) {
 		items = items[1:]
 	}
 
-	if len(items) < 2 {
+	if len(items) == 0 {
 		return nil, env.errorf(n, "invalid fn expression, need args and body")
 	}
 
-	bindings, ok := items[0].(*value.Vector)
-	if !ok {
-		return nil, env.errorf(n, "invalid fn expression, bindings must be a vector")
+	const errorString = "invalid fn expression, expected (fn ([bindings0] body0) ([bindings1] body1) ...) or (fn [bindings] body)"
+
+	arities := make([]*value.List, 0, len(items))
+	if _, ok := items[0].(*value.Vector); ok {
+		// if the next child is a vector, it's the bindings, and we only
+		// have one arity.
+		arities = append(arities, value.NewList(items, value.WithSection(n.Section)))
+	} else {
+		// otherwise, every remaining child must be a list of function
+		// bindings and bodies for each arity.
+		for _, item := range items {
+			list, ok := item.(*value.List)
+			if !ok {
+				return nil, env.errorf(n, errorString)
+			}
+			arities = append(arities, list)
+		}
+	}
+
+	arityValues := make([]value.FuncArity, len(arities))
+	for i, arity := range arities {
+		bindings, ok := arity.Item().(*value.Vector)
+		if !ok {
+			return nil, env.errorf(n, errorString)
+		}
+		if !value.IsValidBinding(bindings) {
+			return nil, env.errorf(n, "invalid fn expression, invalid binding (%v). Must be valid destructure form", bindings)
+		}
+
+		body := arity.Next()
+
+		arityValues[i] = value.FuncArity{
+			BindingForm: bindings,
+			Exprs:       body,
+		}
 	}
 	return &value.Func{
-		Section:     n.Section,
-		LambdaName:  fnName,
-		BindingForm: bindings,
-		Exprs:       value.NewList(items[1:]),
-		Env:         env,
+		Section:    n.Section,
+		LambdaName: fnName,
+		Env:        env,
+		Arities:    arityValues,
 	}, nil
 }
 
@@ -375,8 +382,7 @@ func (env *environment) evalIf(n *value.List) (value.Value, value.Continuation, 
 		return nil, nil, err
 	}
 
-	b, ok := cond.(*value.Bool)
-	if !ok || b.Value { // non-bool is always true
+	if value.IsTruthy(cond) {
 		return nil, func() (value.Value, value.Continuation, error) {
 			return env.eval(n.Next().Next().Item())
 		}, nil
@@ -455,63 +461,6 @@ func toBoolContinuation(v value.Value, c value.Continuation, err error) (value.V
 	return nil, func() (value.Value, value.Continuation, error) {
 		return toBoolContinuation(c())
 	}, nil
-}
-
-func (env *environment) evalAnd(n *value.List) (value.Value, value.Continuation, error) {
-	listLength := n.Count()
-	if listLength < 2 {
-		return nil, nil, env.errorf(n, "invalid and, need at least one arg")
-	}
-
-	cur := n.Next()
-	// iterate through all but the last item.
-	// evaluate the final item in a continuation.
-	for ; !cur.Next().IsEmpty(); cur = cur.Next() {
-		item := cur.Item()
-		res, err := env.Eval(item)
-		if err != nil {
-			return nil, nil, err
-		}
-		b, ok := res.(*value.Bool)
-		if !ok || !b.Value {
-			if b == nil {
-				return value.NewBool(false), nil, nil
-			}
-			return b, nil, nil
-		}
-	}
-	// return a continuation for the last item
-	return toBoolContinuation(nil, func() (value.Value, value.Continuation, error) {
-		// TODO: need to convert to bool...
-		return env.eval(cur.Item())
-	}, nil)
-}
-
-func (env *environment) evalOr(n *value.List) (value.Value, value.Continuation, error) {
-	listLength := n.Count()
-	if listLength < 2 {
-		return nil, nil, env.errorf(n, "invalid or, need at least one arg")
-	}
-
-	//for _, item := range n.Items[1 : len(n.Items)-1] {
-	cur := n.Next()
-	// iterate through all but the last item.
-	// evaluate the final item in a continuation.
-	for ; !cur.Next().IsEmpty(); cur = cur.Next() {
-		item := cur.Item()
-		res, err := env.Eval(item)
-		if err != nil {
-			return nil, nil, err
-		}
-		b, ok := res.(*value.Bool)
-		if ok && b.Value {
-			return b, nil, nil
-		}
-	}
-	// return a continuation for the last item
-	return toBoolContinuation(nil, func() (value.Value, value.Continuation, error) {
-		return env.eval(cur.Item())
-	}, nil)
 }
 
 func (env *environment) evalQuote(n *value.List) (value.Value, error) {
@@ -757,35 +706,17 @@ func (env *environment) evalVectorBindings(bindings *value.Vector) (map[string]v
 }
 
 func (env *environment) evalDefMacro(n *value.List) (value.Value, error) {
-	if n.Count() < 3 {
-		return nil, env.errorf(n, "invalid defmacro, need name and body")
+	fn, err := env.evalFn(n)
+	if err != nil {
+		return nil, err
 	}
 
-	n = n.Next()
-
-	sym, ok := n.Item().(*value.Symbol)
+	sym, ok := n.Next().Item().(*value.Symbol)
 	if !ok {
-		return nil, env.errorf(n.Item(), "invalid defmacro, name must be a symbol")
+		return nil, env.errorf(n.Next().Item(), "invalid defmacro, name must be a symbol")
 	}
 
-	n = n.Next()
-
-	bindings, ok := n.Item().(*value.Vector)
-	if !ok {
-		return nil, env.errorf(n.Item(), "invalid defmacro, bindings must be a vector")
-	}
-
-	n = n.Next()
-
-	env.DefineMacro(sym.Value, &value.Func{
-		// TODO: Section (here and elsewhere in this file) isn't quite
-		// right, but close enough for now for useful errors.
-		Section:     n.Section,
-		LambdaName:  sym.Value,
-		BindingForm: bindings,
-		Exprs:       n,
-		Env:         env,
-	})
+	env.DefineMacro(sym.Value, fn.(*value.Func))
 	return nil, nil
 }
 
@@ -809,7 +740,9 @@ func (env *environment) applyMacro(fn *value.Func, argList *value.List) (value.V
 		return nil, nil, err
 	}
 
-	return env.eval(res)
+	return nil, func() (value.Value, value.Continuation, error) {
+		return env.eval(res)
+	}, nil
 }
 
 // Helpers

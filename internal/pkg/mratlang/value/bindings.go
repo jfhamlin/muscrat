@@ -65,3 +65,35 @@ func Bind(pattern Value, val Value) ([]Value, error) {
 
 	return result, nil
 }
+
+func IsValidBinding(binding *Vector) bool {
+	for i := 0; i < binding.Count(); i += 2 {
+		switch binding.ValueAt(i).(type) {
+		case *Symbol:
+		case *Vector:
+			if !IsValidBinding(binding.ValueAt(i).(*Vector)) {
+				return false
+			}
+		default:
+			return false
+		}
+	}
+	return true
+}
+
+func MinMaxArgumentCount(binding *Vector) (int, int) {
+	min := 0
+	for i := 0; i < binding.Count(); i++ {
+		switch b := binding.ValueAt(i).(type) {
+		case *Symbol:
+			if b.Equal(restSymbol) {
+				return min, -1
+			} else {
+				min++
+			}
+		default:
+			min++
+		}
+	}
+	return min, min
+}

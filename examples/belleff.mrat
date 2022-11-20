@@ -30,7 +30,7 @@
 (def (bell freq)
     ;; by default, mixer will sum all inputs with equal weights,
     ;; summing to q. avoids clipping.
-    (apply mixer (map sin (map (lambda (r) (* r freq)) bellRatios))))
+    (apply mixer (map sin (map (fn [r] (* r freq)) bellRatios))))
 
 ;; create the concrete instrument and output
 
@@ -56,42 +56,3 @@
 (def gain 0)
 
 (mrat.core.io.out (* gain mixed))
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-;; the frequencies for a major C triad
-;; (def cMajor (list 261.63 329.63 392.00))
-
-;; the frequencies for a gothic church organ chord
-;; (def churchChord (list 261.63 329.63 392.00 523.25 659.25 783.99 1046.50))
-
-;; the frequencies for an 80s synth pad chord
-;;(def synthChord (list 261.63 329.63 392.00 523.25 659.25 783.99 1046.50))
-
-;;(def instruments (map (lambda (freq) (saw freq)) synthChord))
-
-;; (mrat.core.io.out (clip (* 2 (sin 440)) -0.5 0.5))
-
-;; (def bells (apply mixer (map bell churchChord)))
-
-;; (def bellOut bells
-
-;; (def mixed
-;;     (mixer bells
-;;            (delay (freeverb bells) 0.2)
-;;        ))
-
-;; (mrat.core.io.out (* 0.25 mixed))

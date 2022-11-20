@@ -9,6 +9,15 @@ eval #f
 (#f #t) => #f
 eval #f
 (#f #f) => #f
+eval nil
+(nil #t) => nil
+eval nil
+(nil #f) => nil
+eval #t
+eval nil
+(#t nil) => nil
+eval #f
+(#f nil) => #f
 
 ### OR
 eval #t
@@ -21,7 +30,18 @@ eval #t
 eval #f
 eval #f
 (#f #f) => #f
+eval nil
+eval #t
+(nil #t) => #t
+eval nil
+eval #f
+(nil #f) => #f
+eval #t
+(#t nil) => #t
+eval #f
+eval nil
+(#f nil) => #f
 
 ### bool conversion
-#f
-#f
+2
+1

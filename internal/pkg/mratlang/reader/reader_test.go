@@ -245,6 +245,8 @@ func printExprAtPosition(ra *runeArray2D, n value.Value) {
 		// the exact formatting of the number is not retained, so any test
 		// cases that do anything more interesting than integers may fail.
 		ra.SetString(v.Pos().Line-1, v.Pos().Column-1, v.String())
+	case *value.Nil:
+		ra.SetString(v.Pos().Line-1, v.Pos().Column-1, v.String())
 	default:
 		panic(fmt.Sprintf("unexpected node type: %T", v))
 	}

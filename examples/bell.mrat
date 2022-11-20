@@ -32,7 +32,7 @@
                       -44
                       ])))
 
-(def (bell freq)
+(defn bell [freq]
   (let ((freqs (apply vector (map (fn (ratio) (* freq ratio (remap (~sin 16) (cents -2) (cents 2)))) bellRatios))))
     (apply ~mixer
            (reduce (fn (acc i) (conj acc (~sin (freqs i)) (bellRatioWeights i)))

@@ -2,10 +2,14 @@ package mratlang
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"os"
+	"strings"
 
 	"github.com/jfhamlin/muscrat/internal/pkg/graph"
+	"github.com/jfhamlin/muscrat/internal/pkg/mratlang/reader"
+	"github.com/jfhamlin/muscrat/internal/pkg/mratlang/stdlib"
 	"github.com/jfhamlin/muscrat/internal/pkg/mratlang/value"
 )
 
@@ -52,6 +56,24 @@ func (p *Program) Eval(opts ...EvalOption) (*graph.Graph, []graph.SinkChan, erro
 	if env == nil {
 		env = newEnvironment(context.Background(), options.stdout)
 		env.loadPath = options.loadPath
+	}
+
+	{
+		core, err := stdlib.StdLib.ReadFile("mratfiles/core.mrat")
+		if err != nil {
+			panic(fmt.Sprintf("could not read stdlib core.mrat: %v", err))
+		}
+		r := reader.New(strings.NewReader(string(core)))
+		exprs, err := r.ReadAll()
+		if err != nil {
+			panic(fmt.Sprintf("error reading core lib: %v", err))
+		}
+		for _, expr := range exprs {
+			_, err := env.Eval(expr)
+			if err != nil {
+				panic(fmt.Sprintf("error evaluating core lib: %v", err))
+			}
+		}
 	}
 
 	for _, node := range p.nodes {

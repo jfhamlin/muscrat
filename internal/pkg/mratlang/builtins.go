@@ -61,7 +61,7 @@ func init() {
 				// boolean functions
 				funcSymbol("not", notBuiltin),
 				// plumbing
-				funcSymbol("~pipe", pipeBuiltin),
+				funcSymbol("*pipe", pipeBuiltin),
 				funcSymbol("pipeset", pipesetBuiltin),
 				// ugen
 				funcSymbol("ugen", ugenBuiltin),
@@ -103,7 +103,7 @@ func init() {
 				funcSymbol("delay", delayBuiltin),
 				funcSymbol("mixer", mixerBuiltin),
 				funcSymbol("env", envBuiltin),
-				funcSymbol("~lores", loresBuiltin),
+				funcSymbol("*lores", loresBuiltin),
 			},
 		},
 	}
@@ -265,7 +265,7 @@ func concatBuiltin(env value.Environment, args []value.Value) (value.Value, erro
 	}, nil
 }
 
-func firstBuiltin(env value.Environment, args []value.Value) (value.Value, error) {
+func firstBuiltin(env value.Environment, args []value.Value) (out value.Value, err error) {
 	if len(args) != 1 {
 		return nil, fmt.Errorf("first expects 1 argument, got %v", len(args))
 	}
@@ -276,10 +276,13 @@ func firstBuiltin(env value.Environment, args []value.Value) (value.Value, error
 
 	switch c := args[0].(type) {
 	case *value.List:
+		if c.IsEmpty() {
+			return value.NilValue, nil
+		}
 		return c.Item(), nil
 	case *value.Vector:
 		if c.Count() == 0 {
-			return nil, nil
+			return value.NilValue, nil
 		}
 		return c.ValueAt(0), nil
 	}
@@ -624,7 +627,7 @@ func pipeBuiltin(env value.Environment, args []value.Value) (value.Value, error)
 	if len(args) != 0 {
 		return nil, fmt.Errorf("pipe expects 0 arguments, got %v", len(args))
 	}
-	nodeID := env.Graph().AddGeneratorNode(&pipe{}, graph.WithLabel("~pipe"))
+	nodeID := env.Graph().AddGeneratorNode(&pipe{}, graph.WithLabel("*pipe"))
 	return &value.Gen{
 		NodeID: nodeID,
 	}, nil
@@ -1479,24 +1482,24 @@ func loresBuiltin(env value.Environment, args []value.Value) (value.Value, error
 	// 3. a resonance value, from 0 to 1.
 
 	if len(args) != 3 {
-		return nil, fmt.Errorf("~lores expects 3 arguments, got %v", len(args))
+		return nil, fmt.Errorf("*lores expects 3 arguments, got %v", len(args))
 	}
 
 	gen, ok := args[0].(*value.Gen)
 	if !ok {
-		return nil, fmt.Errorf("~lores expects a Gen as the first argument, got %v", args[0])
+		return nil, fmt.Errorf("*lores expects a Gen as the first argument, got %v", args[0])
 	}
 
 	cutoff, ok := asGen(env, args[1])
 	if !ok {
-		return nil, fmt.Errorf("~lores expects a gennable as the second argument, got %v", args[1])
+		return nil, fmt.Errorf("*lores expects a gennable as the second argument, got %v", args[1])
 	}
 	resonance, ok := asGen(env, args[2])
 	if !ok {
-		return nil, fmt.Errorf("~lores expects a gennable as the third argument, got %v", args[2])
+		return nil, fmt.Errorf("*lores expects a gennable as the third argument, got %v", args[2])
 	}
 
-	nodeID := env.Graph().AddGeneratorNode(NewLowpassFilterGenerator(), graph.WithLabel("~lores"))
+	nodeID := env.Graph().AddGeneratorNode(NewLowpassFilterGenerator(), graph.WithLabel("*lores"))
 	env.Graph().AddEdge(gen.NodeID, nodeID, "in")
 	env.Graph().AddEdge(cutoff.NodeID, nodeID, "cutoff")
 	env.Graph().AddEdge(resonance.NodeID, nodeID, "resonance")
