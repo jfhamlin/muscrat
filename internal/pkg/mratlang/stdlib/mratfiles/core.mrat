@@ -63,6 +63,7 @@
 (def *sqr mrat.osc/sqr)
 (def *pulse mrat.osc/pulse)
 (def *noise mrat.osc/noise)
+(def *pink-noise mrat.osc/pink-noise)
 (def *phasor mrat.osc/phasor)
 
 (def *freeverb mrat.effects/freeverb)

@@ -25,17 +25,35 @@
 ;;      punch
 ;;      )))
 
-(def sig0 (*sin 440))
-(def sig1 (*sin 880))
+(defn *lfpulse [& args]
+  (remap (apply *pulse args) 0 1))
 
-(defn sin01 [freq] (remap (*sin freq) 0 1))
+(def detune-semis -5)
+(def detune (ugen (semitones detune-semis)))
 
-(defn sig-pan-osc [freq sig0 sig1]
-  (let [t (sin01 freq)]
-    (+ (* t sig0) (* (+ t -1) sig1))))
+(def sig0 (*sin (* 440 detune) :iphase 0.5))
+(def sig1 (*sin (* 440 detune)))
 
-(def left (sig-pan-osc 0.5 sig0 sig1))
-(def right (sig-pan-osc 0.2 sig0 sig1))
+(def left sig0)
+(def right sig1)
 
-(mrat.core.io/out left right);; (* 0.2 (*sin 440)))
+(def pinkish (*pink-noise));;(*lores (*noise) 500 0))
 
+(def channels [left right])
+
+(def channels [pinkish pinkish])
+
+;;(def channels (repeat 2 [left]))
+
+;; (defn sin01 [freq] (remap (*sin freq) 0 1))
+
+;; (defn sig-pan-osc [freq sig0 sig1]
+;;   (let [t (sin01 freq)]
+;;     (+ (* t sig0) (* (+ t -1) sig1))))
+
+;; (def left (sig-pan-osc 0.5 sig0 sig1))
+;; (def right (sig-pan-osc 0.2 sig0 sig1))
+
+(apply mrat.core.io/out
+       (map (fn [x] (* x (decibels -10)))
+            channels))

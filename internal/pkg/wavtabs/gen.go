@@ -33,11 +33,25 @@ func Generator(wavtab Table, opts ...GeneratorOption) generator.SampleGenerator 
 	phase := 0.0
 	lastSync := 0.0
 
+	initialised := false
+
 	return generator.SampleGeneratorFunc(func(ctx context.Context, cfg generator.SampleConfig, n int) []float64 {
 		ws := cfg.InputSamples["w"]
 		phases := cfg.InputSamples["phase"]
 		syncs := cfg.InputSamples["sync"]
 		dcs := cfg.InputSamples["dc"]
+		// TODO: the common case is to set this once at the start. There
+		// are some semantics to figure out here, but it would be nice to
+		// be able to set this once at the start and then have it apply
+		// to all the samples.
+		iphases := cfg.InputSamples["iphase"]
+		if !initialised {
+			initialised = true
+
+			if len(iphases) > 0 {
+				phase = iphases[0]
+			}
+		}
 
 		res := make([]float64, n)
 		for i := 0; i < n; i++ {

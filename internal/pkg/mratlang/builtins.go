@@ -14,6 +14,7 @@ import (
 	"github.com/go-audio/audio"
 	"github.com/go-audio/wav"
 	"github.com/jfhamlin/muscrat/internal/pkg/generator"
+	"github.com/jfhamlin/muscrat/internal/pkg/generator/stochastic"
 	"github.com/jfhamlin/muscrat/internal/pkg/graph"
 	"github.com/jfhamlin/muscrat/internal/pkg/mratlang/value"
 	"github.com/jfhamlin/muscrat/internal/pkg/wavtabs"
@@ -94,6 +95,7 @@ func init() {
 				funcSymbol("pulse", pulseBuiltin),
 				funcSymbol("phasor", phasorBuiltin),
 				funcSymbol("noise", noiseBuiltin),
+				funcSymbol("pink-noise", pinkNoiseBuiltin),
 			},
 		},
 		&Package{
@@ -850,6 +852,13 @@ func handleExtraGenArgs(env value.Environment, nodeID graph.NodeID, args []value
 			return fmt.Errorf("expected keyword as key, got %v", key)
 		}
 		switch kw.Value {
+		case "iphase":
+			_, ok := val.(*value.Num)
+			if !ok {
+				return fmt.Errorf("expected number as iphase value, got %v", val)
+			}
+			gen, _ := asGen(env, val)
+			env.Graph().AddEdge(gen.NodeID, nodeID, "iphase")
 		case "phase":
 			phase, ok := asGen(env, val)
 			if !ok {
@@ -1266,6 +1275,16 @@ func noiseBuiltin(env value.Environment, args []value.Value) (value.Value, error
 		return nil, fmt.Errorf("noise expects 0 arguments, got %v", len(args))
 	}
 	nodeID := env.Graph().AddGeneratorNode(Noise, graph.WithLabel("noise"))
+	return &value.Gen{
+		NodeID: nodeID,
+	}, nil
+}
+
+func pinkNoiseBuiltin(env value.Environment, args []value.Value) (value.Value, error) {
+	if len(args) != 0 {
+		return nil, fmt.Errorf("pinkNoise expects 0 arguments, got %v", len(args))
+	}
+	nodeID := env.Graph().AddGeneratorNode(stochastic.NewPinkNoise(), graph.WithLabel("pink-noise"))
 	return &value.Gen{
 		NodeID: nodeID,
 	}, nil
