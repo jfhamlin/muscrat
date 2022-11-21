@@ -65,6 +65,7 @@
 (def *noise mrat.osc/noise)
 (def *pink-noise mrat.osc/pink-noise)
 (def *phasor mrat.osc/phasor)
+(def *sampler mrat.osc/sampler)
 
 (def *freeverb mrat.effects/freeverb)
 (def *delay mrat.effects/delay)

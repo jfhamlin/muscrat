@@ -540,6 +540,9 @@ func (b *Bool) Equal(v Value) bool {
 // Num is a number.
 type Num struct {
 	Section
+	// Value is the value of the number. It should not be modified
+	// unless the number is being used transiently, because language
+	// semantics require that values are immutable.
 	Value float64
 }
 

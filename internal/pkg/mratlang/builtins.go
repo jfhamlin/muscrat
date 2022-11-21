@@ -96,6 +96,7 @@ func init() {
 				funcSymbol("phasor", phasorBuiltin),
 				funcSymbol("noise", noiseBuiltin),
 				funcSymbol("pink-noise", pinkNoiseBuiltin),
+				funcSymbol("sampler", samplerBuiltin),
 			},
 		},
 		&Package{
@@ -341,8 +342,8 @@ func restBuiltin(env value.Environment, args []value.Value) (value.Value, error)
 }
 
 func subvecBuiltin(env value.Environment, args []value.Value) (value.Value, error) {
-	if len(args) != 3 {
-		return nil, fmt.Errorf("subvec expects 3 arguments, got %v", len(args))
+	if len(args) < 2 || len(args) > 3 {
+		return nil, fmt.Errorf("subvec expects 2 or 3 arguments, got %v", len(args))
 	}
 
 	v, ok := args[0].(*value.Vector)
@@ -355,13 +356,16 @@ func subvecBuiltin(env value.Environment, args []value.Value) (value.Value, erro
 		return nil, fmt.Errorf("subvec expects a number as its second argument, got %v", args[1])
 	}
 
-	end, ok := args[2].(*value.Num)
-	if !ok {
-		return nil, fmt.Errorf("subvec expects a number as its third argument, got %v", args[2])
-	}
-
 	startIdx := int(start.Value)
-	endIdx := int(end.Value)
+	endIdx := v.Count()
+
+	if len(args) == 3 {
+		end, ok := args[2].(*value.Num)
+		if !ok {
+			return nil, fmt.Errorf("subvec expects a number as its third argument, got %v", args[2])
+		}
+		endIdx = int(end.Value)
+	}
 
 	if startIdx < 0 || startIdx > v.Count() || endIdx < 0 || endIdx > v.Count() {
 		return nil, fmt.Errorf("subvec indices out of bounds: %v %v", startIdx, endIdx)
@@ -485,24 +489,54 @@ func floorBuiltin(env value.Environment, args []value.Value) (value.Value, error
 func mulBuiltin(env value.Environment, args []value.Value) (value.Value, error) {
 	var coeff float64 = 1
 	gens := []*value.Gen{}
+	vecs := []*value.Vector{}
 
-	// multiply all number arguments together
+	// multiply all number arguments together. the operation can take
+	// vectors or generators as arguments, but not both.
 	for _, arg := range args {
 		switch arg := arg.(type) {
 		case *value.Num:
 			coeff *= arg.Value
 		case *value.Gen:
 			gens = append(gens, arg)
+			if len(vecs) > 0 {
+				return nil, fmt.Errorf("cannot multiply generators and vectors")
+			}
+		case *value.Vector:
+			vecs = append(vecs, arg)
+			if len(gens) > 0 {
+				return nil, fmt.Errorf("cannot multiply generators and vectors")
+			}
 		default:
 			return nil, fmt.Errorf("invalid type for *: %v", arg)
 		}
 	}
-	// if there are no generators, return the result of multiplying all the numbers
-	if len(gens) == 0 {
+
+	switch {
+	case len(vecs) > 0:
+		res := make([]value.Value, vecs[0].Count())
+		for i := range res {
+			res[i] = value.NewNum(coeff)
+		}
+		for _, vec := range vecs {
+			if vec.Count() != len(res) {
+				return nil, fmt.Errorf("cannot multiply vectors of different lengths (%v and %v)", len(res), vec.Count())
+			}
+			for i := 0; i < vec.Count(); i++ {
+				n, ok := vec.ValueAt(i).(*value.Num)
+				if !ok {
+					return nil, fmt.Errorf("cannot multiply vectors of non-numbers")
+				}
+				res[i].(*value.Num).Value *= n.Value
+			}
+		}
+		return value.NewVector(res), nil
+	case len(gens) == 0:
 		return value.NewNum(coeff), nil
 	}
 
-	// otherwise, create a new constant generator node for the coefficient
+	// Otherwise, we have a generator and (possibly) a coefficent.
+
 	if coeff != 1 {
 		constNodeID := env.Graph().AddGeneratorNode(generator.NewConstant(coeff), graph.WithLabel(fmt.Sprintf("%v", coeff)))
 		gens = append(gens, &value.Gen{NodeID: constNodeID})
@@ -1290,6 +1324,94 @@ func pinkNoiseBuiltin(env value.Environment, args []value.Value) (value.Value, e
 	}, nil
 }
 
+func NewSamplerGenerator(v *value.Vector, loop bool) generator.SampleGenerator {
+	if v.Count() == 0 {
+		return generator.NewConstant(0)
+	}
+
+	sampleLen := v.Count()
+	index := 0
+	stopped := false
+	return generator.SampleGeneratorFunc(func(ctx context.Context, cfg generator.SampleConfig, n int) []float64 {
+		res := make([]float64, n)
+		for i := 0; i < n; i++ {
+			if stopped {
+				res[i] = 0
+				continue
+			}
+
+			// TODO: do this once and cache it.
+			if num, ok := v.ValueAt(index).(*value.Num); ok {
+				res[i] = num.Value
+			} else {
+				res[i] = 0
+			}
+			index++
+			if index >= sampleLen {
+				index = 0
+				if !loop {
+					stopped = true
+				}
+			}
+		}
+		return res
+	})
+}
+
+func gatherArgsAndFlags(args []value.Value, allowedKeywords ...string) ([]value.Value, map[string]value.Value, error) {
+	posArgs := make([]value.Value, 0, len(args))
+	flags := make(map[string]value.Value)
+	for len(args) > 0 {
+		if _, ok := args[0].(*value.Keyword); ok {
+			// handle keyword arguments
+			break
+		}
+		posArgs = append(posArgs, args[0])
+		args = args[1:]
+	}
+	if len(args)%2 != 0 {
+		return nil, nil, fmt.Errorf("expected even number of keyword arguments, got %v", len(args))
+	}
+	for i := 0; i < len(args); i += 2 {
+		kw, ok := args[i].(*value.Keyword)
+		if !ok {
+			return nil, nil, fmt.Errorf("expected keyword argument, got %v", args[i])
+		}
+		if !containsString(allowedKeywords, kw.Value) {
+			return nil, nil, fmt.Errorf("unknown keyword argument %v", kw.Value)
+		}
+		flags[kw.Value] = args[i+1]
+	}
+	return posArgs, flags, nil
+}
+
+func samplerBuiltin(env value.Environment, args []value.Value) (value.Value, error) {
+	args, flags, err := gatherArgsAndFlags(args, "loop")
+	if err != nil {
+		return nil, err
+	}
+
+	// sampler takes a required vector argument
+	// TODO: sample rate, gate
+	if len(args) < 1 {
+		return nil, fmt.Errorf("sampler expects at least 1 argument, got %v", len(args))
+	}
+	vec, ok := args[0].(*value.Vector)
+	if !ok {
+		return nil, fmt.Errorf("sampler expects a vector as the first argument, got %v", args[0])
+	}
+
+	loop := false
+	if loopFlag, ok := flags["loop"]; ok {
+		loop = value.IsTruthy(loopFlag)
+	}
+
+	nodeID := env.Graph().AddGeneratorNode(NewSamplerGenerator(vec, loop), graph.WithLabel("sampler"))
+	return &value.Gen{
+		NodeID: nodeID,
+	}, nil
+}
+
 func getSampleArrays(inputs map[string][]float64, name string) [][]float64 {
 	var numSamples int
 
@@ -1582,7 +1704,8 @@ func openFileBuiltin(env value.Environment, args []value.Value) (value.Value, er
 	}
 	bitDepth := dec.SampleBitDepth()
 
-	var sampleValues []value.Value
+	floatSamples := make([]float64, len(intSamples))
+
 	for _, s := range intSamples {
 		floatSample := float64(s) / float64(int(1)<<uint(bitDepth-1))
 		if floatSample > 1 {
@@ -1590,10 +1713,28 @@ func openFileBuiltin(env value.Environment, args []value.Value) (value.Value, er
 		} else if floatSample < -1 {
 			floatSample = -1
 		}
-		sampleValues = append(sampleValues, &value.Num{Value: floatSample})
+		floatSamples = append(floatSamples, floatSample)
 	}
 
-	// TODO: automatically resample to the current sample rate.
+	// resample to 44100 Hz, assumed to be the sample rate of the audio device
+	// TODOs:
+	// - make this configurable
+	// - don't assume 44100 Hz
+	const deviceSampleRate = 44100
+	if dec.SampleRate != deviceSampleRate {
+		outputSamples := make([]float64, len(floatSamples)*deviceSampleRate/int(dec.SampleRate))
+		for i := range outputSamples {
+			t := float64(i) / float64(len(outputSamples)-1)
+			outputSamples[i] = floatSamples[int(t*float64(len(floatSamples)-1))]
+		}
+		floatSamples = outputSamples
+	}
+
+	sampleValues := make([]value.Value, len(floatSamples))
+	for i, s := range floatSamples {
+		sampleValues[i] = value.NewNum(s)
+	}
+
 	return value.NewVector(sampleValues), nil
 }
 
@@ -1662,4 +1803,13 @@ func asSlice(v value.Value) ([]value.Value, bool) {
 		list = append(list, v)
 	}
 	return list, true
+}
+
+func containsString(list []string, s string) bool {
+	for _, v := range list {
+		if v == s {
+			return true
+		}
+	}
+	return false
 }
