@@ -733,14 +733,21 @@ func applyBuiltin(env value.Environment, args []value.Value) (value.Value, error
 	if !ok {
 		return nil, fmt.Errorf("apply expects a function as the first argument, got %v", args[0])
 	}
-	enum, ok := args[1].(value.Enumerable)
-	if !ok {
-		return nil, fmt.Errorf("apply expects an enumerable as the second argument, got %v", args[1])
+
+	var values []value.Value
+
+	if !value.NilValue.Equal(args[1]) {
+		enum, ok := args[1].(value.Enumerable)
+		if !ok {
+			return nil, fmt.Errorf("apply expects an enumerable as the second argument, got %v", args[1])
+		}
+		var err error
+		values, err = value.EnumerateAll(context.Background(), enum)
+		if err != nil {
+			return nil, err
+		}
 	}
-	values, err := value.EnumerateAll(context.Background(), enum)
-	if err != nil {
-		return nil, err
-	}
+
 	return applyer.Apply(env, values)
 }
 

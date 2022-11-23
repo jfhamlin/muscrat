@@ -1,4 +1,4 @@
-(def print mrat.core.io.print)
+(def print mrat.core.io/print)
 
 (print
  (let ((x 2) (y 3))

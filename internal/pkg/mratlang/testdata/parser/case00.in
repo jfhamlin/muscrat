@@ -1,5 +1,3 @@
-(def print mrat.core.io.print)
-
 ;; simple case
 (print (case (+ 41 1)
          "foo" "bar"

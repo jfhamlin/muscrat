@@ -1,5 +1,5 @@
 (load-file "./testtab.mrat")
-(def print mrat.core.io.print)
+(def print mrat.core.io/print)
 
 (def table
   (list

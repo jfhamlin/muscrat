@@ -7,5 +7,5 @@
   `(let [or# ~x]
      (if or# or# (or ~@next))))
 
-(mrat.core.io.print (or-macro 1 (invalid function call)))
+(print (or-macro 1 (invalid function call)))
 

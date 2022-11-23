@@ -1,6 +1,6 @@
 (defn mulTwo [a b] (* a b))
 
-(mrat.core.io.print (mulTwo 2 3))
+(mrat.core.io/print (mulTwo 2 3))
 
 (defn weirdosc []
-    (* (mrat.osc.sin 261.625565) 0.5))
+    (* (mrat.osc/sin 261.625565) 0.5))

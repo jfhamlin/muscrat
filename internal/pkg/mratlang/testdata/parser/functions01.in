@@ -1,7 +1,5 @@
 (load-file "./functional00.in")
 
-(def print mrat.core.io.print)
-
 (defn fib [n]
   (if (< n 2)
     1
