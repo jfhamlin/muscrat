@@ -13,12 +13,12 @@ import (
 
 	"github.com/go-audio/audio"
 	"github.com/go-audio/wav"
+	"github.com/jfhamlin/freeverb-go"
 	"github.com/jfhamlin/muscrat/internal/pkg/generator"
 	"github.com/jfhamlin/muscrat/internal/pkg/generator/stochastic"
 	"github.com/jfhamlin/muscrat/internal/pkg/graph"
 	"github.com/jfhamlin/muscrat/internal/pkg/mratlang/value"
 	"github.com/jfhamlin/muscrat/internal/pkg/wavtabs"
-	"github.com/jfhamlin/muscrat/pkg/freeverb"
 )
 
 var (

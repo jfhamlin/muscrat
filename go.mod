@@ -7,6 +7,7 @@ require (
 	github.com/fsnotify/fsnotify v1.5.4
 	github.com/go-audio/audio v0.0.0-20181013203223-7b2a6ca21480
 	github.com/go-audio/wav v0.0.0-20181013172942-de841e69b884
+	github.com/jfhamlin/freeverb-go v0.0.0-20230507180339-1f571b97aff7
 	github.com/kylelemons/godebug v1.1.0
 	github.com/mjibson/go-dsp v0.0.0-20180508042940-11479a337f12
 	github.com/stretchr/testify v1.8.0
