@@ -393,23 +393,7 @@ func (a *App) updateSignalGraphFromScriptFile(filename string) {
 	}
 	a.lastSynthFileHash = hash
 
-	program, err := mratlang.Parse(strings.NewReader(string(synthFile)), mratlang.WithFilename(filename))
-	if err != nil {
-		fmt.Println("error parsing script:", err)
-		return
-	}
-	pwd, err := os.Getwd()
-	if err != nil {
-		panic(err)
-	}
-	g, sinkChannels, err := func() (g *graph.Graph, sc []graph.SinkChan, err error) {
-		defer func() {
-			if r := recover(); r != nil {
-				err = fmt.Errorf("%v\n%s", r, debug.Stack())
-			}
-		}()
-		return program.Eval(mratlang.WithLoadPath([]string{pwd}))
-	}()
+	g, sinkChannels, err := evalScript(string(synthFile), filename)
 	if err != nil {
 		fmt.Println("error generating graph:", err)
 		return
@@ -524,6 +508,24 @@ func (a *App) updateSignalGraphFromScriptFile(filename string) {
 	}
 	a.graph = g
 	a.graphOutputChannel = graphOutputChannel
+}
+
+func evalScript(script, filename string) (g *graph.Graph, sc []graph.SinkChan, err error) {
+	program, err := mratlang.Parse(strings.NewReader(script), mratlang.WithFilename(filename))
+	if err != nil {
+		fmt.Println("error parsing script:", err)
+		return nil, nil, err
+	}
+	pwd, err := os.Getwd()
+	if err != nil {
+		panic(err)
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = fmt.Errorf("%v\n%s", r, debug.Stack())
+		}
+	}()
+	return program.Eval(mratlang.WithLoadPath([]string{pwd}))
 }
 
 func (a *App) SetGain(gain float64) {

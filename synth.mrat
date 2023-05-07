@@ -1,29 +1,19 @@
 (load-file "./examples/notes.mrat")
 (load-file "./examples/welsh.mrat")
 
-;; (def noise (*lores (*noise) (remap (*sin 0.1) 350 400) 0.5))
+(def noise (*lores (*noise) (remap (*sin 1) 350 400) 0.99))
 
-;; (def hum-sins
-;;   (let [root 270]
-;;     (map (fn [x] (*sin x))
-;;          [root
-;;           (* root (semitones 2))
-;;           (* root (semitones -4))
-;;           (* root (semitones -11))
-;;           ])))
+(def hum-sins
+  (let [root (* 660 (remap (*tri 15000) 0.5 1))]
+    (map (fn [x] (*sin x))
+         [root
+          (* root (semitones 2))
+          (* root (semitones -4))
+          (* root (semitones -11))
+          ])))
 
-;; (def gate (*sqr .5))
-;; (def punch-env (*env gate '(0 1 1 0) '(0.02 0.1 0.05)))
-;; (def punch (bongo (* C1 (semitones -12)) gate))
-
-;; (mrat.core.io.out
-;;  (* 0.25
-;;     (+
-;;      (* (+ 1 (* -1 punch-env)) (* 0.3
-;;                                   (*mixer 1 noise
-;;                                           5 (sum hum-sins))))
-;;      punch
-;;      )))
+(def gate (*sqr 4))
+(def punch (bongo (* C8 (semitones -12)) gate))
 
 (defn *lfpulse [& args]
   (remap (apply *pulse args) 0 1))
@@ -31,28 +21,13 @@
 (def detune-semis -5)
 (def detune (ugen (semitones detune-semis)))
 
-(def sig0 (*sin (* 440 detune) :iphase 0.5))
-(def sig1 (*sin (* 440 detune)))
+(def sig0 (*sin (* (+ 440 (* 200 (*sin 1))) detune) :iphase 0.5))
+(def sig1 (*sin (* (+ 440 (* 500 (*sin 10))) detune)))
 
-(def left sig0)
-(def right sig1)
-
-(def pinkish (*pink-noise));;(*lores (*noise) 500 0))
+(def left (+ (* 0.4 (apply + hum-sins)) punch noise))
+(def right (+ (* 0.5 sig1) (* 1 (*tri 200))))
 
 (def channels [left right])
-
-(def channels [pinkish pinkish])
-
-;;(def channels (repeat 2 [left]))
-
-;; (defn sin01 [freq] (remap (*sin freq) 0 1))
-
-;; (defn sig-pan-osc [freq sig0 sig1]
-;;   (let [t (sin01 freq)]
-;;     (+ (* t sig0) (* (+ t -1) sig1))))
-
-;; (def left (sig-pan-osc 0.5 sig0 sig1))
-;; (def right (sig-pan-osc 0.2 sig0 sig1))
 
 (apply mrat.core.io/out
        (map (fn [x] (* x (decibels -10)))
