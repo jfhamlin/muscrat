@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"github.com/fsnotify/fsnotify"
+	"github.com/glojurelang/glojure/glj"
 	"github.com/mjibson/go-dsp/fft"
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 	"golang.org/x/term"
@@ -511,6 +512,9 @@ func (a *App) updateSignalGraphFromScriptFile(filename string) {
 }
 
 func evalScript(script, filename string) (g *graph.Graph, sc []graph.SinkChan, err error) {
+	require := glj.Var("glojure.core", "require")
+	require.Invoke(glj.Read("synth"))
+
 	program, err := mratlang.Parse(strings.NewReader(script), mratlang.WithFilename(filename))
 	if err != nil {
 		fmt.Println("error parsing script:", err)

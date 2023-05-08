@@ -5,7 +5,7 @@
 
 pkgs.mkShell {
   nativeBuildInputs = [
-    pkgs.go_1_18
+    pkgs.go_1_19
     pkgs.nodejs
 
     pkgs.SDL2
