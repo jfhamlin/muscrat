@@ -1,35 +1,44 @@
-(load-file "./examples/notes.mrat")
-(load-file "./examples/welsh.mrat")
+(ns synth
+  (:use (mrat.core)))
 
-(def noise (*lores (*noise) (remap (*sin 1) 350 400) 0.99))
+(play 0) ;;(*sin))
 
-(def hum-sins
-  (let [root (* 660 (remap (*tri 15000) 0.5 1))]
-    (map (fn [x] (*sin x))
-         [root
-          (* root (semitones 1))
-          (* root (semitones 2))
-          (* root (semitones -4))
-          (* root (semitones -11))
-          ])))
 
-(def gate (*sqr 4))
-(def punch (bongo (* C1 (semitones -12)) gate))
+;; (load-file "./examples/notes.mrat")
+;; (load-file "./examples/welsh.mrat")
 
-(defn *lfpulse [& args]
-  (remap (apply *pulse args) 0 1))
+;; (def noise (*lores (*noise) (remap (*sin 1) 350 400) 0.99))
 
-(def detune-semis -5)
-(def detune (ugen (semitones detune-semis)))
+;; (def hum-sins
+;;   (let [root (* 660 (remap (*tri 15000) 0.5 1))]
+;;     (map (fn [x] (*sin x))
+;;          [root
+;;           (* root (semitones 1))
+;;           (* root (semitones 2))
+;;           (* root (semitones -4))
+;;           (* root (semitones -11))
+;;           ])))
 
-(def sig0 (*sin (* (+ 440 (* 200 (*sin 1))) detune) :iphase 0.5))
-(def sig1 (*sin (* (+ 440 (* 500 (*sin 10))) detune)))
+;; (def gate (*sqr 4))
+;; (def punch (bongo (* C1 (semitones -12)) gate))
 
-(def left (*freeverb (+ (* 0.4 (apply + hum-sins)) punch noise)))
-(def right 0) ;;(+ (* 0.5 sig1) (* 1 (*tri 200))))
+;; (defn *lfpulse [& args]
+;;   (remap (apply *pulse args) 0 1))
 
-(def channels [left right])
+;; (def detune-semis -5)
+;; (def detune (ugen (semitones detune-semis)))
 
-(apply mrat.core.io/out
-       (map (fn [x] (* x (decibels -10)))
-            channels))
+;; (def sig0 (*sin (* (+ 440 (* 200 (*sin 1))) detune) :iphase 0.5))
+;; (def sig1 (*sin (* (+ 440 (* 500 (*sin 10))) detune)))
+
+;; (def left (*freeverb (+ (* 0.4 (apply + hum-sins)) punch noise)))
+;; (def right 0) ;;(+ (* 0.5 sig1) (* 1 (*tri 200))))
+
+;; (def channels [left right])
+
+;; (apply mrat.core.io/out
+;;        (map (fn [x] (* x (decibels -10)))
+;;             channels))
+
+
+

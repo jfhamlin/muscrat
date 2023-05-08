@@ -5,7 +5,7 @@ go 1.19
 require (
 	github.com/bspaans/bleep v0.0.0-20220414232837-486f92844ed7
 	github.com/fsnotify/fsnotify v1.5.4
-	github.com/glojurelang/glojure v0.0.0-20230508010105-0a4187c6f9a0
+	github.com/glojurelang/glojure v0.0.0-20230508021009-6353bccc613a
 	github.com/go-audio/audio v0.0.0-20181013203223-7b2a6ca21480
 	github.com/go-audio/wav v0.0.0-20181013172942-de841e69b884
 	github.com/jfhamlin/freeverb-go v0.0.0-20230507180339-1f571b97aff7

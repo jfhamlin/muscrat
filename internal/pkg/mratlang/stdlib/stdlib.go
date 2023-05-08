@@ -5,5 +5,5 @@ import (
 	"embed"
 )
 
-//go:embed mratfiles
+//go:embed mrat
 var StdLib embed.FS

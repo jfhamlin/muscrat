@@ -18,13 +18,15 @@ import (
 
 	"github.com/fsnotify/fsnotify"
 	"github.com/glojurelang/glojure/glj"
+	gljrt "github.com/glojurelang/glojure/runtime"
+	"github.com/glojurelang/glojure/value"
 	"github.com/mjibson/go-dsp/fft"
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 	"golang.org/x/term"
 
 	"github.com/jfhamlin/muscrat/internal/pkg/generator"
 	"github.com/jfhamlin/muscrat/internal/pkg/graph"
-	"github.com/jfhamlin/muscrat/internal/pkg/mratlang"
+	"github.com/jfhamlin/muscrat/internal/pkg/mratlang/stdlib"
 	"github.com/jfhamlin/muscrat/internal/pkg/notes"
 	"github.com/jfhamlin/muscrat/internal/pkg/plot"
 
@@ -39,6 +41,9 @@ func init() {
 	go func() {
 		log.Println(http.ListenAndServe("localhost:6060", nil))
 	}()
+
+	gljrt.AddLoadPath(stdlib.StdLib)
+	gljrt.AddLoadPath(os.DirFS("."))
 }
 
 // App struct
@@ -81,7 +86,7 @@ type App struct {
 func NewApp() *App {
 	return &App{
 		outputChannel: make(chan [][]float64, 4), // buffer four packets of samples
-		synthFileName: "synth.mrat",
+		synthFileName: "synth.glj",
 		gain:          0.25,
 		targetGain:    0.25,
 		// showSpectrum:             true,
@@ -512,24 +517,29 @@ func (a *App) updateSignalGraphFromScriptFile(filename string) {
 }
 
 func evalScript(script, filename string) (g *graph.Graph, sc []graph.SinkChan, err error) {
-	require := glj.Var("glojure.core", "require")
-	require.Invoke(glj.Read("synth"))
-
-	program, err := mratlang.Parse(strings.NewReader(script), mratlang.WithFilename(filename))
-	if err != nil {
-		fmt.Println("error parsing script:", err)
-		return nil, nil, err
-	}
-	pwd, err := os.Getwd()
-	if err != nil {
-		panic(err)
-	}
 	defer func() {
 		if r := recover(); r != nil {
 			err = fmt.Errorf("%v\n%s", r, debug.Stack())
 		}
 	}()
-	return program.Eval(mratlang.WithLoadPath([]string{pwd}))
+
+	require := glj.Var("glojure.core", "require")
+	require.Invoke(glj.Read("mrat.core"))
+
+	g = &graph.Graph{}
+	value.PushThreadBindings(value.NewMap(
+		glj.Var("mrat.core", "*graph*"), g,
+	))
+	defer value.PopThreadBindings()
+
+	require.Invoke(glj.Read(strings.TrimSuffix(filename, ".glj")), value.NewKeyword("reload"))
+
+	var sinkChans []graph.SinkChan
+	for _, sink := range g.Sinks() {
+		sinkChans = append(sinkChans, sink.Chan())
+	}
+
+	return g, sinkChans, nil
 }
 
 func (a *App) SetGain(gain float64) {

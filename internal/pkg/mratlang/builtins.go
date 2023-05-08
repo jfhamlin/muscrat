@@ -14,6 +14,7 @@ import (
 	"github.com/go-audio/audio"
 	"github.com/go-audio/wav"
 	"github.com/jfhamlin/freeverb-go"
+
 	"github.com/jfhamlin/muscrat/internal/pkg/generator"
 	"github.com/jfhamlin/muscrat/internal/pkg/generator/stochastic"
 	"github.com/jfhamlin/muscrat/internal/pkg/graph"
@@ -30,17 +31,6 @@ func init() {
 		&Package{
 			Name: "mrat.core",
 			Symbols: []*Symbol{
-				// importing/requiring other packages
-				funcSymbol("load-file", loadFileBuiltin),
-				// list/vector functions
-				funcSymbol("list", listBuiltin),
-				funcSymbol("vector", vectorBuiltin),
-				funcSymbol("length", lengthBuiltin),
-				funcSymbol("conj", conjBuiltin),
-				funcSymbol("concat", concatBuiltin),
-				funcSymbol("first", firstBuiltin),
-				funcSymbol("rest", restBuiltin),
-				funcSymbol("subvec", subvecBuiltin),
 				// math functions
 				funcSymbol("pow", powBuiltin),
 				funcSymbol("floor", floorBuiltin),
@@ -74,7 +64,6 @@ func init() {
 		&Package{
 			Name: "mrat.core.io",
 			Symbols: []*Symbol{
-				funcSymbol("print", printBuiltin),
 				funcSymbol("out", outBuiltin),
 			},
 		},

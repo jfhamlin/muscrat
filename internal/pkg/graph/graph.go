@@ -171,7 +171,7 @@ func (g *Graph) AddEdge(from, to NodeID, port string) {
 	})
 }
 
-func (g *Graph) AddGeneratorNode(gen generator.SampleGenerator, opts ...NodeOption) NodeID {
+func (g *Graph) AddGeneratorNode(gen generator.SampleGenerator, opts ...NodeOption) Node {
 	var options nodeOptions
 	for _, opt := range opts {
 		opt(&options)
@@ -183,7 +183,7 @@ func (g *Graph) AddGeneratorNode(gen generator.SampleGenerator, opts ...NodeOpti
 		label:     options.label,
 	}
 	g.Nodes = append(g.Nodes, node)
-	return node.id
+	return node
 }
 
 func (g *Graph) AddSinkNode(opts ...NodeOption) *SinkNode {
