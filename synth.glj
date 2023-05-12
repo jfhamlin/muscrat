@@ -1,8 +1,20 @@
-(ns synth
-  (:use (mrat.core)))
+(ns synth)
+;;  (:use (mrat.core))) ;; BUGBUG: symbols not added?
+;;(use 'mrat.core)
+(require 'mrat.core :reload)
 
-(play 0) ;;(*sin))
+(import '(github.com$jfhamlin$muscrat$pkg$ugen NewConstant)
+        '(github.com$jfhamlin$muscrat$pkg$wavtabs Generator
+                                                  Sin))
 
+(mrat.core/play (mrat.core/*sin 180 :duty 0.5))
+
+
+;;(println *graph*)
+;;(mrat.core/play 0)
+
+;;(as-ugen 0)
+;;(play 0) ;;(*sin))
 
 ;; (load-file "./examples/notes.mrat")
 ;; (load-file "./examples/welsh.mrat")

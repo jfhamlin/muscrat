@@ -1,0 +1,110 @@
+(ns mrat.core
+  (:import (github.com$jfhamlin$muscrat$pkg$ugen NewConstant)
+           (github.com$jfhamlin$muscrat$pkg$wavtabs Generator
+                                                    Sin)
+           (github.com$jfhamlin$muscrat$pkg$graph Node
+                                                  WithLabel)))
+
+(def ^:dynamic *graph* nil)
+
+(defprotocol UGennable
+  "Protocol for types that can be converted to unit generators."
+  (as-ugen [ug]))
+
+(extend-protocol UGennable
+  Node
+  (as-ugen [ug] ug))
+
+(extend-protocol UGennable
+  float64
+  (as-ugen [x] (.AddGeneratorNode *graph* (NewConstant x))))
+
+(extend-protocol UGennable
+  int64
+  (as-ugen [x] (.AddGeneratorNode *graph* (NewConstant x))))
+
+(defn play
+  [& channels]
+  (let [num-sinks (count (. *graph* sinks))]
+    (doseq [ch channels
+            i (range (count channels))]
+      (let [gen (as-ugen ch)
+            chan-id (+ num-sinks i)
+            sink (.AddSinkNode *graph* (WithLabel (fmt.Sprintf "out%d" chan-id)))]
+        (.AddEdge *graph* (. gen ID) (. sink ID) "w"))))) ;; TODO: "w" seems wrong
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Helpers
+(defn- handle-extra-gen-args
+  [node args]
+  (if (odd? (count args))
+    (throw (fmt.Errorf "handle-extra-gen-args: odd number of args: %v" args))
+    (doseq [[k v] (partition 2 args)]
+      (println k)
+      (let [gen (as-ugen v)
+            param (k {:iphase "iphase"
+                      :phase "phase"
+                      :sync "sync"
+                      :duty "dc"})]
+        (when (nil? param) (throw (fmt.Errorf "handle-extra-gen-args: unknown parameter: %s" k)))
+        (.AddEdge *graph* (.ID gen) (.ID node) param)))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Oscillators
+
+(defn *sin
+  ([] (*sin 440))
+  ([freq & args]
+   (let [sin-gen (Generator (Sin 1024))
+         label (WithLabel "sin")
+         sin-node (.AddGeneratorNode *graph* sin-gen label)
+         freq-node (as-ugen freq)]
+     (.AddEdge *graph* (.ID freq-node) (.ID sin-node) "w")
+     (handle-extra-gen-args sin-node args)
+     sin-node)))
+
+;;(def *sin mrat.osc/sin)
+;; (def *tri mrat.osc/tri)
+;; (def *saw mrat.osc/saw)
+;; (def *sqr mrat.osc/sqr)
+;; (def *pulse mrat.osc/pulse)
+;; (def *noise mrat.osc/noise)
+;; (def *pink-noise mrat.osc/pink-noise)
+;; (def *phasor mrat.osc/phasor)
+;; (def *sampler mrat.osc/sampler)
+
+;; (def *freeverb mrat.effects/freeverb)
+;; (def *delay mrat.effects/delay)
+;; (def *clip mrat.effects/clip)
+;; (def *trand mrat.math.rand/trand)
+;; (def *env mrat.effects/env)
+;; (def *lores mrat.effects/*lores)
+
+;; (def rand mrat.math.rand/rand)
+
+;; (defn remap
+;;   "Remap a value from [min-in, max-in] to [min-out, max-out].
+;;   If not provided, [min-in, max-in] defaults to [-1, 1]"
+;;   ([x min max] (remap x -1 1 min max)
+;;   ([x min-in max-in min max]
+;;    (let [range-in (- max-in min-in)
+;;          range-out (- max min)
+;;          x (- x min-in)]
+;;      (+ min (/ (* x range-out) range-in)))))
+
+;; (defn decibels [db] (pow 10 (/ db 20)))
+
+;; (def *mixer
+;;   (fn [& args]
+;;     (let ((mixerArgs args))
+;;       (let ((weightSum (reduce + 0
+;;                                (map-idx (fn [val idx] (if (even? idx) val 0)) mixerArgs))))
+;;         (sum (map (fn [idx] (let ((weight (nth mixerArgs (* 2 idx)))
+;;                                   (chan   (nth mixerArgs (+ (* 2 idx) 1))))
+;;                               (* (/ weight weightSum) chan)))
+;;                   (range 0 (/ (length mixerArgs) 2))))))))
+
+;; ;;; TODO: move to a library for music theory.
+;; (defn cents [x] (pow 2 (/ x 1200)))
+;; (defn semitones [x] (pow 2 (/ x 12)))
+;; (defn octaves [x] (pow 2 x))

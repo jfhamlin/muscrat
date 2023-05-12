@@ -1,6 +1,0 @@
-1
-"foobar"
-#t
-#f
-:key
-(def x '(my quoted list))

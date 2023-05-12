@@ -1,7 +1,0 @@
-;;;ERROR: <unknown-file>:6:4: invalid dispatch: #w
-(
- 1
- (2)
- #t
- (#what)
- )

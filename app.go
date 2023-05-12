@@ -11,6 +11,7 @@ import (
 	"math"
 	"math/cmplx"
 	"os"
+	"reflect"
 	"runtime/debug"
 	"strings"
 	"sync"
@@ -18,17 +19,18 @@ import (
 
 	"github.com/fsnotify/fsnotify"
 	"github.com/glojurelang/glojure/glj"
+	"github.com/glojurelang/glojure/pkgmap"
 	gljrt "github.com/glojurelang/glojure/runtime"
 	"github.com/glojurelang/glojure/value"
 	"github.com/mjibson/go-dsp/fft"
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 	"golang.org/x/term"
 
-	"github.com/jfhamlin/muscrat/internal/pkg/generator"
-	"github.com/jfhamlin/muscrat/internal/pkg/graph"
-	"github.com/jfhamlin/muscrat/internal/pkg/mratlang/stdlib"
 	"github.com/jfhamlin/muscrat/internal/pkg/notes"
 	"github.com/jfhamlin/muscrat/internal/pkg/plot"
+	"github.com/jfhamlin/muscrat/pkg/graph"
+	"github.com/jfhamlin/muscrat/pkg/ugen"
+	"github.com/jfhamlin/muscrat/pkg/wavtabs"
 
 	"github.com/bspaans/bleep/audio"
 	"github.com/bspaans/bleep/sinks"
@@ -42,8 +44,16 @@ func init() {
 		log.Println(http.ListenAndServe("localhost:6060", nil))
 	}()
 
-	gljrt.AddLoadPath(stdlib.StdLib)
+	gljrt.AddLoadPath(os.DirFS("./pkg/stdlib")) //stdlib.StdLib)
 	gljrt.AddLoadPath(os.DirFS("."))
+
+	// TODO: build some tooling to auto-gen the package map
+	// for now, just hard-code it
+	pkgmap.Set("github.com/jfhamlin/muscrat/pkg/graph.Node", reflect.TypeOf((*graph.Node)(nil)).Elem())
+	pkgmap.Set("github.com/jfhamlin/muscrat/pkg/graph.WithLabel", graph.WithLabel)
+	pkgmap.Set("github.com/jfhamlin/muscrat/pkg/ugen.NewConstant", ugen.NewConstant)
+	pkgmap.Set("github.com/jfhamlin/muscrat/pkg/wavtabs.Generator", wavtabs.Generator)
+	pkgmap.Set("github.com/jfhamlin/muscrat/pkg/wavtabs.Sin", wavtabs.Sin)
 }
 
 // App struct
@@ -53,8 +63,8 @@ type App struct {
 	gain       float64
 	targetGain float64
 
-	generator     generator.SampleGenerator
-	nextGenerator generator.SampleGenerator
+	generator     ugen.SampleGenerator
+	nextGenerator ugen.SampleGenerator
 	fade          float64
 
 	showSpectrum     bool
@@ -420,7 +430,7 @@ func (a *App) updateSignalGraphFromScriptFile(filename string) {
 
 	go func() {
 		defer close(graphStopChan)
-		graph.RunGraph(graphCtx, g, generator.SampleConfig{SampleRateHz: a.sampleRate})
+		graph.RunGraph(graphCtx, g, ugen.SampleConfig{SampleRateHz: a.sampleRate})
 	}()
 
 	graphOutputChannel := make(chan [][]float64)
@@ -538,6 +548,8 @@ func evalScript(script, filename string) (g *graph.Graph, sc []graph.SinkChan, e
 	for _, sink := range g.Sinks() {
 		sinkChans = append(sinkChans, sink.Chan())
 	}
+
+	fmt.Println("loaded graph", g, "with", len(sinkChans), "sinks")
 
 	return g, sinkChans, nil
 }
