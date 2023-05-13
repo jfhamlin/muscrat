@@ -1,7 +1,10 @@
 (ns mrat.core
   (:import (github.com$jfhamlin$muscrat$pkg$ugen NewConstant)
            (github.com$jfhamlin$muscrat$pkg$wavtabs Generator
-                                                    Sin)
+                                                    Sin
+                                                    Saw
+                                                    Tri
+                                                    Pulse)
            (github.com$jfhamlin$muscrat$pkg$graph Node
                                                   WithLabel)))
 
@@ -25,16 +28,19 @@
 
 (defn play
   [& channels]
-  (let [num-sinks (count (. *graph* sinks))]
-    (doseq [ch channels
-            i (range (count channels))]
-      (let [gen (as-ugen ch)
+  (let [num-sinks (count (. *graph* sinks))
+        ch-inds (map vector channels (range (count channels)))]
+    (doseq [ch-ind ch-inds]
+      (let [ch (first ch-ind)
+            i (second ch-ind)
+            gen (as-ugen ch)
             chan-id (+ num-sinks i)
             sink (.AddSinkNode *graph* (WithLabel (fmt.Sprintf "out%d" chan-id)))]
         (.AddEdge *graph* (. gen ID) (. sink ID) "w"))))) ;; TODO: "w" seems wrong
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; Helpers
+;; Oscillators
+
 (defn- handle-extra-gen-args
   [node args]
   (if (odd? (count args))
@@ -49,23 +55,25 @@
         (when (nil? param) (throw (fmt.Errorf "handle-extra-gen-args: unknown parameter: %s" k)))
         (.AddEdge *graph* (.ID gen) (.ID node) param)))))
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; Oscillators
+(defmacro defwtosc
+  [name wavtab]
+  (let [fn-name (symbol (str \* name))]
+  `(defn ~fn-name
+     ([freq#] (~fn-name 440))
+     ([freq# & args#]
+      (let [gen# (~'Generator (~wavtab 1024))
+            label# (~'WithLabel ~(str name))
+            osc-node# (.AddGeneratorNode *graph* gen# label#)
+            freq-node# (as-ugen freq#)]
+        (.AddEdge *graph* (.ID freq-node#) (.ID osc-node#) "w")
+        (handle-extra-gen-args osc-node# args#)
+        osc-node#)))))
 
-(defn *sin
-  ([] (*sin 440))
-  ([freq & args]
-   (let [sin-gen (Generator (Sin 1024))
-         label (WithLabel "sin")
-         sin-node (.AddGeneratorNode *graph* sin-gen label)
-         freq-node (as-ugen freq)]
-     (.AddEdge *graph* (.ID freq-node) (.ID sin-node) "w")
-     (handle-extra-gen-args sin-node args)
-     sin-node)))
+(defwtosc sin Sin)
+(defwtosc saw Saw)
+(defwtosc tri Tri)
+;; (defwtosc sqr Pulse) ;; TODO: add default duty cycle and label support
 
-;;(def *sin mrat.osc/sin)
-;; (def *tri mrat.osc/tri)
-;; (def *saw mrat.osc/saw)
 ;; (def *sqr mrat.osc/sqr)
 ;; (def *pulse mrat.osc/pulse)
 ;; (def *noise mrat.osc/noise)

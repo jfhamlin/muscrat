@@ -11,7 +11,6 @@ import (
 	"math"
 	"math/cmplx"
 	"os"
-	"reflect"
 	"runtime/debug"
 	"strings"
 	"sync"
@@ -30,7 +29,8 @@ import (
 	"github.com/jfhamlin/muscrat/internal/pkg/plot"
 	"github.com/jfhamlin/muscrat/pkg/graph"
 	"github.com/jfhamlin/muscrat/pkg/ugen"
-	"github.com/jfhamlin/muscrat/pkg/wavtabs"
+
+	"github.com/jfhamlin/muscrat/pkg/gen/gljimports"
 
 	"github.com/bspaans/bleep/audio"
 	"github.com/bspaans/bleep/sinks"
@@ -47,13 +47,9 @@ func init() {
 	gljrt.AddLoadPath(os.DirFS("./pkg/stdlib")) //stdlib.StdLib)
 	gljrt.AddLoadPath(os.DirFS("."))
 
-	// TODO: build some tooling to auto-gen the package map
-	// for now, just hard-code it
-	pkgmap.Set("github.com/jfhamlin/muscrat/pkg/graph.Node", reflect.TypeOf((*graph.Node)(nil)).Elem())
-	pkgmap.Set("github.com/jfhamlin/muscrat/pkg/graph.WithLabel", graph.WithLabel)
-	pkgmap.Set("github.com/jfhamlin/muscrat/pkg/ugen.NewConstant", ugen.NewConstant)
-	pkgmap.Set("github.com/jfhamlin/muscrat/pkg/wavtabs.Generator", wavtabs.Generator)
-	pkgmap.Set("github.com/jfhamlin/muscrat/pkg/wavtabs.Sin", wavtabs.Sin)
+	gljimports.RegisterImports(func(export string, val interface{}) {
+		pkgmap.Set(export, val)
+	})
 }
 
 // App struct
