@@ -1,5 +1,6 @@
 (ns mrat.core
-  (:import (github.com$jfhamlin$muscrat$pkg$ugen NewConstant)
+  (:import (github.com$jfhamlin$muscrat$pkg$ugen NewConstant
+                                                 NewSum)
            (github.com$jfhamlin$muscrat$pkg$wavtabs Generator
                                                     Sin
                                                     Saw
@@ -10,13 +11,20 @@
 
 (def ^:dynamic *graph* nil)
 
+(defn- add-node
+  [ug label]
+  (.AddGeneratorNode *graph* ug (WithLabel (str label))))
+
+(defn- add-edge
+  [x y port] (.AddEdge *graph* (.ID x) (.ID y) port))
+
 (defprotocol UGennable
   "Protocol for types that can be converted to unit generators."
   (as-ugen [ug]))
 
 (extend-protocol UGennable
   Node
-  (as-ugen [ug] ug))
+  (as-ugen [n] n))
 
 (extend-protocol UGennable
   float64
@@ -37,6 +45,31 @@
             chan-id (+ num-sinks i)
             sink (.AddSinkNode *graph* (WithLabel (fmt.Sprintf "out%d" chan-id)))]
         (.AddEdge *graph* (. gen ID) (. sink ID) "w"))))) ;; TODO: "w" seems wrong
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Operators
+
+(defn- +-internal
+  [& xs]
+  (let [groups (group-by #(instance? Node %) xs)
+        nums (get groups false ())
+        ugens (get groups true ())
+        num-sum (apply glojure.core/+ nums)]
+    (if (empty? ugens)
+      num-sum
+      (let [sum-node (add-node (NewSum) "+")
+            nodes (if (zero? num-sum) ugens
+                      (conj ugens (add-node (NewConstant num-sum) num-sum)))]
+        (doseq [[n i] (map vector nodes (range (count nodes)))]
+          (add-edge n sum-node (str \$ i)))
+        sum-node))))
+
+(defn +
+  "Return the sum of any combination of numbers or ugens.
+  If any argument to + is a ugen, then the result of + is a ugen"
+  ([] 0)
+  ([x] x)
+  ([x & more] (apply +-internal (cons x more))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Oscillators
