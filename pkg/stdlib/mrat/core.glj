@@ -49,27 +49,27 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Operators
 
-;; (defn- +-internal
-;;   [& xs]
-;;   (let [groups (group-by #(instance? Node %) xs)
-;;         nums (get groups false ())
-;;         ugens (get groups true ())
-;;         num-sum (apply glojure.core/+ nums)]
-;;     (if (empty? ugens)
-;;       num-sum
-;;       (let [sum-node (add-node (NewSum) "+")
-;;             nodes (if (zero? num-sum) ugens
-;;                       (conj ugens (add-node (NewConstant num-sum) num-sum)))]
-;;         (doseq [[n i] (map vector nodes (range (count nodes)))]
-;;           (add-edge n sum-node (str \$ i)))
-;;         sum-node))))
+(defn- +-internal
+  [& xs]
+  (let [groups (group-by #(instance? Node %) xs)
+        nums (get groups false ())
+        ugens (get groups true ())
+        num-sum (apply glojure.core/+ nums)]
+    (if (empty? ugens)
+      num-sum
+      (let [sum-node (add-node (NewSum) "+")
+            nodes (if (zero? num-sum) ugens
+                      (conj ugens (add-node (NewConstant num-sum) num-sum)))]
+        (doseq [[n i] (map vector nodes (range (count nodes)))]
+          (add-edge n sum-node (str \$ i)))
+        sum-node))))
 
-;; (defn +
-;;   "Return the sum of any combination of numbers or ugens.
-;;   If any argument to + is a ugen, then the result of + is a ugen"
-;;   ([] 0)
-;;   ([x] x)
-;;   ([x & more] (apply +-internal (cons x more))))
+(defn +
+  "Return the sum of any combination of numbers or ugens.
+  If any argument to + is a ugen, then the result of + is a ugen"
+  ([] 0)
+  ([x] x)
+  ([x & more] (apply +-internal (cons x more))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Oscillators
