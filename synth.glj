@@ -6,8 +6,8 @@
         '(github.com$jfhamlin$muscrat$pkg$wavtabs Generator
                                                   Sin))
 
-(mrat.core/play (mrat.core/*sin 300 :iphase 0)
-                (mrat.core/*sin 301 :iphase 0))
+(mrat.core/play (mrat.core/sin 300 :iphase 0)
+                (mrat.core/tri 301 :duty (mrat.core/sin 2)))
 
 ;;(println *graph*)
 ;;(mrat.core/play 0)

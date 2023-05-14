@@ -56,9 +56,9 @@
 
 (defmacro defwtosc
   [name wavtab]
-  (let [fn-name (symbol (str \* name))]
+  (let [fn-name (symbol (str name))]
   `(defn ~fn-name
-     ([freq#] (~fn-name 440))
+     ([] (~fn-name 440))
      ([freq# & args#]
       (let [gen# (~'Generator (~wavtab 1024))
             label# (~'WithLabel ~(str name))
