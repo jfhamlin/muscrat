@@ -46,7 +46,6 @@
   (if (odd? (count args))
     (throw (fmt.Errorf "handle-extra-gen-args: odd number of args: %v" args))
     (doseq [[k v] (partition 2 args)]
-      (println k)
       (let [gen (as-ugen v)
             param (k {:iphase "iphase"
                       :phase "phase"

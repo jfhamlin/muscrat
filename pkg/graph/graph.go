@@ -211,6 +211,16 @@ func (g *Graph) Sinks() []*SinkNode {
 	return sinks
 }
 
+func (g *Graph) SinkChans() []SinkChan {
+	var chs []SinkChan
+	for _, node := range g.Nodes {
+		if sink, ok := node.(*SinkNode); ok {
+			chs = append(chs, sink.output)
+		}
+	}
+	return chs
+}
+
 func (g *Graph) Node(id NodeID) Node {
 	if int(id) >= len(g.Nodes) {
 		return nil

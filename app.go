@@ -18,8 +18,6 @@ import (
 
 	"github.com/fsnotify/fsnotify"
 	"github.com/glojurelang/glojure/glj"
-	"github.com/glojurelang/glojure/pkgmap"
-	gljrt "github.com/glojurelang/glojure/runtime"
 	"github.com/glojurelang/glojure/value"
 	"github.com/mjibson/go-dsp/fft"
 	"github.com/wailsapp/wails/v2/pkg/runtime"
@@ -30,7 +28,7 @@ import (
 	"github.com/jfhamlin/muscrat/pkg/graph"
 	"github.com/jfhamlin/muscrat/pkg/ugen"
 
-	"github.com/jfhamlin/muscrat/pkg/gen/gljimports"
+	_ "github.com/jfhamlin/muscrat/pkg/mrat"
 
 	"github.com/bspaans/bleep/audio"
 	"github.com/bspaans/bleep/sinks"
@@ -43,13 +41,6 @@ func init() {
 	go func() {
 		log.Println(http.ListenAndServe("localhost:6060", nil))
 	}()
-
-	gljrt.AddLoadPath(os.DirFS("./pkg/stdlib")) //stdlib.StdLib)
-	gljrt.AddLoadPath(os.DirFS("."))
-
-	gljimports.RegisterImports(func(export string, val interface{}) {
-		pkgmap.Set(export, val)
-	})
 }
 
 // App struct
