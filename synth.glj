@@ -1,9 +1,14 @@
 (ns synth
-  (:use (mrat.core)))
+  (:require [mrat.core :refer :all]))
+
 (require 'mrat.core :reload)
 
-(mrat.core/play (mrat.core/+ (mrat.core/sin 300)
-                             (mrat.core/sin 300)))
+(def output
+  (+ (sin 440 :phase (phasor 300))
+     (sin 600)))
+
+(play (freeverb output :room-size 0.6 :wet 1))
+
 
 
 ;; (mrat.core/play (mrat.core/+ (mrat.core/*sin 180)

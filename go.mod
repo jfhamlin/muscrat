@@ -6,6 +6,7 @@ require (
 	github.com/bspaans/bleep v0.0.0-20220414232837-486f92844ed7
 	github.com/fsnotify/fsnotify v1.5.4
 	github.com/glojurelang/glojure v0.0.0-20230512061700-6d3a1890f55c
+	github.com/jfhamlin/freeverb-go v1.0.0
 	github.com/mjibson/go-dsp v0.0.0-20180508042940-11479a337f12
 	github.com/stretchr/testify v1.8.1
 	github.com/wailsapp/wails/v2 v2.1.0

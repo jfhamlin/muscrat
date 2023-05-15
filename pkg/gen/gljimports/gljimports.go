@@ -4,7 +4,10 @@ package gljimports
 import (
 	github_com_jfhamlin_muscrat_pkg_ugen "github.com/jfhamlin/muscrat/pkg/ugen"
 	github_com_jfhamlin_muscrat_pkg_wavtabs "github.com/jfhamlin/muscrat/pkg/wavtabs"
+	github_com_jfhamlin_muscrat_pkg_stochastic "github.com/jfhamlin/muscrat/pkg/stochastic"
+	github_com_jfhamlin_muscrat_pkg_effects "github.com/jfhamlin/muscrat/pkg/effects"
 	github_com_jfhamlin_muscrat_pkg_graph "github.com/jfhamlin/muscrat/pkg/graph"
+	github_com_jfhamlin_freeverb_go "github.com/jfhamlin/freeverb-go"
 	"reflect"
 )
 
@@ -31,6 +34,18 @@ func RegisterImports(_register func(string, interface{})) {
 	_register("github.com/jfhamlin/muscrat/pkg/wavtabs.Tri", github_com_jfhamlin_muscrat_pkg_wavtabs.Tri)
 	_register("github.com/jfhamlin/muscrat/pkg/wavtabs.WithDefaultDutyCycle", github_com_jfhamlin_muscrat_pkg_wavtabs.WithDefaultDutyCycle)
 
+	// package github.com/jfhamlin/muscrat/pkg/stochastic
+	////////////////////////////////////////
+	_register("github.com/jfhamlin/muscrat/pkg/stochastic.NewNoise", github_com_jfhamlin_muscrat_pkg_stochastic.NewNoise)
+	_register("github.com/jfhamlin/muscrat/pkg/stochastic.NewPinkNoise", github_com_jfhamlin_muscrat_pkg_stochastic.NewPinkNoise)
+	_register("github.com/jfhamlin/muscrat/pkg/stochastic.Option", reflect.TypeOf((*github_com_jfhamlin_muscrat_pkg_stochastic.Option)(nil)).Elem())
+	_register("github.com/jfhamlin/muscrat/pkg/stochastic.PinkNoise", reflect.TypeOf((*github_com_jfhamlin_muscrat_pkg_stochastic.PinkNoise)(nil)).Elem())
+	_register("github.com/jfhamlin/muscrat/pkg/stochastic.WithRand", github_com_jfhamlin_muscrat_pkg_stochastic.WithRand)
+
+	// package github.com/jfhamlin/muscrat/pkg/effects
+	////////////////////////////////////////
+	_register("github.com/jfhamlin/muscrat/pkg/effects.NewFreeverb", github_com_jfhamlin_muscrat_pkg_effects.NewFreeverb)
+
 	// package github.com/jfhamlin/muscrat/pkg/graph
 	////////////////////////////////////////
 	_register("github.com/jfhamlin/muscrat/pkg/graph.Edge", reflect.TypeOf((*github_com_jfhamlin_muscrat_pkg_graph.Edge)(nil)).Elem())
@@ -44,4 +59,9 @@ func RegisterImports(_register func(string, interface{})) {
 	_register("github.com/jfhamlin/muscrat/pkg/graph.SinkChan", reflect.TypeOf((*github_com_jfhamlin_muscrat_pkg_graph.SinkChan)(nil)).Elem())
 	_register("github.com/jfhamlin/muscrat/pkg/graph.SinkNode", reflect.TypeOf((*github_com_jfhamlin_muscrat_pkg_graph.SinkNode)(nil)).Elem())
 	_register("github.com/jfhamlin/muscrat/pkg/graph.WithLabel", github_com_jfhamlin_muscrat_pkg_graph.WithLabel)
+
+	// package github.com/jfhamlin/freeverb-go
+	////////////////////////////////////////
+	_register("github.com/jfhamlin/freeverb-go.NewRevModel", github_com_jfhamlin_freeverb_go.NewRevModel)
+	_register("github.com/jfhamlin/freeverb-go.RevModel", reflect.TypeOf((*github_com_jfhamlin_freeverb_go.RevModel)(nil)).Elem())
 }

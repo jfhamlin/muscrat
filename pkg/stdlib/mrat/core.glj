@@ -1,13 +1,18 @@
 (ns mrat.core
-  (:import (github.com$jfhamlin$muscrat$pkg$ugen NewConstant
+  (:import (github.com$jfhamlin$muscrat$pkg$graph Node
+                                                  WithLabel)
+           (github.com$jfhamlin$muscrat$pkg$ugen NewConstant
                                                  NewSum)
            (github.com$jfhamlin$muscrat$pkg$wavtabs Generator
                                                     Sin
                                                     Saw
                                                     Tri
-                                                    Pulse)
-           (github.com$jfhamlin$muscrat$pkg$graph Node
-                                                  WithLabel)))
+                                                    Pulse
+                                                    Phasor)
+           (github.com$jfhamlin$muscrat$pkg$stochastic NewNoise
+                                                       NewPinkNoise)
+           (github.com$jfhamlin$muscrat$pkg$effects NewFreeverb)
+           (github.com/jfhamlin/freeverb-go NewRevModel)))
 
 (def ^:dynamic *graph* nil)
 
@@ -44,7 +49,7 @@
             gen (as-node ch)
             chan-id (+ num-sinks i)
             sink (.AddSinkNode *graph* (WithLabel (fmt.Sprintf "out%d" chan-id)))]
-        (.AddEdge *graph* (. gen ID) (. sink ID) "w"))))) ;; TODO: "w" seems wrong
+        (add-edge gen sink "w"))))) ;; TODO: "w" seems wrong
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Operators
@@ -74,6 +79,8 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Oscillators
 
+(def default-freq 440)
+
 (defn- handle-extra-gen-args
   [node args]
   (if (odd? (count args))
@@ -85,19 +92,19 @@
                       :sync "sync"
                       :duty "dc"})]
         (when (nil? param) (throw (fmt.Errorf "handle-extra-gen-args: unknown parameter: %s" k)))
-        (.AddEdge *graph* (.ID gen) (.ID node) param)))))
+        (add-edge gen node param)))))
 
 (defmacro defwtosc
   [name wavtab]
   (let [fn-name (symbol (str name))]
   `(defn ~fn-name
-     ([] (~fn-name 440))
+     ([] (~fn-name default-freq))
      ([freq# & args#]
       (let [gen# (~'Generator (~wavtab 1024))
             label# (~'WithLabel ~(str name))
-            osc-node# (.AddGeneratorNode *graph* gen# label#)
+            osc-node# (add-node gen# label#)
             freq-node# (as-node freq#)]
-        (.AddEdge *graph* (.ID freq-node#) (.ID osc-node#) "w")
+        (add-edge freq-node# osc-node# "w")
         (handle-extra-gen-args osc-node# args#)
         osc-node#)))))
 
@@ -106,12 +113,53 @@
 (defwtosc tri Tri)
 ;; (defwtosc sqr Pulse) ;; TODO: add default duty cycle and label support
 
+(defn phasor
+  ([] (phasor default-freq))
+  ([freq & args]
+   (let [freq-node (as-node freq)
+         node (add-node (Generator (Phasor 1024)) "phasor")]
+     (add-edge freq-node node "w")
+     node)))
+
 ;; (def *sqr mrat.osc/sqr)
 ;; (def *pulse mrat.osc/pulse)
-;; (def *noise mrat.osc/noise)
-;; (def *pink-noise mrat.osc/pink-noise)
-;; (def *phasor mrat.osc/phasor)
 ;; (def *sampler mrat.osc/sampler)
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Noise
+
+(defn noise
+  []
+  (add-node (NewNoise) "noise"))
+
+(defn pink-noise
+  []
+  (add-node (NewPinkNoise) "pink-noise"))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Effects
+
+(defn- freeverb-gen
+  [& opts]
+  (let [opts (apply hash-map opts)
+        dry (get opts :dry 0.5)
+        wet (get opts :wet 0.5)
+        room-size (get opts :room-size 0.5)
+        damp (get opts :damp 0.5)
+        width (get opts :width 1.0)]
+    (NewFreeverb
+     (doto (NewRevModel)
+       (.SetDry dry)
+       (.SetWet wet)
+       (.SetRoomSize room-size)
+       (.SetDamp damp)
+       (.SetWidth width)))))
+
+(defn freeverb
+  [node & opts]
+  (let [fv-node (add-node (apply freeverb-gen opts) "freeverb")]
+    (add-edge node fv-node "$0")
+    fv-node))
 
 ;; (def *freeverb mrat.effects/freeverb)
 ;; (def *delay mrat.effects/delay)
