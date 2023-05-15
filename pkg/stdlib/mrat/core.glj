@@ -21,7 +21,7 @@
                                                     NewLowpassFilter)
            (github.com$jfhamlin$muscrat$pkg$sampler NewSampler
                                                     LoadSample)
-           (github.com/jfhamlin/freeverb-go NewRevModel)))
+           (github.com$jfhamlin$freeverb-go NewRevModel)))
 
 (def ^:dynamic *graph* nil)
 
