@@ -11,11 +11,13 @@
 
 (play output output)
 
+
 ;; (mrat.core/play (mrat.core/+ (mrat.core/*sin 180)
 ;;                              (mrat.core/*sin 180 :iphase 0.5)))
 
 ;;(println *graph*)
 ;;(mrat.core/play 0)
+
 
 ;;(as-ugen 0)
 ;;(play 0) ;;(*sin))
@@ -41,6 +43,7 @@
 
 ;; (defn *lfpulse [& args]
 ;;   (remap (apply *pulse args) 0 1))
+
 
 ;; (def detune-semis -5)
 ;; (def detune (ugen (semitones detune-semis)))

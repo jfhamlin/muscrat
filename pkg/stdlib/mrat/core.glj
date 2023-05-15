@@ -126,9 +126,13 @@
      ([] (~fn-name default-freq))
      ([freq# & args#]
       (if (odd? (count args#))
-        (throw (fmt.Errorf "%s: odd number of flag args: %v" (str '~fn-name) args#)))
-      (let [args# (into {} (partition 2 args#))
-            gen# (~'Generator (~wavtab 1024))
+        (throw (fmt.Errorf "%s: odd number of flag args: %v" (str ~name) args#)))
+      (let [args# (reduce #(apply assoc %1 %2) {} (partition 2 args#))
+            wt-opts# [(~'WithDefaultDutyCycle (get args# :default-duty 1))
+                      (~'WithMultiply (get args# :mul 1.0))
+                      (~'WithAdd (get args# :add 0.0))]
+            args# (dissoc args# :default-duty :mul :add)
+            gen# (apply ~'Generator (~wavtab 1024) wt-opts#)
             label# (~'WithLabel ~(str name))
             osc-node# (add-node gen# label#)
             freq-node# (as-node freq#)]
