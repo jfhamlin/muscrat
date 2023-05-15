@@ -104,7 +104,7 @@
 (defn *
   "Return the product of any combination of numbers or ugens.
   If any argument to * is a node, then the result of * is a node."
-  ([] 0)
+  ([] 1)
   ([x] x)
   ([x & more] (apply *-internal (cons x more))))
 
