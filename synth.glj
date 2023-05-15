@@ -3,9 +3,15 @@
 
 (require 'mrat.core :reload)
 
-(def output (sin 440 :duty 0.1))
+(def output (-> (load-sample "/Users/jfhamlin/Projects/muscrat-projects/niegalo-todo/niegalo_todo.wav")
+                (sampler)
+                (freeverb :room-size 1 :dry 0 :wet 1)
+                (+ (* 0.1 (saw 300)))
+                (freeverb :room-size 1 :dry 0.2 :wet 1)
+                (lores 880 0.7)
+                (* 0.25)
+                (play)))
 
-(play output output)
 
 ;; (mrat.core/play (mrat.core/+ (mrat.core/*sin 180)
 ;;                              (mrat.core/*sin 180 :iphase 0.5)))
@@ -16,7 +22,6 @@
 
 ;;(as-ugen 0)
 ;;(play 0) ;;(*sin))
-
 
 ;; (load-file "./examples/notes.mrat")
 ;; (load-file "./examples/welsh.mrat")
