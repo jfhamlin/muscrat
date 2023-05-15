@@ -120,31 +120,33 @@
       (add-edge gen node param))))
 
 (defmacro defwtosc
-  [name wavtab]
-  (let [fn-name (symbol (str name))]
-  `(defn ~fn-name
-     ([] (~fn-name default-freq))
-     ([freq# & args#]
-      (if (odd? (count args#))
-        (throw (fmt.Errorf "%s: odd number of flag args: %v" (str ~name) args#)))
-      (let [args# (reduce #(apply assoc %1 %2) {} (partition 2 args#))
-            wt-opts# [(~'WithDefaultDutyCycle (get args# :default-duty 1))
-                      (~'WithMultiply (get args# :mul 1.0))
-                      (~'WithAdd (get args# :add 0.0))]
-            args# (dissoc args# :default-duty :mul :add)
-            gen# (apply ~'Generator (~wavtab 1024) wt-opts#)
-            label# (~'WithLabel ~(str name))
-            osc-node# (add-node gen# label#)
-            freq-node# (as-node freq#)]
-        (add-edge freq-node# osc-node# "w")
-        (handle-extra-gen-args osc-node# args#)
-        osc-node#)))))
+  [name wavtab & default-args]
+  (let [fn-name (symbol (str name))
+        default-args (vec default-args)]
+    `(defn ~fn-name
+       ([] (~fn-name default-freq))
+       ([freq# & args#]
+        (if (odd? (count args#))
+          (throw (fmt.Errorf "%s: odd number of flag args: %v" (str ~name) args#)))
+        (let [args# (if (empty? ~default-args) args# (concat ~default-args args#))
+              args# (reduce #(apply assoc %1 %2) {} (partition 2 args#))
+              wt-opts# [(~'WithDefaultDutyCycle (get args# :default-duty 1))
+                        (~'WithMultiply (get args# :mul 1.0))
+                        (~'WithAdd (get args# :add 0.0))]
+              args# (dissoc args# :default-duty :mul :add)
+              gen# (apply ~'Generator (~wavtab 1024) wt-opts#)
+              label# (~'WithLabel ~(str name))
+              osc-node# (add-node gen# label#)
+              freq-node# (as-node freq#)]
+          (add-edge freq-node# osc-node# "w")
+          (handle-extra-gen-args osc-node# args#)
+          osc-node#)))))
 
 (defwtosc sin Sin)
 (defwtosc saw Saw)
 (defwtosc tri Tri)
 (defwtosc phasor Phasor)
-;; (defwtosc sqr Pulse) ;; TODO: add default duty cycle and label support
+(defwtosc pulse Pulse :default-duty 0.5)
 
 ;; (defn phasor
 ;;   ([] (phasor default-freq))
