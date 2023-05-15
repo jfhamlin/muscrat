@@ -4,12 +4,12 @@
 (require 'mrat.core :reload)
 
 (def output
-  (+ (sin 440 :phase (phasor 300))
-     (sin 600)))
+  (-> (+ (pink-noise) (sin 440))
+      (lores 700 0.8)
+      (* 0.5)
+      (freeverb :room-size 0.8)))
 
-(play (freeverb output :room-size 0.6 :wet 1))
-
-
+(play output output)
 
 ;; (mrat.core/play (mrat.core/+ (mrat.core/*sin 180)
 ;;                              (mrat.core/*sin 180 :iphase 0.5)))

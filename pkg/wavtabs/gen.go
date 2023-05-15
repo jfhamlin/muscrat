@@ -9,6 +9,8 @@ import (
 
 type genOpts struct {
 	defaultDutyCycle float64
+	multiply         float64
+	add              float64
 }
 
 // GeneratorOption is an option for the Generator.
@@ -21,13 +23,31 @@ func WithDefaultDutyCycle(dc float64) GeneratorOption {
 	}
 }
 
+func WithMultiply(m float64) GeneratorOption {
+	return func(opts *genOpts) {
+		opts.multiply = m
+	}
+}
+
+func WithAdd(a float64) GeneratorOption {
+	return func(opts *genOpts) {
+		opts.add = a
+	}
+}
+
 // Generator is a generator that generates a wavetable.
-func Generator(wavtab Table, opts ...GeneratorOption) ugen.SampleGenerator {
+func Generator(wavtabIn Table, opts ...GeneratorOption) ugen.SampleGenerator {
 	options := genOpts{
 		defaultDutyCycle: 1,
+		multiply:         1,
 	}
 	for _, opt := range opts {
 		opt(&options)
+	}
+
+	wavtab := make(Table, len(wavtabIn))
+	for i, v := range wavtabIn {
+		wavtab[i] = v*options.multiply + options.add
 	}
 
 	phase := 0.0

@@ -2,8 +2,12 @@
   (:import (github.com$jfhamlin$muscrat$pkg$graph Node
                                                   WithLabel)
            (github.com$jfhamlin$muscrat$pkg$ugen NewConstant
-                                                 NewSum)
+                                                 NewSum
+                                                 NewProduct)
            (github.com$jfhamlin$muscrat$pkg$wavtabs Generator
+                                                    WithDefaultDutyCycle
+                                                    WithMultiply
+                                                    WithAdd
                                                     Sin
                                                     Saw
                                                     Tri
@@ -11,7 +15,9 @@
                                                     Phasor)
            (github.com$jfhamlin$muscrat$pkg$stochastic NewNoise
                                                        NewPinkNoise)
-           (github.com$jfhamlin$muscrat$pkg$effects NewFreeverb)
+           (github.com$jfhamlin$muscrat$pkg$mod NewEnvelope)
+           (github.com$jfhamlin$muscrat$pkg$effects NewFreeverb
+                                                    NewLowpassFilter)
            (github.com/jfhamlin/freeverb-go NewRevModel)))
 
 (def ^:dynamic *graph* nil)
@@ -71,10 +77,31 @@
 
 (defn +
   "Return the sum of any combination of numbers or ugens.
-  If any argument to + is a ugen, then the result of + is a ugen"
+  If any argument to + is a node, then the result of + is a node"
   ([] 0)
   ([x] x)
   ([x & more] (apply +-internal (cons x more))))
+
+(defn- *-internal
+  [& xs]
+  (let [groups (group-by #(instance? Node %) xs)
+        nums (get groups false ())
+        ugens (get groups true ())
+        num-prod (apply glojure.core/* nums)]
+    (if (empty? ugens)
+      num-prod
+      (let [prod-node (add-node (NewProduct) "*")
+            nodes (conj ugens (add-node (NewConstant num-prod) num-prod))]
+        (doseq [[n i] (map vector nodes (range (count nodes)))]
+          (add-edge n prod-node (str \$ i)))
+        prod-node))))
+
+(defn *
+  "Return the product of any combination of numbers or ugens.
+  If any argument to * is a node, then the result of * is a node."
+  ([] 0)
+  ([x] x)
+  ([x & more] (apply *-internal (cons x more))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Oscillators
@@ -82,17 +109,15 @@
 (def default-freq 440)
 
 (defn- handle-extra-gen-args
-  [node args]
-  (if (odd? (count args))
-    (throw (fmt.Errorf "handle-extra-gen-args: odd number of args: %v" args))
-    (doseq [[k v] (partition 2 args)]
-      (let [gen (as-node v)
-            param (k {:iphase "iphase"
-                      :phase "phase"
-                      :sync "sync"
-                      :duty "dc"})]
-        (when (nil? param) (throw (fmt.Errorf "handle-extra-gen-args: unknown parameter: %s" k)))
-        (add-edge gen node param)))))
+  [node args-map]
+  (doseq [[k v] args-map]
+    (let [gen (as-node v)
+          param (k {:iphase "iphase"
+                    :phase "phase"
+                    :sync "sync"
+                    :duty "dc"})]
+      (when (nil? param) (throw (fmt.Errorf "handle-extra-gen-args: unknown parameter: %s" k)))
+      (add-edge gen node param))))
 
 (defmacro defwtosc
   [name wavtab]
@@ -100,7 +125,10 @@
   `(defn ~fn-name
      ([] (~fn-name default-freq))
      ([freq# & args#]
-      (let [gen# (~'Generator (~wavtab 1024))
+      (if (odd? (count args#))
+        (throw (fmt.Errorf "%s: odd number of flag args: %v" (str '~fn-name) args#)))
+      (let [args# (into {} (partition 2 args#))
+            gen# (~'Generator (~wavtab 1024))
             label# (~'WithLabel ~(str name))
             osc-node# (add-node gen# label#)
             freq-node# (as-node freq#)]
@@ -111,15 +139,16 @@
 (defwtosc sin Sin)
 (defwtosc saw Saw)
 (defwtosc tri Tri)
+(defwtosc phasor Phasor)
 ;; (defwtosc sqr Pulse) ;; TODO: add default duty cycle and label support
 
-(defn phasor
-  ([] (phasor default-freq))
-  ([freq & args]
-   (let [freq-node (as-node freq)
-         node (add-node (Generator (Phasor 1024)) "phasor")]
-     (add-edge freq-node node "w")
-     node)))
+;; (defn phasor
+;;   ([] (phasor default-freq))
+;;   ([freq & args]
+;;    (let [freq-node (as-node freq)
+;;          node (add-node (Generator (Phasor 1024)) "phasor")]
+;;      (add-edge freq-node node "w")
+;;      node)))
 
 ;; (def *sqr mrat.osc/sqr)
 ;; (def *pulse mrat.osc/pulse)
@@ -137,16 +166,27 @@
   (add-node (NewPinkNoise) "pink-noise"))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Modulators
+
+(defn env
+  [gate levels times & opts]
+  (let []))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Effects
 
 (defn- freeverb-gen
   [& opts]
   (let [opts (apply hash-map opts)
+        supported #{:dry :wet :room-size :damp :width}
+        unsupported (seq (remove supported (keys opts)))
         dry (get opts :dry 0.5)
         wet (get opts :wet 0.5)
         room-size (get opts :room-size 0.5)
         damp (get opts :damp 0.5)
         width (get opts :width 1.0)]
+    (if unsupported (throw (apply str "freeverb: unsupported option(s) supplied: "
+                                  (interpose \, unsupported))))
     (NewFreeverb
      (doto (NewRevModel)
        (.SetDry dry)
@@ -161,12 +201,21 @@
     (add-edge node fv-node "$0")
     fv-node))
 
-;; (def *freeverb mrat.effects/freeverb)
+(defn lores
+  [n cutoff res]
+  (let [n (as-node n)
+        cutoff (as-node cutoff)
+        res (as-node res)
+        lpf (add-node (NewLowpassFilter) "lores")]
+    (add-edge n lpf "in")
+    (add-edge cutoff lpf "cutoff")
+    (add-edge res lpf "resonance")
+    lpf))
+
 ;; (def *delay mrat.effects/delay)
 ;; (def *clip mrat.effects/clip)
 ;; (def *trand mrat.math.rand/trand)
 ;; (def *env mrat.effects/env)
-;; (def *lores mrat.effects/*lores)
 
 ;; (def rand mrat.math.rand/rand)
 

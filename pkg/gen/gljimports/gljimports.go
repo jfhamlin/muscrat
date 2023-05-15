@@ -6,6 +6,7 @@ import (
 	github_com_jfhamlin_muscrat_pkg_wavtabs "github.com/jfhamlin/muscrat/pkg/wavtabs"
 	github_com_jfhamlin_muscrat_pkg_stochastic "github.com/jfhamlin/muscrat/pkg/stochastic"
 	github_com_jfhamlin_muscrat_pkg_effects "github.com/jfhamlin/muscrat/pkg/effects"
+	github_com_jfhamlin_muscrat_pkg_mod "github.com/jfhamlin/muscrat/pkg/mod"
 	github_com_jfhamlin_muscrat_pkg_graph "github.com/jfhamlin/muscrat/pkg/graph"
 	github_com_jfhamlin_freeverb_go "github.com/jfhamlin/freeverb-go"
 	"reflect"
@@ -32,7 +33,9 @@ func RegisterImports(_register func(string, interface{})) {
 	_register("github.com/jfhamlin/muscrat/pkg/wavtabs.Sin", github_com_jfhamlin_muscrat_pkg_wavtabs.Sin)
 	_register("github.com/jfhamlin/muscrat/pkg/wavtabs.Table", reflect.TypeOf((*github_com_jfhamlin_muscrat_pkg_wavtabs.Table)(nil)).Elem())
 	_register("github.com/jfhamlin/muscrat/pkg/wavtabs.Tri", github_com_jfhamlin_muscrat_pkg_wavtabs.Tri)
+	_register("github.com/jfhamlin/muscrat/pkg/wavtabs.WithAdd", github_com_jfhamlin_muscrat_pkg_wavtabs.WithAdd)
 	_register("github.com/jfhamlin/muscrat/pkg/wavtabs.WithDefaultDutyCycle", github_com_jfhamlin_muscrat_pkg_wavtabs.WithDefaultDutyCycle)
+	_register("github.com/jfhamlin/muscrat/pkg/wavtabs.WithMultiply", github_com_jfhamlin_muscrat_pkg_wavtabs.WithMultiply)
 
 	// package github.com/jfhamlin/muscrat/pkg/stochastic
 	////////////////////////////////////////
@@ -45,6 +48,11 @@ func RegisterImports(_register func(string, interface{})) {
 	// package github.com/jfhamlin/muscrat/pkg/effects
 	////////////////////////////////////////
 	_register("github.com/jfhamlin/muscrat/pkg/effects.NewFreeverb", github_com_jfhamlin_muscrat_pkg_effects.NewFreeverb)
+	_register("github.com/jfhamlin/muscrat/pkg/effects.NewLowpassFilter", github_com_jfhamlin_muscrat_pkg_effects.NewLowpassFilter)
+
+	// package github.com/jfhamlin/muscrat/pkg/mod
+	////////////////////////////////////////
+	_register("github.com/jfhamlin/muscrat/pkg/mod.NewEnvelope", github_com_jfhamlin_muscrat_pkg_mod.NewEnvelope)
 
 	// package github.com/jfhamlin/muscrat/pkg/graph
 	////////////////////////////////////////
