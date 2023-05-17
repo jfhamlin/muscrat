@@ -54,10 +54,8 @@
    (let [channels (cons ch channels)
          num-sinks (count (. *graph* sinks))
          ch-inds (map vector channels (range (count channels)))]
-     (doseq [ch-ind ch-inds]
-       (let [ch (first ch-ind)
-             i (second ch-ind)
-             gen (as-node ch)
+     (doseq [[ch i] ch-inds]
+       (let [gen (as-node ch)
              chan-id (+ num-sinks i)
              sink (.AddSinkNode *graph* (WithLabel (fmt.Sprintf "out%d" chan-id)))]
          (add-edge! gen sink "w")))))) ;; TODO: "w" seems wrong
