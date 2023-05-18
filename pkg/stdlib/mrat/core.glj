@@ -182,7 +182,18 @@
 
 (defn env
   [gate levels times & opts]
-  (let []))
+  (let [trigger (as-node gate)
+        levels (map as-node levels)
+        times (map as-node times)]
+    (if (not= (count levels) (inc (count times)))
+      (throw (str "env expects the number of levels to be one more than the number of times, got " (count levels) " levels and " (count times) " times.")))
+    (let [env-node (add-node! (NewEnvelope "lin") "envelope")]
+      (add-edge! trigger env-node "trigger")
+      (doseq [[n i] (map vector levels (range (count levels)))]
+        (add-edge! n env-node (str "level$" i)))
+      (doseq [[n i] (map vector times (range (count times)))]
+        (add-edge! n env-node (str "time$" i)))
+      env-node)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Effects

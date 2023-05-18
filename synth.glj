@@ -3,25 +3,25 @@
 
 (require 'mrat.core :reload)
 
-;;(load-sample "/Users/jfhamlin/Projects/muscrat-projects/niegalo-todo/niegalo_todo.wav")
+;;(def niegalo (load-sample "/Users/jfhamlin/Projects/muscrat-projects/niegalo-todo/niegalo_todo.wav"))
 
 (defn my-weird-loop [freq-rng]
   (-> (saw 0.05 :mul freq-rng)
       (+ 700)
       (sin :duty 0.25)
+      (+ (sampler niegalo))
       (* (sqr 256 :mul 0.5 :add 0.5 :duty 0.5))
       (freeverb :room-size 1 :dry 0 :wet 1)
       (lores 840 0.95)
       (* 0.25)))
 
-(defn my-mic [freq-rng]
-  (-> (soundin)
-      ;; (freeverb :room-size 1 :dry 1 :wet 0.5)
-      ;; (lores 840 0.95)
-      (* 0.5)))
 ;;(play (my-weird-loop 50))
+(play (-> (env (sqr 0.5) '(0 1 1 0) '(0.1 1 0.1))
+          (* (sin))))
 
-(play (sin 500) (sin 500))
+
+;; (-> 
+;;           (* (sin)))
 
 ;; (load-file "./examples/notes.mrat")
 ;; (load-file "./examples/welsh.mrat")
@@ -43,6 +43,7 @@
 
 ;; (defn *lfpulse [& args]
 ;;   (remap (apply *pulse args) 0 1))
+
 
 
 ;; (def detune-semis -5)
