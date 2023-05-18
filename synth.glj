@@ -20,18 +20,8 @@
       ;; (lores 840 0.95)
       (* 0.5)))
 ;;(play (my-weird-loop 50))
-(play (my-mic 10))
 
-;; (mrat.core/play (mrat.core/+ (mrat.core/*sin 180)
-;;                              (mrat.core/*sin 180 :iphase 0.5)))
-
-;;(println *graph*)
-;;(mrat.core/play 0)
-
-
-
-;;(as-ugen 0)
-;;(play 0) ;;(*sin))
+(play (sin 500) (sin 500))
 
 ;; (load-file "./examples/notes.mrat")
 ;; (load-file "./examples/welsh.mrat")
