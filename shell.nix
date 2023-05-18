@@ -9,6 +9,7 @@ pkgs.mkShell {
     pkgs.nodejs
 
     pkgs.SDL2
+    pkgs.portaudio
 
     pkgs.pkgconfig
 

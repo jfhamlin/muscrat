@@ -3,9 +3,14 @@ module github.com/jfhamlin/muscrat
 go 1.19
 
 require (
+	github.com/MarkKremer/microphone v1.1.0
 	github.com/bspaans/bleep v0.0.0-20220414232837-486f92844ed7
+	github.com/faiface/beep v1.1.0
 	github.com/fsnotify/fsnotify v1.5.4
 	github.com/glojurelang/glojure v0.0.0-20230512061700-6d3a1890f55c
+	github.com/go-audio/audio v1.0.0
+	github.com/go-audio/wav v1.0.0
+	github.com/gordonklaus/portaudio v0.0.0-20221027163845-7c3b689db3cc
 	github.com/jfhamlin/freeverb-go v1.0.0
 	github.com/mjibson/go-dsp v0.0.0-20180508042940-11479a337f12
 	github.com/stretchr/testify v1.8.1
@@ -18,8 +23,7 @@ replace github.com/glojurelang/glojure => ../glojure
 require (
 	github.com/bep/debounce v1.2.1 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
-	github.com/go-audio/audio v0.0.0-20181013203223-7b2a6ca21480 // indirect
-	github.com/go-audio/wav v0.0.0-20181013172942-de841e69b884 // indirect
+	github.com/go-audio/riff v1.0.0 // indirect
 	github.com/go-ole/go-ole v1.2.6 // indirect
 	github.com/google/uuid v1.1.2 // indirect
 	github.com/imdario/mergo v0.3.12 // indirect
@@ -29,7 +33,6 @@ require (
 	github.com/leaanthony/go-ansi-parser v1.0.1 // indirect
 	github.com/leaanthony/gosod v1.0.3 // indirect
 	github.com/leaanthony/slicer v1.5.0 // indirect
-	github.com/mattetti/audio v0.0.0-20180912171649-01576cde1f21 // indirect
 	github.com/mattn/go-colorable v0.1.11 // indirect
 	github.com/mattn/go-isatty v0.0.14 // indirect
 	github.com/modern-go/gls v0.0.0-20220109145502-612d0167dce5 // indirect

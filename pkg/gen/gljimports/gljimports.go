@@ -8,6 +8,7 @@ import (
 	github_com_jfhamlin_muscrat_pkg_effects "github.com/jfhamlin/muscrat/pkg/effects"
 	github_com_jfhamlin_muscrat_pkg_mod "github.com/jfhamlin/muscrat/pkg/mod"
 	github_com_jfhamlin_muscrat_pkg_sampler "github.com/jfhamlin/muscrat/pkg/sampler"
+	github_com_jfhamlin_muscrat_pkg_aio "github.com/jfhamlin/muscrat/pkg/aio"
 	github_com_jfhamlin_muscrat_pkg_graph "github.com/jfhamlin/muscrat/pkg/graph"
 	github_com_jfhamlin_freeverb_go "github.com/jfhamlin/freeverb-go"
 	"reflect"
@@ -59,6 +60,10 @@ func RegisterImports(_register func(string, interface{})) {
 	////////////////////////////////////////
 	_register("github.com/jfhamlin/muscrat/pkg/sampler.LoadSample", github_com_jfhamlin_muscrat_pkg_sampler.LoadSample)
 	_register("github.com/jfhamlin/muscrat/pkg/sampler.NewSampler", github_com_jfhamlin_muscrat_pkg_sampler.NewSampler)
+
+	// package github.com/jfhamlin/muscrat/pkg/aio
+	////////////////////////////////////////
+	_register("github.com/jfhamlin/muscrat/pkg/aio.NewMicrophone", github_com_jfhamlin_muscrat_pkg_aio.NewMicrophone)
 
 	// package github.com/jfhamlin/muscrat/pkg/graph
 	////////////////////////////////////////
