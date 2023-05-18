@@ -3,9 +3,7 @@ module github.com/jfhamlin/muscrat
 go 1.19
 
 require (
-	github.com/MarkKremer/microphone v1.1.0
 	github.com/bspaans/bleep v0.0.0-20220414232837-486f92844ed7
-	github.com/faiface/beep v1.1.0
 	github.com/fsnotify/fsnotify v1.5.4
 	github.com/glojurelang/glojure v0.0.0-20230512061700-6d3a1890f55c
 	github.com/go-audio/audio v1.0.0

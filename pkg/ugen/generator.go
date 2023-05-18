@@ -22,3 +22,17 @@ type SampleGeneratorFunc func(context.Context, SampleConfig, int) []float64
 func (gs SampleGeneratorFunc) GenerateSamples(ctx context.Context, cfg SampleConfig, n int) []float64 {
 	return gs(ctx, cfg, n)
 }
+
+// Starter is an interface for starting a sample generator. If a
+// sample generator implements this interface, it will be started when
+// a graph is run.
+type Starter interface {
+	Start() error
+}
+
+// Stopper is an interface for stopping a sample generator. If a
+// sample generator implements this interface, it will be stopped when
+// a graph is stopped.
+type Stopper interface {
+	Stop() error
+}

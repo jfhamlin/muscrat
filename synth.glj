@@ -5,10 +5,8 @@
 
 ;;(load-sample "/Users/jfhamlin/Projects/muscrat-projects/niegalo-todo/niegalo_todo.wav")
 
-(mic)
-
 (defn my-weird-loop [freq-rng]
-  (-> (sin 2 :mul freq-rng)
+  (-> (saw 0.05 :mul freq-rng)
       (+ 700)
       (sin :duty 0.25)
       (* (sqr 256 :mul 0.5 :add 0.5 :duty 0.5))
@@ -16,13 +14,20 @@
       (lores 840 0.95)
       (* 0.25)))
 
-(play (my-weird-loop 5))
+(defn my-mic [freq-rng]
+  (-> (soundin)
+      ;; (freeverb :room-size 1 :dry 1 :wet 0.5)
+      ;; (lores 840 0.95)
+      (* 0.5)))
+;;(play (my-weird-loop 50))
+(play (my-mic 10))
 
 ;; (mrat.core/play (mrat.core/+ (mrat.core/*sin 180)
 ;;                              (mrat.core/*sin 180 :iphase 0.5)))
 
 ;;(println *graph*)
 ;;(mrat.core/play 0)
+
 
 
 ;;(as-ugen 0)
@@ -64,8 +69,3 @@
 ;; (apply mrat.core.io/out
 ;;        (map (fn [x] (* x (decibels -10)))
 ;;             channels))
-
-
-
-
-
