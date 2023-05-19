@@ -117,7 +117,7 @@
   (if (odd? (count flags))
     (throw (apply str "odd number of flag args: " (interpose \, unsupported))))
   (let [m (reduce #(apply assoc %1 %2) {} (partition 2 flags))
-        unsupported (seq (remove (keys defaults) (keys m)))]
+        unsupported (seq (remove (set (keys defaults)) (keys m)))]
     (if unsupported (throw (apply str "unsupported option(s) supplied: "
                                   (interpose \, unsupported))))
     (merge defaults m)))
