@@ -34,7 +34,7 @@ func LoadSample(filename string) []float64 {
 	}
 	bitDepth := dec.SampleBitDepth()
 
-	floatSamples := make([]float64, len(intSamples))
+	floatSamples := make([]float64, 0, len(intSamples))
 
 	for _, s := range intSamples {
 		floatSample := float64(s) / float64(int(1)<<uint(bitDepth-1))
@@ -44,16 +44,6 @@ func LoadSample(filename string) []float64 {
 			floatSample = -1
 		}
 		floatSamples = append(floatSamples, floatSample)
-	}
-
-	// TODO: we're getting a huge prefix of zero samples that don't play
-	// when playing the wav file with Quicktime. We may be loading a
-	// channel with no audio?
-	for i, s := range floatSamples {
-		if s != 0 {
-			floatSamples = floatSamples[i:]
-			break
-		}
 	}
 
 	// resample to 44100 Hz, assumed to be the sample rate of the audio device
