@@ -1,0 +1,88 @@
+(ns mrat.welsh
+  (:require [mrat.core :refer :all]))
+
+(defn- mkosc
+  [cfg freq & flags]
+  (let [detune (or (:detune cfg) 1)]
+    (* (decibels (:mix cfg))
+       (apply (:wave cfg) (* detune freq) flags))))
+
+(defn- lfo-flag
+  [cfg osc-cfg lfo]
+  (when-let [dst ((:route cfg) (:key osc-cfg))]
+    (let [depth (dst (:depth cfg))
+          osc-duty (get osc-cfg :duty 1)
+          val (case dst
+                    :duty (+ osc-duty (* 0.5 depth lfo))
+                    (throw (str "unsupported lfo destination: " dst)))]
+    [dst val])))
+
+(defn mkwelsh
+  [cfg]
+  (let [osc-cfg (:osc cfg)
+        osc1-cfg (osc-cfg 0)
+        osc2-cfg (osc-cfg 1)
+        lfo-cfg (:lfo cfg)
+        lpf-cfg (:lpf cfg)
+        [a d s r] (:adsr cfg)
+        a (max 0.001 a)]
+    (fn [gate freq]
+      (let [amp (env gate [0 1 s 0] [a d r])
+            lfo ((:wave lfo-cfg) (:freq lfo-cfg))
+            osc1-flags (lfo-flag lfo-cfg osc1-cfg lfo)
+            osc2-flags (lfo-flag lfo-cfg osc2-cfg lfo)
+            osc1 (apply mkosc osc1-cfg freq osc1-flags)
+            osc2 (apply mkosc osc2-cfg freq osc2-flags)]
+        (* amp (-> (+ osc1 osc2)
+                   (lores (:cutoff lpf-cfg) (:res lpf-cfg))))))))
+
+(def dark-city
+  (mkwelsh
+   {:osc [{:key :osc1
+           :wave sqr
+           :duty 0.5
+           :detune (octaves -2)
+           :mix 0}
+          {:key :osc2
+           :wave saw
+           :detune (* (semitones -11) (cents -92))
+           :mix 0}]
+    :lfo {:route {:osc1 :duty
+                  :osc2 :duty}
+          :wave sin
+          :freq 4
+          :depth {:duty 0.45}
+          :env 0.75
+          :adsr [5.15 6.35 0.5 5.20]}
+    :lpf {:cutoff 300
+          :res 0}
+    :adsr [0 3.9 0.7 6.35]}))
+
+;; (def growling-bass
+;;   (mkwelsh
+;;    {:osc [{:key :osc1
+;;            :wave sqr
+;;            :duty 0.5
+;;            :detune (octaves -2)
+;;            :mix 0}
+;;           {:key :osc2
+;;            :wave saw
+;;            :detune (semitones -9)
+;;            :mix 0}]
+;;     :lpf {:cutoff 122
+;;           :res 0}})) ;; todo
+
+;; (def bongo
+;;   (mkwelsh {:osc [{:key :osc1
+;;                    :wave :tri
+;;                    :mix 0}
+;;                   {:key :osc2
+;;                    :wave :sqr
+;;                    :mix 0.65}]
+;;             :lpf {:cutoff 600
+;;                   :res 0
+;;                   :env 0.6}
+;;             :amp {:attack 0.0001
+;;                   :decay 0.22
+;;                   :sustain 0
+;;                   :release 0.22}}))

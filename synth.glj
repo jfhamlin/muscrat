@@ -1,30 +1,15 @@
 (ns synth
-  (:require [mrat.core :refer :all]))
-
-(require 'mrat.core :reload)
+  (:require [mrat.core :refer :all] :reload
+            [mrat.welsh] :reload))
 
 ;;(def niegalo (load-sample "/Users/jfhamlin/Projects/muscrat-projects/niegalo-todo/niegalo_todo.wav"))
 
-(defn my-weird-loop [freq-rng]
-  (-> (saw 0.05 :mul freq-rng)
-      (+ 700)
-      (sin :duty 0.25)
-      (+ (sampler niegalo))
-      (* (sqr 256 :mul 0.5 :add 0.5 :duty 0.5))
-      (freeverb :room-size 1 :dry 0 :wet 1)
-      (lores 840 0.95)
-      (* 0.25)))
-
-;;(play (my-weird-loop 50))
-(play (-> (env (sqr 0.5) '(0 1 1 0) '(0.1 1 0.1))
-          (* (sin))))
-
-
-;; (-> 
-;;           (* (sin)))
+(play (-> (sqr 4)
+          (mrat.welsh/dark-city 100)))
 
 ;; (load-file "./examples/notes.mrat")
 ;; (load-file "./examples/welsh.mrat")
+
 
 ;; (def noise (*lores (*noise) (remap (*sin 1) 350 400) 0.99))
 

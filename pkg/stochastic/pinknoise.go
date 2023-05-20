@@ -20,12 +20,16 @@ type PinkNoise struct {
 	// dice[k] is the previous value of the kth octave
 	dice [numVMCOctaves]float64
 	rand *rand.Rand
+	add  float64
+	mul  float64
 }
 
 // NewPinkNoise returns a new PinkNoise stochastic generator.
 func NewPinkNoise(opts ...Option) *PinkNoise {
 	o := options{
 		rand: rand.New(rand.NewSource(0)),
+		add:  0.0,
+		mul:  1.0,
 	}
 	for _, opt := range opts {
 		opt(&o)
@@ -38,13 +42,15 @@ func NewPinkNoise(opts ...Option) *PinkNoise {
 	return &PinkNoise{
 		rand: o.rand,
 		dice: dice,
+		add:  o.add,
+		mul:  o.mul,
 	}
 }
 
 func (pn *PinkNoise) GenerateSamples(ctx context.Context, cfg ugen.SampleConfig, n int) []float64 {
 	samples := make([]float64, n)
 	for i := 0; i < n; i++ {
-		samples[i] = pn.generateSample()
+		samples[i] = pn.mul*pn.generateSample() + pn.add
 	}
 	return samples
 }
