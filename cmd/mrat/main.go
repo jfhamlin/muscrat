@@ -6,10 +6,22 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
-	"os/signal"
 
+	"github.com/jfhamlin/muscrat/pkg/aio"
 	"github.com/jfhamlin/muscrat/pkg/mrat"
+
+	"golang.org/x/term"
+
+	// pprof
+	"net/http"
+	_ "net/http/pprof"
 )
+
+func init() {
+	go func() {
+		fmt.Println(http.ListenAndServe("localhost:6060", nil))
+	}()
+}
 
 func main() {
 	flag.Parse()
@@ -20,10 +32,20 @@ func main() {
 		os.Exit(1)
 	}
 
+	// set up raw input mode
+	{
+		oldState, err := term.MakeRaw(int(os.Stdin.Fd()))
+		if err != nil {
+			fmt.Println(err)
+			return
+		}
+		defer term.Restore(int(os.Stdin.Fd()), oldState)
+	}
+
 	script, err := ioutil.ReadFile(scriptFile)
 	if err != nil {
 		fmt.Printf("Error reading script file: %v\n", err)
-		os.Exit(1)
+		return
 	}
 
 	msgs := make(chan *mrat.ServerMessage, 1)
@@ -45,17 +67,26 @@ func main() {
 		err := mrat.WatchFile(ctx, scriptFile, srv)
 		if err != nil {
 			fmt.Printf("error watching file: %v\n", err)
-			os.Exit(1)
+			return
 		}
 		close(done)
 	}()
 
-	// wait for OS interrupt signal
-	c := make(chan os.Signal, 1)
-	signal.Notify(c, os.Interrupt)
-
-	s := <-c
-	fmt.Println("exiting on signal:", s)
-	cancel()
-	<-done
+	for {
+		b := make([]byte, 1)
+		_, err = os.Stdin.Read(b)
+		if err != nil {
+			fmt.Println(err)
+			return
+		}
+		if b[0] == 3 {
+			fmt.Println("exiting")
+			cancel()
+			return
+		}
+		select {
+		case aio.StdinChan <- b[0]:
+		default:
+		}
+	}
 }

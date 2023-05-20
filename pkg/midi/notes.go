@@ -1,4 +1,4 @@
-package notes
+package midi
 
 // Note represents a note.
 type Note struct {
@@ -25,6 +25,7 @@ func GetNote(name string) *Note {
 }
 
 var (
+	// TODO: set the right MIDI values
 	C0  = Note{Name: "C0", Frequency: 16.35, MIDI: 1}
 	Cs0 = Note{Name: "Cs0", Frequency: 17.32, MIDI: 1}
 	Db0 = Note{Name: "Db0", Frequency: 17.32, MIDI: 1}

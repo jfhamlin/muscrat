@@ -1,0 +1,9 @@
+(ns mrat.midi
+  (:import (github.com$jfhamlin$muscrat$pkg$midi Notes)))
+
+(doall (map
+        (fn [note]
+          (eval
+           `(def ~(symbol (.Name note)) ~(.Frequency note))))
+        Notes))
+

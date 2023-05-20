@@ -13,7 +13,7 @@ require (
 	github.com/mjibson/go-dsp v0.0.0-20180508042940-11479a337f12
 	github.com/stretchr/testify v1.8.1
 	github.com/wailsapp/wails/v2 v2.1.0
-	golang.org/x/term v0.0.0-20221017184919-83659145692c
+	golang.org/x/term v0.8.0
 )
 
 replace github.com/glojurelang/glojure => ../glojure
@@ -47,7 +47,7 @@ require (
 	go4.org/unsafe/assume-no-moving-gc v0.0.0-20230426161633-7e06285ff160 // indirect
 	golang.org/x/crypto v0.0.0-20210921155107-089bfa567519 // indirect
 	golang.org/x/net v0.0.0-20220722155237-a158d28d115b // indirect
-	golang.org/x/sys v0.6.0 // indirect
+	golang.org/x/sys v0.8.0 // indirect
 	golang.org/x/text v0.3.7 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )

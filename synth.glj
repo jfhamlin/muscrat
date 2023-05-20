@@ -1,16 +1,27 @@
 (ns synth
   (:require [mrat.core :refer :all] :reload
+            [mrat.midi :refer :all] :reload
             [mrat.welsh] :reload))
 
-;;(def niegalo (load-sample "/Users/jfhamlin/Projects/muscrat-projects/niegalo-todo/niegalo_todo.wav"))
+(def qm (qwerty-midi))
+(def root (* (octaves 1) (qm 0)))
+(def ival-up 1.5)
 
-(println (- 1 2))
+(def gate (noise 16))
 
-(play (-> (sqr 0.5)
-          (mrat.welsh/dark-city 400)))
-
-;; (load-file "./examples/notes.mrat")
-;; (load-file "./examples/welsh.mrat")
+(play (-> gate
+          (env [(semitones ival-up) (semitones ival-up) 1 1] [0.01 0.15 0.3])
+          (* root)
+          (sin)
+          (* (env gate [0 1 1 0] [0.001 0.44 0.01]))
+          (lores (* root (octaves 2)) 0.92)
+          (+ (* (decibels -10)
+                (-> (pink-noise)
+                    (* (sqr 10 :duty 0.8))
+                    (+ (* (env gate [0 1 1 0] [0.001 0.44 0.01])
+                          (sqr 1 :duty 0.8 :add 0.5 :mul 0.5)
+                          (noise)))
+                    (lores 800 0.7))))))
 
 ;; (def noise (*lores (*noise) (remap (*sin 1) 350 400) 0.99))
 
