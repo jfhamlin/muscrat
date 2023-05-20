@@ -47,6 +47,8 @@ func RegisterImports(_register func(string, interface{})) {
 	_register("github.com/jfhamlin/muscrat/pkg/stochastic.NewPinkNoise", github_com_jfhamlin_muscrat_pkg_stochastic.NewPinkNoise)
 	_register("github.com/jfhamlin/muscrat/pkg/stochastic.Option", reflect.TypeOf((*github_com_jfhamlin_muscrat_pkg_stochastic.Option)(nil)).Elem())
 	_register("github.com/jfhamlin/muscrat/pkg/stochastic.PinkNoise", reflect.TypeOf((*github_com_jfhamlin_muscrat_pkg_stochastic.PinkNoise)(nil)).Elem())
+	_register("github.com/jfhamlin/muscrat/pkg/stochastic.WithAdd", github_com_jfhamlin_muscrat_pkg_stochastic.WithAdd)
+	_register("github.com/jfhamlin/muscrat/pkg/stochastic.WithMul", github_com_jfhamlin_muscrat_pkg_stochastic.WithMul)
 	_register("github.com/jfhamlin/muscrat/pkg/stochastic.WithRand", github_com_jfhamlin_muscrat_pkg_stochastic.WithRand)
 
 	// package github.com/jfhamlin/muscrat/pkg/effects

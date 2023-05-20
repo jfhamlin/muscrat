@@ -17,6 +17,21 @@
                     (throw (str "unsupported lfo destination: " dst)))]
     [dst val])))
 
+(defn- mklpf
+  [cfg gate]
+  (let [cutoff (:cutoff cfg)
+        [a d s r] (:adsr cfg)
+        init-level (:env cfg)
+        lpf-env (* (env gate [init-level
+                              1
+                              (+ (* s (- 1 init-level)) init-level)
+                              init-level]
+                        [a d r]))
+        res (* lpf-env (:res cfg))
+        cutoff (* 0.5 (+ (* lpf-env cutoff)
+                         (* (- 1 lpf-env) 10000)))]
+    (fn [sig] (lores sig cutoff res))))
+
 (defn mkwelsh
   [cfg]
   (let [osc-cfg (:osc cfg)
@@ -24,6 +39,7 @@
         osc2-cfg (osc-cfg 1)
         lfo-cfg (:lfo cfg)
         lpf-cfg (:lpf cfg)
+        lpf-env (:env lpf-cfg)
         [a d s r] (:adsr cfg)
         a (max 0.001 a)]
     (fn [gate freq]
@@ -32,9 +48,11 @@
             osc1-flags (lfo-flag lfo-cfg osc1-cfg lfo)
             osc2-flags (lfo-flag lfo-cfg osc2-cfg lfo)
             osc1 (apply mkosc osc1-cfg freq osc1-flags)
-            osc2 (apply mkosc osc2-cfg freq osc2-flags)]
+            osc2 (apply mkosc osc2-cfg freq osc2-flags)
+            lpf (mklpf lpf-cfg gate)
+            dry (+ osc1 osc2)]
         (* amp (-> (+ osc1 osc2)
-                   (lores (:cutoff lpf-cfg) (:res lpf-cfg))))))))
+                   (lpf)))))))
 
 (def dark-city
   (mkwelsh
@@ -51,11 +69,11 @@
                   :osc2 :duty}
           :wave sin
           :freq 4
-          :depth {:duty 0.45}
+          :depth {:duty 0.45}}
+    :lpf {:cutoff 300
+          :res 0
           :env 0.75
           :adsr [5.15 6.35 0.5 5.20]}
-    :lpf {:cutoff 300
-          :res 0}
     :adsr [0 3.9 0.7 6.35]}))
 
 ;; (def growling-bass

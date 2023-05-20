@@ -4,12 +4,13 @@
 
 ;;(def niegalo (load-sample "/Users/jfhamlin/Projects/muscrat-projects/niegalo-todo/niegalo_todo.wav"))
 
-(play (-> (sqr 4)
-          (mrat.welsh/dark-city 100)))
+(println (- 1 2))
+
+(play (-> (sqr 0.5)
+          (mrat.welsh/dark-city 400)))
 
 ;; (load-file "./examples/notes.mrat")
 ;; (load-file "./examples/welsh.mrat")
-
 
 ;; (def noise (*lores (*noise) (remap (*sin 1) 350 400) 0.99))
 
@@ -22,6 +23,7 @@
 ;;           (* root (semitones -4))
 ;;           (* root (semitones -11))
 ;;           ])))
+
 
 ;; (def gate (*sqr 4))
 ;; (def punch (bongo (* C1 (semitones -12)) gate))
