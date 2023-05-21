@@ -350,9 +350,12 @@
 ;; Sequencing utilities
 
 (defn sequencer
-  [notes times]
-  (let [counter (atom nil)
+  [notes times & flags]
+  (let [flags (validate-flags flags {:loop true})
+        looping (:loop flags)
+        counter (atom nil)
         index (atom 0)
+        done (atom false)
         num-samples (fn [cfg t] (int (* t (:sample-rate-hz cfg))))
         notes (vec (concat notes (repeat (max 0 (- (count times) (count notes))) 0)))
         times (vec (concat times (repeat (max 0 (- (count notes) (count times))) 0)))
@@ -361,13 +364,15 @@
               (reset! counter (num-samples cfg (nth times 0))))
             (loop [res nil
                    n n]
-              (if (zero? n)
-                res
+              (if (or (zero? n) @done)
+                (if (zero? n) res (concat res (repeat n 0)))
                 (let [nsamp (min n @counter)
                       n (- n nsamp)
                       smps (repeat nsamp (nth notes @index))]
                   (reset! counter (- @counter nsamp))
                   (when (zero? @counter)
+                    (if (and (not looping) (= @index (dec (count notes))))
+                      (reset! done true))
                     (reset! index (mod (inc @index) (count notes)))
                     (reset! counter (num-samples cfg (nth times @index))))
                   (recur (concat res smps)
