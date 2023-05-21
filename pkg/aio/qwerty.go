@@ -75,6 +75,8 @@ func (q *qwertyTrig) GenerateSamples(ctx context.Context, cfg ugen.SampleConfig,
 	for i := range res {
 		if *q.lastTrig {
 			res[i] = 1
+		} else {
+			res[i] = -1
 		}
 	}
 	return res

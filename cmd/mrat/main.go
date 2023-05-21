@@ -96,7 +96,7 @@ func streamKeys(cancel context.CancelFunc) {
 
 	// track one key input at a time for now
 	var pressedKey byte
-	const keyTimeout = 200 * time.Millisecond
+	const keyTimeout = 500 * time.Millisecond
 	for {
 		var b byte
 		select {
