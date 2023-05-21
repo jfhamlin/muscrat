@@ -110,6 +110,8 @@ func NewEnvelope(opts ...EnvOption) ugen.SampleGenerator {
 						res[i] = level1 + (level2-level1)*(triggerTime-(timeSum-t[i]))/t[i]
 					case "exp":
 						res[i] = level1 * math.Pow(level2/level1, (triggerTime-(timeSum-t[i]))/t[i])
+					case "hold":
+						res[i] = level1
 					default:
 						panic(fmt.Sprintf("unknown interpolation type: %s", o.interp))
 					}
