@@ -7,3 +7,7 @@
            `(def ~(symbol (.Name note)) ~(.Frequency note))))
         Notes))
 
+(def midi-map
+  (reduce (fn [acc [m f]] (assoc acc m f))
+          {}
+          (map #(vector (.MIDI %) (.Frequency %)) Notes)))

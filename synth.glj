@@ -3,58 +3,30 @@
             [mrat.midi :refer :all] :reload
             [mrat.welsh] :reload))
 
-(def qm (qwerty-midi))
-(def root (* (octaves 1) (qm 0)))
-(def ival-up 1.5)
+(defn pad
+  ([gate] (pad gate 440))
+  ([gate freq] (pad gate freq (decibels -20)))
+  ([gate freq amp]
+   (let [size 32
+         freqs (map #(* freq (semitones %)) (repeatedly size #(* 0.1 (noise 8))))
+         snds (map #(saw % :duty 1) freqs)
+         snds (map #(delayc % (* 0.01 (math$rand.Float64))) snds)
+         snd (sum snds)
+         asr (env gate [0 1 1 0] [3 1 3])]
+     (* amp asr snd))))
 
-(def gate (noise 16))
+(let [qm (qwerty-midi)]
+  (def in-freq (qm 0))
+  (def in-gate (qm 1)))
 
-(play (-> gate
-          (env [(semitones ival-up) (semitones ival-up) 1 1] [0.01 0.15 0.3])
-          (* root)
-          (sin)
-          (* (env gate [0 1 1 0] [0.001 0.44 0.01]))
-          (lores (* root (octaves 2)) 0.92)
-          (+ (* (decibels -10)
-                (-> (pink-noise)
-                    (* (sqr 10 :duty 0.8))
-                    (+ (* (env gate [0 1 1 0] [0.001 0.44 0.01])
-                          (sqr 1 :duty 0.8 :add 0.5 :mul 0.5)
-                          (noise)))
-                    (lores 800 0.7))))))
+(def root (* (octaves -2) in-freq))
 
-;; (def noise (*lores (*noise) (remap (*sin 1) 350 400) 0.99))
+(def ivals (map semitones [3 7 12 14 15 24]))
 
-;; (def hum-sins
-;;   (let [root (* 660 (remap (*tri 15000) 0.5 1))]
-;;     (map (fn [x] (*sin x))
-;;          [root
-;;           (* root (semitones 1))
-;;           (* root (semitones 2))
-;;           (* root (semitones -4))
-;;           (* root (semitones -11))
-;;           ])))
-
-
-;; (def gate (*sqr 4))
-;; (def punch (bongo (* C1 (semitones -12)) gate))
-
-;; (defn *lfpulse [& args]
-;;   (remap (apply *pulse args) 0 1))
-
-
-
-;; (def detune-semis -5)
-;; (def detune (ugen (semitones detune-semis)))
-
-;; (def sig0 (*sin (* (+ 440 (* 200 (*sin 1))) detune) :iphase 0.5))
-;; (def sig1 (*sin (* (+ 440 (* 500 (*sin 10))) detune)))
-
-;; (def left (*freeverb (+ (* 0.4 (apply + hum-sins)) punch noise)))
-;; (def right 0) ;;(+ (* 0.5 sig1) (* 1 (*tri 200))))
-
-;; (def channels [left right])
-
-;; (apply mrat.core.io/out
-;;        (map (fn [x] (* x (decibels -10)))
-;;             channels))
+(play (sum
+       (map #(-> (pad (sqr in-gate :iphase (math$rand.Float64))
+                      (* root %)
+                      (decibels -55))
+                 (delayc (* 0.01 (math$rand.Float64)))
+                 (lores (* 4 root) 0))
+        ivals)))

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"time"
 
 	"github.com/jfhamlin/muscrat/pkg/aio"
 	"github.com/jfhamlin/muscrat/pkg/mrat"
@@ -72,20 +73,49 @@ func main() {
 		close(done)
 	}()
 
+	streamKeys(cancel)
+	<-done
+}
+
+func streamKeys(cancel context.CancelFunc) {
+	defer cancel()
+
+	erred := make(chan error)
+	keyCh := make(chan byte, 1)
+	go func() {
+		for {
+			b := make([]byte, 1)
+			_, err := os.Stdin.Read(b)
+			if err != nil {
+				erred <- err
+				return
+			}
+			keyCh <- b[0]
+		}
+	}()
+
+	// track one key input at a time for now
+	var pressedKey byte
+	const keyTimeout = 200 * time.Millisecond
 	for {
-		b := make([]byte, 1)
-		_, err = os.Stdin.Read(b)
-		if err != nil {
-			fmt.Println(err)
-			return
-		}
-		if b[0] == 3 {
-			fmt.Println("exiting")
-			cancel()
-			return
-		}
+		var b byte
 		select {
-		case aio.StdinChan <- b[0]:
+		case b = <-keyCh:
+		case <-time.After(keyTimeout):
+			if pressedKey != 0 {
+				pressedKey = 0
+			}
+		case err := <-erred:
+			fmt.Println("Error reading from stdin:", err)
+			return
+		}
+		if b == 3 {
+			fmt.Println("exiting")
+			return
+		}
+		pressedKey = b
+		select {
+		case aio.StdinChan <- b:
 		default:
 		}
 	}
