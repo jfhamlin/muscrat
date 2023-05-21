@@ -86,6 +86,7 @@ func (n *GeneratorNode) GenerateSamples(ctx context.Context, cfg ugen.SampleConf
 			// TODO: make the failure of this node visible to the user.
 			//fmt.Printf("node %s failed: %v\n", n, r)
 			// print stack trace
+			fmt.Printf("node %s failed: %v\n", n, r)
 			fmt.Printf("stack trace: %s\n", debug.Stack())
 			outputSamples = make([]float64, numSamples)
 		}

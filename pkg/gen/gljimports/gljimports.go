@@ -25,6 +25,7 @@ func RegisterImports(_register func(string, interface{})) {
 	_register("github.com/jfhamlin/muscrat/pkg/ugen.SampleConfig", reflect.TypeOf((*github_com_jfhamlin_muscrat_pkg_ugen.SampleConfig)(nil)).Elem())
 	_register("github.com/jfhamlin/muscrat/pkg/ugen.SampleGenerator", reflect.TypeOf((*github_com_jfhamlin_muscrat_pkg_ugen.SampleGenerator)(nil)).Elem())
 	_register("github.com/jfhamlin/muscrat/pkg/ugen.SampleGeneratorFunc", reflect.TypeOf((*github_com_jfhamlin_muscrat_pkg_ugen.SampleGeneratorFunc)(nil)).Elem())
+	_register("github.com/jfhamlin/muscrat/pkg/ugen.SimpleSampleGeneratorFunc", reflect.TypeOf((*github_com_jfhamlin_muscrat_pkg_ugen.SimpleSampleGeneratorFunc)(nil)).Elem())
 	_register("github.com/jfhamlin/muscrat/pkg/ugen.Starter", reflect.TypeOf((*github_com_jfhamlin_muscrat_pkg_ugen.Starter)(nil)).Elem())
 	_register("github.com/jfhamlin/muscrat/pkg/ugen.Stopper", reflect.TypeOf((*github_com_jfhamlin_muscrat_pkg_ugen.Stopper)(nil)).Elem())
 

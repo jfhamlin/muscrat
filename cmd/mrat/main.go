@@ -34,7 +34,7 @@ func main() {
 	}
 
 	// set up raw input mode
-	{
+	if false {
 		oldState, err := term.MakeRaw(int(os.Stdin.Fd()))
 		if err != nil {
 			fmt.Println(err)
