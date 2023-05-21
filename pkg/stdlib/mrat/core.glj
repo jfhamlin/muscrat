@@ -256,6 +256,10 @@
   [gate [a s r]]
   (env gate [0 s 0] [a r] :release-node 1))
 
+(defn env-adsr
+  [gate [a d s r]]
+  (env gate [0 1 s 0] [a d r] :release-node 2))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Effects
 
@@ -329,38 +333,3 @@
         trig (.AsTrigger midi)]
     [(add-node! midi "qwerty-midi")
      (add-node! trig "qwerty-trig")]))
-
-
-;; (def *delay mrat.effects/delay)
-;; (def *clip mrat.effects/clip)
-;; (def *trand mrat.math.rand/trand)
-;; (def *env mrat.effects/env)
-
-;; (def rand mrat.math.rand/rand)
-
-;; (defn remap
-;;   "Remap a value from [min-in, max-in] to [min-out, max-out].
-;;   If not provided, [min-in, max-in] defaults to [-1, 1]"
-;;   ([x min max] (remap x -1 1 min max)
-;;   ([x min-in max-in min max]
-;;    (let [range-in (- max-in min-in)
-;;          range-out (- max min)
-;;          x (- x min-in)]
-;;      (+ min (/ (* x range-out) range-in)))))
-
-;; (defn decibels [db] (pow 10 (/ db 20)))
-
-;; (def *mixer
-;;   (fn [& args]
-;;     (let ((mixerArgs args))
-;;       (let ((weightSum (reduce + 0
-;;                                (map-idx (fn [val idx] (if (even? idx) val 0)) mixerArgs))))
-;;         (sum (map (fn [idx] (let ((weight (nth mixerArgs (* 2 idx)))
-;;                                   (chan   (nth mixerArgs (+ (* 2 idx) 1))))
-;;                               (* (/ weight weightSum) chan)))
-;;                   (range 0 (/ (length mixerArgs) 2))))))))
-
-;; ;;; TODO: move to a library for music theory.
-;; (defn cents [x] (pow 2 (/ x 1200)))
-;; (defn semitones [x] (pow 2 (/ x 12)))
-;; (defn octaves [x] (pow 2 x))
