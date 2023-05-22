@@ -4,7 +4,7 @@
             [mrat.scales :refer :all] :reload
             [mrat.welsh] :reload))
 
-(def root (* E3 (semitones 3)))
+(def root (* E3 (semitones 0))) ;; 3
 (def notes (map #(* root (semitones %))
                 aeolian))
 
