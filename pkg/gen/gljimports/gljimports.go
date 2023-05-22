@@ -12,6 +12,7 @@ import (
 	github_com_jfhamlin_muscrat_pkg_aio "github.com/jfhamlin/muscrat/pkg/aio"
 	github_com_jfhamlin_muscrat_pkg_graph "github.com/jfhamlin/muscrat/pkg/graph"
 	github_com_jfhamlin_freeverb_go "github.com/jfhamlin/freeverb-go"
+	github_com_jfhamlin_muscrat_pkg_slice "github.com/jfhamlin/muscrat/pkg/slice"
 	"reflect"
 )
 
@@ -270,4 +271,8 @@ func RegisterImports(_register func(string, interface{})) {
 	////////////////////////////////////////
 	_register("github.com/jfhamlin/freeverb-go.NewRevModel", github_com_jfhamlin_freeverb_go.NewRevModel)
 	_register("github.com/jfhamlin/freeverb-go.RevModel", reflect.TypeOf((*github_com_jfhamlin_freeverb_go.RevModel)(nil)).Elem())
+
+	// package github.com/jfhamlin/muscrat/pkg/slice
+	////////////////////////////////////////
+	_register("github.com/jfhamlin/muscrat/pkg/slice.FindIndexOfRisingEdge", github_com_jfhamlin_muscrat_pkg_slice.FindIndexOfRisingEdge)
 }

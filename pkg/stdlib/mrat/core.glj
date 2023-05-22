@@ -347,7 +347,7 @@
     (SimpleSampleGeneratorFunc wrapped)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; Sequencing utilities
+;; Pattern utilities
 
 (defn sequencer
   [notes times & flags]
@@ -378,3 +378,69 @@
                   (recur (concat res smps)
                          n)))))]
     (add-node! (ugen-fn f) "sequencer")))
+
+(defn choose
+  [freq opts] ;; TODO: support dynamic freq. take a gate instead!
+  (let [counter (atom nil)
+        choice-index (atom (rand-int (count opts)))]
+    (let [f (fn [cfg n]
+              (let [inputs (:input-samples cfg)]
+                (if (nil? @counter)
+                  (reset! counter (/ (:sample-rate-hz cfg) freq)))
+                (loop [res nil
+                       remain n]
+                  (if (zero? remain)
+                    res
+                    (let [choice (get inputs (str "$" @choice-index))
+                          nsamp (min @counter remain)
+                          start (- n remain)
+                          end (+ start nsamp)
+                          smps (go/slice choice start end)]
+                      (reset! counter (- @counter nsamp))
+                      (when (zero? @counter)
+                        (reset! counter (/ (:sample-rate-hz cfg) freq))
+                        (reset! choice-index (rand-int (count opts))))
+                      (recur (concat res smps)
+                             (- remain nsamp)))))))]
+      (let [opt-nodes (map as-node opts)
+            node (add-node! (ugen-fn f) "choose")]
+        (doseq [[on i] (map vector opt-nodes (range (count opt-nodes)))]
+          (add-edge! on node (str "$" i)))
+        node))))
+
+(defn- find-retrigger-index
+  [slc i last-gate n]
+  (github.com$jfhamlin$muscrat$pkg$slice.FindIndexOfRisingEdge slc i last-gate))
+
+(defn choose-gate
+  [gate opts]
+  (let [last-gate (atom 0)
+        choice-index (atom (rand-int (count opts)))]
+    (let [f (fn [cfg n]
+              (let [inputs (:input-samples cfg)
+                    trigs (get inputs "trigger")]
+                (loop [res nil
+                       remain n
+                       lg @last-gate]
+                  (if (zero? remain)
+                    (do
+                      (reset! last-gate (get trigs (dec n)))
+                      res)
+                    (let [choice (get inputs (str "$" @choice-index))
+                          index (- n remain)
+                          next-choice-index (find-retrigger-index trigs index lg n)
+                          nsamp (min remain (- next-choice-index index))
+                          start index
+                          end (+ start nsamp)
+                          smps (go/slice choice start end)]
+                      (if (< next-choice-index n)
+                        (reset! choice-index (rand-int (count opts))))
+                      (recur (concat res smps)
+                             (- remain nsamp)
+                             (get trigs (min (dec n) (inc end)))))))))]
+      (let [opt-nodes (map as-node opts)
+            node (add-node! (ugen-fn f) "choose-gate")]
+        (doseq [[on i] (map vector opt-nodes (range (count opt-nodes)))]
+          (add-edge! on node (str "$" i)))
+        (add-edge! (as-node gate) node "trigger")
+        node))))

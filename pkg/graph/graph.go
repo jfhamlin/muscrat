@@ -365,8 +365,11 @@ func RunNode(ctx context.Context, node *GeneratorNode, g *Graph, cfg ugen.Sample
 		}
 	}
 
+	// start := time.Now()
 	cfg.InputSamples = inputSamples
 	outputSamples := node.GenerateSamples(ctx, cfg, numSamples)
+	// elapsed := time.Since(start)
+	// fmt.Printf("node %s: %s\n", node.String(), elapsed)
 
 	for _, e := range g.OutgoingEdges(node.ID()) {
 		select {

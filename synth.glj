@@ -1,47 +1,21 @@
 (ns synth
   (:require [mrat.core :refer :all] :reload
             [mrat.midi :refer :all] :reload
-            [mrat.scales :refer :all] :reload))
+            [mrat.scales :refer :all] :reload
+            [mrat.welsh] :reload))
 
-(defn choose
-  [freq opts] ;; TODO: support dynamic freq. take a gate instead!
-  (let [counter (atom nil)
-        choice-index (atom (rand-int (count opts)))]
-    (let [f (fn [cfg n]
-              (let [inputs (:input-samples cfg)]
-                (if (nil? @counter)
-                  (reset! counter (/ (:sample-rate-hz cfg) freq)))
-                (loop [res nil
-                       remain n]
-                  (if (zero? remain)
-                    res
-                    (let [choice (get inputs (str "$" @choice-index))
-                          nsamp (min @counter remain)
-                          start (- n remain)
-                          end (+ start nsamp)
-                          smps (go/slice choice start end)]
-                      (reset! counter (- @counter nsamp))
-                      (when (zero? @counter)
-                        (reset! counter (/ (:sample-rate-hz cfg) freq))
-                        (reset! choice-index (rand-int (count opts))))
-                      (recur (concat res smps)
-                             (- remain nsamp)))))))]
-      (let [opt-nodes (map as-node opts)
-            node (add-node! (ugen-fn f) "choose")]
-        (doseq [[on i] (map vector opt-nodes (range (count opt-nodes)))]
-          (add-edge! on node (str "$" i)))
-        node))))
-
-(def root C3)
+(def root E3)
 (def notes (map #(* root (semitones %))
                 aeolian))
 
-(def phrase (sequencer [C3  Eb3  G3  Bb3]
-                       [0.1 0.1 0.1 0.1]))
+(defn synth
+  [gate freq]
+  (mrat.welsh/dark-city gate (* freq (semitones (* 0.2 (noise 8))))))
 
-(play (let [freq (choose 8 notes)
+(play (let [gate (sqr 0.2)
+            freq (choose-gate gate notes)
             amp (decibels -10)]
-        (-> (saw freq)
-            (lores (* 4 freq) 0.9)
+        (-> (synth gate freq)
+            (lores (* 2 freq) 0.9)
             (freeverb)
             (* amp))))

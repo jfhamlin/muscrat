@@ -16,6 +16,8 @@ import (
 	"github.com/jfhamlin/muscrat/pkg/graph"
 	"github.com/jfhamlin/muscrat/pkg/ugen"
 
+	_ "github.com/jfhamlin/muscrat/internal/pkg/plot"
+
 	"github.com/glojurelang/glojure/pkgmap"
 	"github.com/glojurelang/glojure/runtime"
 )
@@ -173,8 +175,15 @@ func (s *Server) getSamples(cfg *audio.AudioConfig, n int) []int {
 	case channelSamples = <-s.outputChannel:
 	case <-time.After(time.Duration(n) * time.Second / time.Duration(cfg.SampleRate)):
 		// return silence if we can't get samples fast enough.
-		channelSamples = [][]float64{make([]float64, n)}
+		channelSamples = [][]float64{make([]float64, n), make([]float64, n)}
 	}
+
+	// width, height, err := term.GetSize(int(os.Stdout.Fd()))
+	// if err != nil {
+	// 	panic(err)
+	// }
+	// plt := plot.LineChartString(channelSamples[0], width, height)
+	// fmt.Print("\n" + plt)
 
 	// update gain to approach target gain.
 	for i, samples := range channelSamples {
