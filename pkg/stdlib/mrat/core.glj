@@ -74,7 +74,17 @@
 (defn pow
   [b e] (math.Pow b e)) ;; TODO: use glojure.math
 
-(defn decibels [db] (pow 10 (/ db 20.0)))
+(defn- freq-ratio
+  [x kind]
+  (let [n (add-node! (NewFreqRatio kind) kind)]
+    (add-edge! x n "in")
+    n))
+
+(defn decibels
+  [db]
+  (if (instance? Node db)
+    (freq-ratio db "decibels")
+    (pow 10 (/ db 20.0))))
 
 (defn cents [x] (pow 2 (/ x 1200.0)))
 
@@ -85,7 +95,6 @@
       (add-edge! x stn "in")
       stn)
     (pow 2 (/ x 12.0))))
-
 
 (defn octaves [x] (pow 2 x))
 

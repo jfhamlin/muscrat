@@ -1,4 +1,4 @@
-(ns synth
+(ns examples.basic_beat
   (:require [mrat.core :refer :all] :reload
             [mrat.midi :refer :all] :reload
             [mrat.scales :refer :all] :reload
@@ -54,3 +54,4 @@
         (* amp))))
 
 (play (* (decibels -5) (+ mid bass kick highs)))
+

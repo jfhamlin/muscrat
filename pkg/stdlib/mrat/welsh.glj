@@ -26,7 +26,7 @@
                               1
                               (+ (* s (- 1 init-level)) init-level)
                               init-level]
-                        [a d r]))
+                        [a d r] :release-node 2))
         res (* lpf-env (:res cfg))
         cutoff (* 0.5 (+ (* lpf-env cutoff)
                          (* (- 1 lpf-env) 10000)))]
@@ -43,7 +43,7 @@
         [a d s r] (:adsr cfg)
         a (max 0.001 a)]
     (fn [gate freq]
-      (let [amp (env gate [0 1 s 0] [a d r])
+      (let [amp (env-adsr gate [a s d r])
             lfo ((:wave lfo-cfg) (:freq lfo-cfg))
             osc1-flags (lfo-flag lfo-cfg osc1-cfg lfo)
             osc2-flags (lfo-flag lfo-cfg osc2-cfg lfo)
