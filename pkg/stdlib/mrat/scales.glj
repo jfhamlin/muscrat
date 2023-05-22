@@ -8,7 +8,7 @@
 (def aeolian [0 2 3 5 7 8 10])
 (def locrian [0 1 3 5 6 8 10])
 
-(def ionian)
+(def major ionian)
 (def minor aeolian)
 
 (def major-pentatonic [0 2 4 7 9])
@@ -19,4 +19,4 @@
 (def harmonic-minor [0 2 3 5 7 8 11])
 (def melodic-minor [0 2 3 5 7 9 11])
 
-(defn chromatic (range 12))
+(def chromatic (range 12))
