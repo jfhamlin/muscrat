@@ -8,7 +8,7 @@
 ;; silence
 
 (def full-drone-volume-time 5)
-(def full-melody-volume-time 15)
+(def full-melody-volume-time 0) ;;15)
 (def melody-cf1-time 30)
 (def melody-cf2-dur 45)
 (def melody-cf3-start-time (+ melody-cf2-dur melody-cf1-time))
@@ -23,7 +23,7 @@
                                            melody-cf2-dur
                                            100]))
 
-(def duty-env (env 1 [1 1 0.2 0.2] [30 2 100]))
+(def duty-env (env 1 [0.8 0.8 0.2 0.2] [30 2 100]))
 
 (def root E3)
 (def notes (map #(* root (semitones %))
@@ -47,7 +47,7 @@
   (let [gate (noise melody-freq-seq)
         freq (choose-gate gate notes)
         amp (decibels melody-env)]
-    (-> (synth gate freq)
+    (-> (mixed-synth gate freq (env 1 [0 1 1] [120 100]))
         (lores (* 2 freq) 0.9)
         (freeverb :room-size room-size-env)
         (* amp))))
