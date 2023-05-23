@@ -306,10 +306,10 @@ func transformSampleBuffer(cfg *audio.AudioConfig, buf [][]float64) []int {
 	transformSample := func(sample float64) int {
 		s := (sample + 1) * (maxValue / 2)
 		if s > maxValue {
-			//fmt.Printf("XXX clipping high (max=%v): %v (%v)\n", maxValue, s, sample)
+			fmt.Printf("XXX clipping high (max=%v): %v (%v)\n", maxValue, s, sample)
 		}
 		if s < 0 {
-			//fmt.Printf("XXX clipping low (min=%v): %v (%v)\n", 0, s, sample)
+			fmt.Printf("XXX clipping low (min=%v): %v (%v)\n", 0, s, sample)
 		}
 		s = math.Max(0, math.Ceil(s))
 		return int(math.Min(s, maxValue-1))

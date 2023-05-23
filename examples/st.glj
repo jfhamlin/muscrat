@@ -6,9 +6,10 @@
 
 ;; START
 ;; silence
+(def song-dur (* 60 3))
 
 (def full-drone-volume-time 5)
-(def full-melody-volume-time 0) ;;15)
+(def full-melody-volume-time 15)
 (def melody-cf1-time 30)
 (def melody-cf2-dur 45)
 (def melody-cf3-start-time (+ melody-cf2-dur melody-cf1-time))
@@ -16,8 +17,17 @@
 
 (def drone-env    (env 1 [-100 -20 -20] [full-drone-volume-time 120]))
 (def melody-env    (env 1 [-100 -15 -15] [full-melody-volume-time 120]))
-(def room-size-env (env 1 [0.5 0.5 1 1] [room-size-1-time 3 100]))
 
+(def room-size-env (env 1 [0.5 0.5 1 1] [room-size-1-time 3 100]))
+(def dry-env (env 1 [0.5 0.5 0 0] [(- song-dur 10) 3 100]))
+
+(def noise-env (env 1 [0 0.05 0.25 0.25] [5 song-dur 10]))
+
+(def song-env (env 1 [1 0.9 0.75 0.75 0] [room-size-1-time 10 (- song-dur room-size-1-time 10) 15]))
+
+;; TODO:
+;; - louder noise over time
+;; - end at a bit after 3 min
 
 (def melody-freq-seq (sequencer [4 16 32] [melody-cf1-time
                                            melody-cf2-dur
@@ -49,7 +59,7 @@
         amp (decibels melody-env)]
     (-> (mixed-synth gate freq (env 1 [0 1 1] [120 100]))
         (lores (* 2 freq) 0.9)
-        (freeverb :room-size room-size-env)
+        (freeverb :room-size room-size-env :dry dry-env)
         (* amp))))
 
 (def drone
@@ -62,5 +72,18 @@
         (lores (* 2 freq) 0.8)
         (* amp))))
 
-(play (+ drone
-         melody))
+(def noise-bursts
+  (let [lo 0.1
+        nl 1
+        cutoff (* 4 root (semitones (* 0.2 (noise-quad 8))))]
+    (-> (pink-noise)
+        (lores cutoff 0.8)
+        (* (env 1
+                [0  lo  nl   nl  lo   lo  nl  nl    lo  lo   nl   nl]
+                [  5   1    2    1   10  1    4    1   20  1    1000 ]))
+        (* noise-env))))
+
+(play (* song-env
+         (+ drone
+            melody
+            noise-bursts)))

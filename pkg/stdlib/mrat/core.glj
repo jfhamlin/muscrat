@@ -279,13 +279,11 @@
 
 (defn- freeverb-gen
   [& opts]
-  (let [dry (get opts :dry 0.5)
-        wet (get opts :wet 0.5)
+  (let [wet (get opts :wet 0.5)
         damp (get opts :damp 0.5)
         width (get opts :width 1.0)]
     (NewFreeverb
      (doto (NewRevModel)
-       (.SetDry dry)
        (.SetWet wet)
        (.SetDamp damp)
        (.SetWidth width)))))
@@ -298,9 +296,11 @@
         _ (if unsupported (throw (apply str "freeverb: unsupported option(s) supplied: "
                                         (interpose \, unsupported))))
         fv-node (add-node! (apply freeverb-gen opts) "freeverb")
-        rs-node (as-node (get opts :room-size 0.5))]
+        rs-node (as-node (get opts :room-size 0.5))
+        dry-node (as-node (get opts :dry 0.5))]
     (add-edge! node fv-node "$0")
     (add-edge! rs-node fv-node "room-size")
+    (add-edge! dry-node fv-node "dry")
     fv-node))
 
 (defn lores

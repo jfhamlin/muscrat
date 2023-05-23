@@ -21,6 +21,13 @@ func NewFreeverb(revmod *freeverb.RevModel) ugen.SampleGenerator {
 				revmod.SetRoomSize(roomSize)
 			}
 		}
+		if drys, ok := cfg.InputSamples["dry"]; ok {
+			d := drys[0]
+			dry := float32(math.Max(0, math.Min(1, d)))
+			if math.Abs(float64(dry-revmod.GetDry())) > 0.01 {
+				revmod.SetDry(dry)
+			}
+		}
 
 		outputLeft := make([]float32, n)
 		outputRight := make([]float32, n)
