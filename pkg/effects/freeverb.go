@@ -2,6 +2,7 @@ package effects
 
 import (
 	"context"
+	"math"
 
 	"github.com/jfhamlin/freeverb-go"
 	"github.com/jfhamlin/muscrat/pkg/ugen"
@@ -13,6 +14,14 @@ func NewFreeverb(revmod *freeverb.RevModel) ugen.SampleGenerator {
 		for i := 0; i < n; i++ {
 			input32[i] = float32(cfg.InputSamples["$0"][i])
 		}
+		if roomSizes, ok := cfg.InputSamples["room-size"]; ok {
+			rs := roomSizes[0]
+			roomSize := float32(math.Max(0, math.Min(1, rs)))
+			if math.Abs(float64(roomSize-revmod.GetRoomSize())) > 0.01 {
+				revmod.SetRoomSize(roomSize)
+			}
+		}
+
 		outputLeft := make([]float32, n)
 		outputRight := make([]float32, n)
 		revmod.ProcessReplace(input32, input32, outputLeft, outputRight, n, 1)

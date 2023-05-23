@@ -10,7 +10,7 @@ import (
 
 // NewNoise returns a new Noise ugen. If freq is 0, the noise will be
 // white.
-func NewNoise(freq float64, opts ...Option) ugen.SampleGenerator {
+func NewNoise(opts ...Option) ugen.SampleGenerator {
 	o := options{
 		rand: rand.New(rand.NewSource(0)),
 		add:  0.0,
@@ -24,26 +24,20 @@ func NewNoise(freq float64, opts ...Option) ugen.SampleGenerator {
 	add := o.add
 	mul := o.mul
 
-	freq = math.Max(0, freq)
-
-	if freq == 0 {
-		return ugen.SampleGeneratorFunc(func(ctx context.Context, cfg ugen.SampleConfig, n int) []float64 {
-			res := make([]float64, n)
-			for i := 0; i < n; i++ {
-				res[i] = mul*2*rnd.Float64() - 1 + add
-			}
-			return res
-		})
-	}
-
 	last := mul*2*rnd.Float64() - 1 + add
 	counter := 0
 	// Logic taken from supercollider LFNoise0 ugen
 	return ugen.SampleGeneratorFunc(func(ctx context.Context, cfg ugen.SampleConfig, n int) []float64 {
+		ws := cfg.InputSamples["w"]
 		res := make([]float64, n)
 		remain := n
 		i := 0
 		for {
+			freq := 0.0
+			if len(ws) > 0 {
+				freq = ws[i]
+			}
+			freq = math.Max(0, freq)
 			if counter <= 0 {
 				counter = int(float64(cfg.SampleRateHz) / freq)
 				if counter <= 0 {

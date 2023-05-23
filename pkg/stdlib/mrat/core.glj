@@ -223,7 +223,11 @@
   If frequency is zero or not provided, generates white noise. Currently,
   frequency must be a number, not a node."
   ([] (noise 0))
-  ([freq] (add-node! (NewNoise freq) "noise")))
+  ([freq]
+   (let [n (add-node! (NewNoise) "noise")
+         f (as-node freq)]
+     (add-edge! f n "w")
+     n)))
 
 (defn pink-noise
   []
@@ -275,28 +279,28 @@
 
 (defn- freeverb-gen
   [& opts]
-  (let [opts (apply hash-map opts)
-        supported #{:dry :wet :room-size :damp :width}
-        unsupported (seq (remove supported (keys opts)))
-        dry (get opts :dry 0.5)
+  (let [dry (get opts :dry 0.5)
         wet (get opts :wet 0.5)
-        room-size (get opts :room-size 0.5)
         damp (get opts :damp 0.5)
         width (get opts :width 1.0)]
-    (if unsupported (throw (apply str "freeverb: unsupported option(s) supplied: "
-                                  (interpose \, unsupported))))
     (NewFreeverb
      (doto (NewRevModel)
        (.SetDry dry)
        (.SetWet wet)
-       (.SetRoomSize room-size)
        (.SetDamp damp)
        (.SetWidth width)))))
 
 (defn freeverb
   [node & opts]
-  (let [fv-node (add-node! (apply freeverb-gen opts) "freeverb")]
+  (let [opts (apply hash-map opts)
+        supported #{:dry :wet :room-size :damp :width}
+        unsupported (seq (remove supported (keys opts)))
+        _ (if unsupported (throw (apply str "freeverb: unsupported option(s) supplied: "
+                                        (interpose \, unsupported))))
+        fv-node (add-node! (apply freeverb-gen opts) "freeverb")
+        rs-node (as-node (get opts :room-size 0.5))]
     (add-edge! node fv-node "$0")
+    (add-edge! rs-node fv-node "room-size")
     fv-node))
 
 (defn lores

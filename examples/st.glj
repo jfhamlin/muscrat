@@ -1,0 +1,66 @@
+(ns examples.st
+  (:require [mrat.core :refer :all] :reload
+            [mrat.midi :refer :all] :reload
+            [mrat.scales :refer :all] :reload
+            [mrat.welsh] :reload))
+
+;; START
+;; silence
+
+(def full-drone-volume-time 5)
+(def full-melody-volume-time 15)
+(def melody-cf1-time 30)
+(def melody-cf2-dur 45)
+(def melody-cf3-start-time (+ melody-cf2-dur melody-cf1-time))
+(def room-size-1-time (+ melody-cf3-start-time 2))
+
+(def drone-env    (env 1 [-100 -20 -20] [full-drone-volume-time 120]))
+(def melody-env    (env 1 [-100 -15 -15] [full-melody-volume-time 120]))
+(def room-size-env (env 1 [0.5 0.5 1 1] [room-size-1-time 3 100]))
+
+
+(def melody-freq-seq (sequencer [4 16 32] [melody-cf1-time
+                                           melody-cf2-dur
+                                           100]))
+
+(def duty-env (env 1 [1 1 0.2 0.2] [30 2 100]))
+
+(def root E3)
+(def notes (map #(* root (semitones %))
+                aeolian))
+
+(defn synth-osc
+  [osc gate freq]
+  (osc (* freq (semitones (* 0.2 (noise-quad 8)))) :duty duty-env))
+
+(defn mixed-synth
+  [gate freq mix]
+  (let [saw-synth (synth-osc saw gate freq)
+        sqr-synth (synth-osc sqr gate freq)]
+    (+ (* (- 1 mix) saw-synth) (* mix sqr-synth))))
+
+(defn synth
+  [gate freq]
+  (saw (* freq (semitones (* 0.2 (noise-quad 8)))) :duty duty-env))
+
+(def melody
+  (let [gate (noise melody-freq-seq)
+        freq (choose-gate gate notes)
+        amp (decibels melody-env)]
+    (-> (synth gate freq)
+        (lores (* 2 freq) 0.9)
+        (freeverb :room-size room-size-env)
+        (* amp))))
+
+(def drone
+  (let [amp (decibels drone-env)
+        freq (* root (octaves -1))]
+    (-> (sum (repeatedly
+             16
+             #(saw (* freq (semitones (* 0.2 (noise-quad 8))))
+                   :iphase (math$rand.Float64))))
+        (lores (* 2 freq) 0.8)
+        (* amp))))
+
+(play (+ drone
+         melody))

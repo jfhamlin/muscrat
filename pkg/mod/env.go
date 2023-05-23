@@ -78,6 +78,9 @@ func NewEnvelope(opts ...EnvOption) ugen.SampleGenerator {
 				continue
 			}
 			if triggerTime > envDur {
+				if len(levels) == 0 {
+					fmt.Println("EMPTY LEVELS???", len(times))
+				}
 				res[i] = levels[len(levels)-1][i]
 				continue
 			}
