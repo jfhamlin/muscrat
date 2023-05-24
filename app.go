@@ -23,7 +23,8 @@ import (
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 	"golang.org/x/term"
 
-	"github.com/jfhamlin/muscrat/internal/pkg/notes"
+	"github.com/jfhamlin/muscrat/pkg/midi"
+
 	"github.com/jfhamlin/muscrat/internal/pkg/plot"
 	"github.com/jfhamlin/muscrat/pkg/graph"
 	"github.com/jfhamlin/muscrat/pkg/ugen"
@@ -546,7 +547,7 @@ func (a *App) SetGain(gain float64) {
 }
 
 func (a *App) GetNotes() []string {
-	return notes.Names()
+	return midi.Names()
 }
 
 type FreqInfo struct {
