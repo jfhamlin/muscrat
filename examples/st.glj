@@ -23,7 +23,7 @@
 
 (def noise-env (env 1 [0 0.05 0.25 0.25] [5 song-dur 10]))
 
-(def song-env (env 1 [1 0.9 0.75 0.75 0] [room-size-1-time 10 (- song-dur room-size-1-time 10) 15]))
+(def song-env (env 1 [0 -10 -15 -15 -100] [room-size-1-time 10 (- song-dur room-size-1-time 10) 15]))
 
 ;; TODO:
 ;; - louder noise over time
@@ -83,7 +83,11 @@
                 [  5   1    2    1   10  1    4    1   20  1    1000 ]))
         (* noise-env))))
 
-(play (* song-env
-         (+ drone
-            melody
-            noise-bursts)))
+(def song
+  (* (decibels song-env)
+     (+ drone
+        melody
+        noise-bursts)))
+;; (wavout song)
+(play song)
+

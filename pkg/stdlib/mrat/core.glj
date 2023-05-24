@@ -350,6 +350,8 @@
      (add-node! trig "qwerty-trig")]))
 
 (defn wavout
+  "Save the input to a 32-bit wav file (up to two channels) named by
+  the :filename flag (default out.wav)."
   [ch & ch-flags]
   (let [[chs flags] (split-with #(not (keyword? %)) ch-flags)
         flags (validate-flags flags {:filename "out.wav"})

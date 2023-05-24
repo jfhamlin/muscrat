@@ -69,9 +69,9 @@ func (wo *WavOut) GenerateSamples(ctx context.Context, cfg ugen.SampleConfig, n 
 		Data: make([]int, n*numChan),
 	}
 	for i := 0; i < n; i++ {
-		buf.Data[i*numChan] = float64ToInt24(ch0[i])
+		buf.Data[i*numChan] = float64ToInt32(ch0[i])
 		if numChan == 2 {
-			buf.Data[i*numChan+1] = float64ToInt24(ch1[i])
+			buf.Data[i*numChan+1] = float64ToInt32(ch1[i])
 		}
 	}
 	wo.enc.Write(buf)
@@ -79,12 +79,14 @@ func (wo *WavOut) GenerateSamples(ctx context.Context, cfg ugen.SampleConfig, n 
 	return make([]float64, n)
 }
 
-func float64ToInt24(f float64) int {
+func float64ToInt32(f float64) int {
 	if f > 1.0 {
+		fmt.Printf("clipping: %f > 1.0\n", f)
 		f = 1.0
 	}
 	if f < -1.0 {
+		fmt.Printf("clipping: %f < -1.0\n", f)
 		f = -1.0
 	}
-	return int(f * (1<<23 - 1))
+	return int(f * (1<<31 - 1))
 }
