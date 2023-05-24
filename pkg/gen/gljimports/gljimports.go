@@ -251,7 +251,9 @@ func RegisterImports(_register func(string, interface{})) {
 	_register("github.com/jfhamlin/muscrat/pkg/aio.InputDevice", reflect.TypeOf((*github_com_jfhamlin_muscrat_pkg_aio.InputDevice)(nil)).Elem())
 	_register("github.com/jfhamlin/muscrat/pkg/aio.NewInputDevice", github_com_jfhamlin_muscrat_pkg_aio.NewInputDevice)
 	_register("github.com/jfhamlin/muscrat/pkg/aio.NewQwertyMIDI", github_com_jfhamlin_muscrat_pkg_aio.NewQwertyMIDI)
+	_register("github.com/jfhamlin/muscrat/pkg/aio.NewWavOut", github_com_jfhamlin_muscrat_pkg_aio.NewWavOut)
 	_register("github.com/jfhamlin/muscrat/pkg/aio.StdinChan", github_com_jfhamlin_muscrat_pkg_aio.StdinChan)
+	_register("github.com/jfhamlin/muscrat/pkg/aio.WavOut", reflect.TypeOf((*github_com_jfhamlin_muscrat_pkg_aio.WavOut)(nil)).Elem())
 
 	// package github.com/jfhamlin/muscrat/pkg/graph
 	////////////////////////////////////////

@@ -4,53 +4,6 @@
             [mrat.scales :refer :all] :reload
             [mrat.welsh] :reload))
 
-(def root (* E3 (semitones 3)))
-(def notes (map #(* root (semitones %))
-                aeolian))
-
-(defn synth
-  [gate freq]
-  (-> (saw (* freq (semitones (* 0.05 (noise-quad 8)))) :duty 1 :iphase (math$rand.Float64))
-      (* (env-adsr gate [0.3 0.5 0.8 1]))
-      (delayc (* 0.2 (math$rand.Float64)))))
-
-(def mid
-  (let [gate (sqr 8 :duty 0.7)
-        freq (choose-gate gate notes)
-        amp (decibels -15)]
-    (-> (sum (map #(synth gate (* freq %)) (map semitones [0 0 0 0 0 0])))
-        (lores (* 2 freq) 0.9)
-        (freeverb :room-size 0.5)
-        (* amp))))
-
-(def bass
-  (let [gate (sqr 0.5)
-        freq (* (choose-gate gate [root root (* root (semitones 7))]) (octaves -1))
-        amp (decibels -5)]
-    (-> (sum (repeatedly 16 #(sin (* freq (semitones (* 0.1 (noise-quad 4))))
-                                  :iphase (math$rand.Float64) :duty 0.6)))
-        (* (env gate [0 1 0.8 0] [0.1 0.2 0.6]))
-        (lores (* 2 freq) 0.5)
-        (* amp))))
-
-(def kick
-  (let [gate (sqr 2)
-        freqs [500 50 10]
-        durs [0.01 0.2]
-        freq-sweep (env gate freqs durs)
-        amp (env-asr gate [0.01 1 1])]
-    (-> (tri freq-sweep :duty 0.5)
-        (* amp))))
-
-(def highs
-  (let [gate (sqr 16)
-        freq (choose-gate gate (map #(* % (octaves 1)) notes))
-        amp (decibels -10)
-        mask (sqr (/ 1.0 8.0) :mul 0.5 :add 0.5)]
-    (-> (sqr freq :duty 0.8)
-        (lores freq 0.9)
-        (* (env-adsr gate [0.01 0.02 1 0.1]))
-        (* mask)
-        (* amp))))
-
-(play (* (decibels -5) (+ mid bass kick highs)))
+(def synth (sin))
+;; (wavout synth :filename "test.wav")
+(play synth)
