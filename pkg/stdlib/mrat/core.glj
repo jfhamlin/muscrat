@@ -319,8 +319,8 @@
   [n delay-time]
   (let [delay (add-node! (NewDelay) "delay")]
     (add-edge! (as-node n) delay "$0")
-    (add-edge! (as-node n) delay "delay")
-    n))
+    (add-edge! (as-node delay-time) delay "delay")
+    delay))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Sampler
