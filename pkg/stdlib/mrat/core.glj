@@ -24,6 +24,7 @@
                                                 WithInterpolation)
            (github.com$jfhamlin$muscrat$pkg$effects NewFreeverb
                                                     NewLowpassFilter
+                                                    NewBPF
                                                     NewDelay)
            (github.com$jfhamlin$muscrat$pkg$sampler NewSampler
                                                     LoadSample)
@@ -275,6 +276,10 @@
   [gate [a d s r]]
   (env gate [0 1 s 0] [a d r] :release-node 2))
 
+(defn env-perc
+  [gate [a d]]
+  (env gate [0 1 0] [a d]))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Effects
 
@@ -305,6 +310,7 @@
     fv-node))
 
 (defn lores
+  "A simple lowpass filter with cutoff and resonance."
   [n cutoff res]
   (let [n (as-node n)
         cutoff (as-node cutoff)
@@ -315,7 +321,19 @@
     (add-edge! res lpf "resonance")
     lpf))
 
-(defn delayc
+(defn bpf
+  [n freq bw]
+  (let [n (as-node n)
+        freq (as-node freq)
+        bw (as-node bw)
+        filter (add-node! (NewBPF) "bpf")]
+    (add-edge! n filter "in")
+    (add-edge! freq filter "w")
+    (add-edge! bw filter "bw")
+    filter))
+
+(defn delayl
+  "Delay line with linear interpolation."
   [n delay-time]
   (let [delay (add-node! (NewDelay) "delay")]
     (add-edge! (as-node n) delay "$0")

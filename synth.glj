@@ -4,6 +4,5 @@
             [mrat.scales :refer :all] :reload
             [mrat.welsh] :reload))
 
-(def synth (sin))
-;; (wavout synth :filename "test.wav")
-(play synth)
+(play (-> (sqr 200)
+          (bpf 200 0.1)))

@@ -59,6 +59,7 @@ func RegisterImports(_register func(string, interface{})) {
 
 	// package github.com/jfhamlin/muscrat/pkg/effects
 	////////////////////////////////////////
+	_register("github.com/jfhamlin/muscrat/pkg/effects.NewBPF", github_com_jfhamlin_muscrat_pkg_effects.NewBPF)
 	_register("github.com/jfhamlin/muscrat/pkg/effects.NewDelay", github_com_jfhamlin_muscrat_pkg_effects.NewDelay)
 	_register("github.com/jfhamlin/muscrat/pkg/effects.NewFreeverb", github_com_jfhamlin_muscrat_pkg_effects.NewFreeverb)
 	_register("github.com/jfhamlin/muscrat/pkg/effects.NewLowpassFilter", github_com_jfhamlin_muscrat_pkg_effects.NewLowpassFilter)

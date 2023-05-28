@@ -38,7 +38,10 @@ func NewNoise(opts ...Option) ugen.SampleGenerator {
 				freq = ws[i]
 			}
 			freq = math.Max(0, freq)
-			if counter <= 0 {
+			if freq == 0 {
+				counter = 1
+				last = mul*2*rnd.Float64() - 1 + add
+			} else if counter <= 0 {
 				counter = int(float64(cfg.SampleRateHz) / freq)
 				if counter <= 0 {
 					counter = 1
