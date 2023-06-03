@@ -176,7 +176,8 @@ func (s *Server) getSamples(cfg *audio.AudioConfig, n int) []int {
 	select {
 	case channelSamples = <-s.outputChannel:
 		if len(channelSamples) != 2 {
-			panic("expected 2 channels")
+			// fmt.Println("WARNING: expected 2 channels, got", len(channelSamples))
+			channelSamples = [][]float64{make([]float64, n), make([]float64, n)}
 		}
 	case <-time.After(time.Duration(n) * time.Second / time.Duration(cfg.SampleRate)):
 		// return silence if we can't get samples fast enough.

@@ -4,14 +4,39 @@
             [mrat.scales :refer :all] :reload
             [mrat.welsh] :reload))
 
-(def root 260)
+(def pulse-freq 6.75)
 
-(defn tri-phase-saw
+(defn pad
+  ([gate] (pad gate 440))
+  ([gate freq] (pad gate freq (decibels -20)))
+  ([gate freq amp]
+   (let [size 32
+         freqs (map #(* freq (semitones %)) (repeatedly size #(* 0.1 (noise 8))))
+         snds (map #(saw %) freqs)
+         snds (map #(delayl % (* 0.01 (math$rand.Float64))) snds)
+         snd (sum snds)
+         asr (env-asr gate [1 1 8])]
+     (-> (* amp asr snd)
+         (lores (* 4 freq) 0)
+         (freeverb :room-size 0.5)))))
+
+(defn pulse-snd
   [freq]
-  (* (/ 1.0 10.0)
-     (+ (saw freq :iphase 0.5)
-        (* -1 (saw freq :iphase 0.2))
-        (saw freq :iphase 0.75))))
+  (let [e (env (sqr pulse-freq)
+               [0 1 0.8 0]
+               [0.003 0.02 0.06])
+        sig (sum (repeatedly 16
+                             #(* (if (= 0 (math$rand.Intn 2)) 1 -1)
+                                 (saw freq :iphase (math$rand.Float64) :duty (math$rand.Float64)))))
+        sig (* e sig)]
+    (-> sig
+        (lores (* (+ 4 (* 3 (noise-quad 1))) freq) 0.7))))
 
-(play (tri-phase-saw root))
+(def pan-pulse
+  (pan2 (pulse-snd C3) (* 0.75 (noise-quad 2)) (decibels -10)))
 
+(play (* (decibels -15)
+         (+ pan-pulse
+            (sum (map #(pad (sqr (* 1 pulse-freq)) %) [C5 Ds5 G5]))
+            (* (env (noise pulse-freq) [0 1 1 0] [0.001 0.02 0.001])
+               (-> (noise) (bpf C6 1))))))

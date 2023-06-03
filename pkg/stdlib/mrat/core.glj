@@ -59,16 +59,17 @@
   (as-node [x] (add-node! (NewConstant x) x)))
 
 (defn play
-  ([ch] (play ch ch))
-  ([ch & channels]
-   (let [channels (cons ch channels)
-         num-sinks (count (. *graph* sinks))
-         ch-inds (map vector channels (range (count channels)))]
-     (doseq [[ch i] ch-inds]
-       (let [gen (as-node ch)
-             chan-id (+ num-sinks i)
-             sink (.AddSinkNode *graph* (WithLabel (fmt.Sprintf "out%d" chan-id)))]
-         (add-edge! gen sink "w")))))) ;; TODO: "w" seems wrong
+  [channels]
+  (let [channels (if-not (coll? channels) [channels channels] channels)
+        channels (if (= (count channels) 0) [0 0] channels)
+        channels (if (= (count channels) 1) [(first channels) (first channels)] channels)
+        num-sinks (count (. *graph* sinks))
+        ch-inds (map vector channels (range (count channels)))]
+    (doseq [[ch i] ch-inds]
+      (let [gen (as-node ch)
+            chan-id (+ num-sinks i)
+            sink (.AddSinkNode *graph* (WithLabel (fmt.Sprintf "out%d" chan-id)))]
+        (add-edge! gen sink "w"))))) ;; TODO: "w" seems wrong
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Utilities
@@ -120,10 +121,22 @@
 
 (defn +
   "Return the sum of any combination of numbers or ugens.
-  If any argument to + is a node, then the result of + is a node"
+  If any argument to + is a node, then the result of + is a node.  If
+  any argument to + is a collection, then the result is a collection
+  whose length is the length of the longest collection (max-len) and
+  where the elements of each argument are added pairwise. Any
+  non-collections are duplicated to max-len, and any collections
+  shorter than max-len are cycled up to max-len."
   ([] 0)
   ([x] x)
-  ([x & more] (apply +-internal (cons x more))))
+  ([x & more]
+   (let [args (cons x more)]
+     (if (some coll? args)
+       (let [colls (map #(if (coll? %) % [%]) args)
+             max-len (apply max (map count colls))
+             colls (map #(take max-len (cycle %)) colls)]
+         (apply map + colls))
+       (apply +-internal args)))))
 
 (defn -
   "Return the difference of any combination of numbers or ugens.
@@ -151,7 +164,14 @@
   If any argument to * is a node, then the result of * is a node."
   ([] 1)
   ([x] x)
-  ([x & more] (apply *-internal (cons x more))))
+  ([x & more]
+   (let [args (cons x more)]
+     (if (some coll? args)
+       (let [colls (map #(if (coll? %) % [%]) args)
+             max-len (apply max (map count colls))
+             colls (map #(take max-len (cycle %)) colls)]
+         (apply map * colls))
+       (apply *-internal args)))))
 
 (defn sum
   [coll] (apply + coll))
@@ -339,6 +359,16 @@
     (add-edge! (as-node n) delay "$0")
     (add-edge! (as-node delay-time) delay "delay")
     delay))
+
+(defn pan2
+  [in pos level]
+  (let [pos (as-node pos)
+        mid (as-node 0.707)
+        sq (* -0.207 pos pos)
+        left-scale (+ mid (* -0.5 pos) sq)
+        right-scale (+ mid (* 0.5 pos) sq)]
+    [(* level left-scale in)
+     (* level right-scale in)]))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Sampler
