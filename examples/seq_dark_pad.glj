@@ -10,7 +10,7 @@
    (let [size 32
          freqs (map #(* freq (semitones %)) (repeatedly size #(* 0.1 (noise 8))))
          snds (map #(saw %) freqs)
-         snds (map #(delayc % (* 0.01 (math$rand.Float64))) snds)
+         snds (map #(delayl % (* 0.01 (math$rand.Float64))) snds)
          snd (sum snds)
          asr (env-asr gate [1 1 8])]
      (* amp asr snd))))
@@ -26,8 +26,8 @@
 (play (sum
        (map #(-> (pad impulses
                       (* s %)
-                      (decibels -50))
-                 (delayc (* 0.01 (math$rand.Float64)))
+                      (decibels -35))
+                 (delayl (* 0.01 (math$rand.Float64)))
                  (lores (* 4 s) 0)
                  (freeverb :room-size 0.6))
         ivals)))

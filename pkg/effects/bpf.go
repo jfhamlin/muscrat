@@ -32,21 +32,13 @@ func NewBPF() ugen.SampleGenerator {
 				b1 = c * d * a0
 				b2 = (1 - c) * a0
 
-				y0 := in[i] + b1*y1 + b2*y2
-				res[i] = a0 * (y0 - y2)
-				y2 = y1
-				y1 = y0
-
 				freq = ws[i]
 				bw = bws[i]
-			} else {
-				y0 := in[i] + b1*y1 + b2*y2
-				res[i] = a0 * (y0 - y2)
-				y2 = y1
-				y1 = y0
 			}
-			y1 = zapgremlins(y1)
-			y2 = zapgremlins(y2)
+			y0 := in[i] + b1*y1 + b2*y2
+			res[i] = a0 * (y0 - y2)
+			y2 = zapgremlins(y1)
+			y1 = zapgremlins(y0)
 		}
 
 		return res

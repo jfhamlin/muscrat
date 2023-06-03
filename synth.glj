@@ -4,5 +4,14 @@
             [mrat.scales :refer :all] :reload
             [mrat.welsh] :reload))
 
-(play (-> (sqr 200)
-          (bpf 200 0.1)))
+(def root 260)
+
+(defn tri-phase-saw
+  [freq]
+  (* (/ 1.0 10.0)
+     (+ (saw freq :iphase 0.5)
+        (* -1 (saw freq :iphase 0.2))
+        (saw freq :iphase 0.75))))
+
+(play (tri-phase-saw root))
+
