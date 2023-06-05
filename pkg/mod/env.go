@@ -108,15 +108,19 @@ func NewEnvelope(opts ...EnvOption) ugen.SampleGenerator {
 					level2 := levels[j+1][i]
 					// interpolate between levels[j] and levels[j+1]
 					// at time triggerTime
-					switch o.interp {
-					case "lin":
-						res[i] = level1 + (level2-level1)*(triggerTime-(timeSum-t[i]))/t[i]
-					case "exp":
-						res[i] = level1 * math.Pow(level2/level1, (triggerTime-(timeSum-t[i]))/t[i])
-					case "hold":
-						res[i] = level1
-					default:
-						panic(fmt.Sprintf("unknown interpolation type: %s", o.interp))
+					if t[i] == 0 {
+						res[i] = level2
+					} else {
+						switch o.interp {
+						case "lin":
+							res[i] = level1 + (level2-level1)*(triggerTime-(timeSum-t[i]))/t[i]
+						case "exp":
+							res[i] = level1 * math.Pow(level2/level1, (triggerTime-(timeSum-t[i]))/t[i])
+						case "hold":
+							res[i] = level1
+						default:
+							panic(fmt.Sprintf("unknown interpolation type: %s", o.interp))
+						}
 					}
 					triggerTime += 1 / float64(cfg.SampleRateHz)
 					break

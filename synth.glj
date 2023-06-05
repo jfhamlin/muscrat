@@ -37,6 +37,7 @@
 
 (play (* (decibels -15)
          (+ pan-pulse
-            (sum (map #(pad (sqr (* 1 pulse-freq)) %) [C5 Ds5 G5]))
+            (sum (map #(pad (sqr (* 0.5 pulse-freq)) %) [C5 Ds5 G5]))
             (* (env (noise pulse-freq) [0 1 1 0] [0.001 0.02 0.001])
                (-> (noise) (bpf C6 1))))))
+

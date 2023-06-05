@@ -3,12 +3,11 @@ package mrat
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
 
 	"github.com/fsnotify/fsnotify"
 )
 
-func WatchFile(ctx context.Context, path string, srv *Server) error {
+func watchFile(ctx context.Context, path string, srv *Server) error {
 	watcher, err := fsnotify.NewWatcher()
 	if err != nil {
 		return fmt.Errorf("failed to create watcher: %w", err)
@@ -19,6 +18,10 @@ func WatchFile(ctx context.Context, path string, srv *Server) error {
 
 	defer watcher.Close()
 
+	if err := srv.EvalScript(path); err != nil {
+		fmt.Println("failed to eval script:", err)
+	}
+
 	for {
 		select {
 		case <-ctx.Done():
@@ -27,11 +30,7 @@ func WatchFile(ctx context.Context, path string, srv *Server) error {
 			if !ok {
 				return nil
 			}
-			buf, err := ioutil.ReadFile(path)
-			if err != nil {
-				return fmt.Errorf("failed to read file: %w", err)
-			}
-			if err := srv.EvalScript(string(buf), path); err != nil {
+			if err := srv.EvalScript(path); err != nil {
 				fmt.Println("failed to eval script:", err)
 			}
 		case err, ok := <-watcher.Errors:

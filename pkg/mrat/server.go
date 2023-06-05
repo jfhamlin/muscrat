@@ -22,6 +22,8 @@ import (
 
 	"github.com/glojurelang/glojure/pkgmap"
 	"github.com/glojurelang/glojure/runtime"
+
+	wrt "github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
 func init() {
@@ -36,6 +38,9 @@ func init() {
 
 type (
 	Server struct {
+		// wails context
+		ctx context.Context
+
 		sampleRate int
 
 		gain       float64
@@ -51,6 +56,8 @@ type (
 
 		// output channel for server messages
 		msgChan chan<- *ServerMessage
+
+		started bool
 
 		mtx sync.RWMutex
 	}
@@ -69,7 +76,16 @@ func NewServer(msgChan chan<- *ServerMessage) *Server {
 	}
 }
 
-func (s *Server) Start(script, path string) error {
+func (s *Server) Start(ctx context.Context) error {
+	s.mtx.Lock()
+	defer s.mtx.Unlock()
+	if s.started {
+		return fmt.Errorf("server already started")
+	}
+	s.started = true
+
+	s.ctx = ctx
+
 	cfg := audio.NewAudioConfig()
 	s.sampleRate = cfg.SampleRate
 
@@ -80,11 +96,16 @@ func (s *Server) Start(script, path string) error {
 	}
 	sink.Start(s.getSamples)
 
-	return s.EvalScript(script, path)
+	s.playGraph(zeroGraph())
+	return nil
 }
 
-func (s *Server) EvalScript(script, path string) error {
-	hash := sha256.Sum256([]byte(script))
+func (s *Server) EvalScript(path string) error {
+	script, err := os.ReadFile(path)
+	if err != nil {
+		return err
+	}
+	hash := sha256.Sum256(script)
 
 	s.mtx.RLock()
 	if bytes.Equal(hash[:], s.lastFileHash[:]) {
@@ -93,7 +114,7 @@ func (s *Server) EvalScript(script, path string) error {
 	}
 	s.mtx.RUnlock()
 
-	g, err := EvalScript(script, path)
+	g, err := EvalScript(path)
 	if err != nil {
 		return err
 	}
@@ -106,6 +127,12 @@ func (s *Server) EvalScript(script, path string) error {
 	s.playGraph(g)
 	return nil
 }
+
+func (s *Server) SetGain(gain float64) {
+	s.targetGain = math.Max(0, math.Min(gain, 1))
+}
+
+////////////////////////////////////////////////////////////////////////////////
 
 func (s *Server) playGraph(g *graph.Graph) {
 	gr := s.newGraphRunner(g)
@@ -138,7 +165,6 @@ func (s *Server) fadeTo(gr *graphRunner) {
 
 		// mixed samples
 		mixSmps := make([][]float64, int(math.Max(float64(len(oldSmps)), float64(len(newSmps)))))
-
 		zeros := make([]float64, len(oldSmps[0]))
 
 		for chIdx := 0; chIdx < len(mixSmps); chIdx++ {
@@ -175,7 +201,7 @@ func (s *Server) getSamples(cfg *audio.AudioConfig, n int) []int {
 	var channelSamples [][]float64
 	select {
 	case channelSamples = <-s.outputChannel:
-		if len(channelSamples) != 2 {
+		if len(channelSamples) < 2 {
 			// fmt.Println("WARNING: expected 2 channels, got", len(channelSamples))
 			channelSamples = [][]float64{make([]float64, n), make([]float64, n)}
 		}
@@ -205,6 +231,11 @@ func (s *Server) getSamples(cfg *audio.AudioConfig, n int) []int {
 		}
 		s.gain = target
 		channelSamples[i] = newSamples
+	}
+
+	{
+		avgSamples := averageBuffers(channelSamples)
+		go wrt.EventsEmit(s.ctx, "samples", avgSamples)
 	}
 
 	return transformSampleBuffer(cfg, channelSamples)
@@ -334,4 +365,35 @@ func transformSampleBuffer(cfg *audio.AudioConfig, buf [][]float64) []int {
 	}
 
 	return out
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
+func zeroGraph() *graph.Graph {
+	g := &graph.Graph{}
+	s0 := g.AddSinkNode()
+	s1 := g.AddSinkNode()
+	zero := g.AddGeneratorNode(ugen.NewConstant(0))
+	g.AddEdge(zero.ID(), s0.ID(), "in")
+	g.AddEdge(zero.ID(), s1.ID(), "in")
+	return g
+}
+
+// averageBuffers returns the average of the N buffers. If the buffers
+// are not the same length, the result is undefined, and may panic.
+func averageBuffers(bufs [][]float64) []float64 {
+	if len(bufs) == 1 {
+		return bufs[0]
+	}
+
+	avg := make([]float64, len(bufs[0]))
+	for i := 0; i < len(bufs); i++ {
+		for j := 0; j < len(bufs[0]); j++ {
+			avg[j] += bufs[i][j]
+		}
+	}
+	for i := 0; i < len(avg); i++ {
+		avg[i] /= float64(len(bufs))
+	}
+	return avg
 }

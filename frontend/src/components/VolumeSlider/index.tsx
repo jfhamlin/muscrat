@@ -27,9 +27,8 @@ export default function VolumeSlider(props: VolumeSliderProps) {
     label="Volume (dB)"
     value={toDecibels(props.volume)}
     onChange={handleChange}
-    min={-30}
+    min={-50}
     max={0}
     step={0.5}
   />;
 }
-

@@ -13,14 +13,13 @@ import logo from './assets/images/muscrat.svg';
 
 import {
   SetGain,
-  GraphDot,
-  GraphJSON,
-  SetShowSpectrum,
-  SetShowSpectrumHist,
-  SetShowOscilloscope,
-  SetOscilloscopeWindow,
-  SetOscilloscopeFreq,
-} from "../wailsjs/go/main/App";
+  /* GraphJSON,
+   * SetShowSpectrum,
+   * SetShowSpectrumHist,
+   * SetShowOscilloscope,
+   * SetOscilloscopeWindow,
+   * SetOscilloscopeFreq, */
+} from "../wailsjs/go/mrat/Server";
 
 import styled from 'styled-components';
 
@@ -90,7 +89,6 @@ function ugenGraphJsonToGraph(json: string): any {
 
 function App() {
   const [graphSeqNum, setGraphSeqNum] = useState(0);
-  const [graphDot, setGraphDot] = useState<string|undefined>();
 
   const sampleRate = 44100;
 
@@ -98,14 +96,6 @@ function App() {
     const ival = setInterval(() => {
       setGraphSeqNum(graphSeqNum + 1);
     }, 1000);
-
-    const updateGraph = async () => {
-      const dot = await GraphDot();
-      if (dot !== graphDot) {
-        setGraphDot(dot);
-      }
-    };
-    updateGraph();
 
     return () => {
       clearInterval(ival);
@@ -123,22 +113,22 @@ function App() {
   const [graphJSON, setGraphJSON] = useState<string>("{}");
   const [graph, setGraph] = useState<any>({ edges: [], nodes: [] });
 
-  useEffect(() => {
-    const updateGraph = async () => {
-      const json = await GraphJSON();
-      if (json !== graphJSON) {
-        setGraphJSON(json);
-        setGraph(ugenGraphJsonToGraph(json));
-      }
-      setTimeout(() => setGraphUpdateSeqNum((n) => n + 1), 1000);
-    };
-    updateGraph();
-  }, [graphUpdateSeqNum]);
+  /* useEffect(() => {
+   *   const updateGraph = async () => {
+   *     const json = await GraphJSON();
+   *     if (json !== graphJSON) {
+   *       setGraphJSON(json);
+   *       setGraph(ugenGraphJsonToGraph(json));
+   *     }
+   *     setTimeout(() => setGraphUpdateSeqNum((n) => n + 1), 1000);
+   *   };
+   *   updateGraph();
+   * }, [graphUpdateSeqNum]); */
 
   return (
     <AppContainer id="App">
       <img src={logo} className="App-logo" alt="logo" style={{
-        maxHeight: '100px',
+        maxHeight: '50px',
         objectFit: 'contain',
       }} />
       <StyledContainer>
