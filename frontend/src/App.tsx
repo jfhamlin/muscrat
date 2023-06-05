@@ -13,12 +13,7 @@ import logo from './assets/images/muscrat.svg';
 
 import {
   SetGain,
-  /* GraphJSON,
-   * SetShowSpectrum,
-   * SetShowSpectrumHist,
-   * SetShowOscilloscope,
-   * SetOscilloscopeWindow,
-   * SetOscilloscopeFreq, */
+  /* GraphJSON */
 } from "../wailsjs/go/mrat/Server";
 
 import styled from 'styled-components';
@@ -132,9 +127,9 @@ function App() {
         objectFit: 'contain',
       }} />
       <StyledContainer>
-        <StyledGraph>
-          <UGenGraph graph={graph} />
-        </StyledGraph>
+        {/* <StyledGraph>
+            <UGenGraph graph={graph} />
+            </StyledGraph> */}
         <Inspector
           volume={gain}
           setVolume={handleGainChange}

@@ -99,14 +99,6 @@ function SignalInspector(props: { signal: SignalInfo }) {
   const { signal } = props;
 
   // Visualization options
-  const inspectorModeState = useState(['time', 'frequency']);
-  const [inspectorMode, setInspectorMode] = inspectorModeState;
-  const handleInspectorModeChange = (
-    event: React.MouseEvent<HTMLElement>,
-    newMode: string[],
-  ) => {
-    setInspectorMode(newMode);
-  };
 
   const [oscilloscopeWindow, setOscilloscopeWindow] = useState(0.01);
   const handleOscilloscopeWindowChange = (
@@ -154,7 +146,7 @@ function SignalInspector(props: { signal: SignalInfo }) {
       if (oscSamples.current.length > numOscSamples) {
         oscSamples.current = oscSamples.current.slice(-numOscSamples);
       }
-      if (inspectorModeState[0].includes('time') && now - lastUpdate.current > (1000.0 / oscilloscopeFreq)) {
+      if (now - lastUpdate.current > (1000.0 / oscilloscopeFreq)) {
         setSamples(oscSamples.current);
         lastUpdate.current = now;
       }
@@ -163,7 +155,7 @@ function SignalInspector(props: { signal: SignalInfo }) {
       if (fftSamples.current.length > MAX_FFT_SAMPLES) {
         fftSamples.current = fftSamples.current.slice(-MAX_FFT_SAMPLES);
       }
-      if (inspectorModeState[0].includes('frequency') && now - lastFftUpdate.current > (1000.0 / fftFreq)) {
+      if (now - lastFftUpdate.current > (1000.0 / fftFreq)) {
         // apply a hann window
         const fftSamps = fftSamples.current.map(
           (s: number, i: number) => s * (0.5 - 0.5 * Math.cos(2 * Math.PI * i / fftSamples.current.length))
@@ -180,24 +172,7 @@ function SignalInspector(props: { signal: SignalInfo }) {
 
   return (
     <div>
-      <h2>{props.signal.label}</h2>
-
-      <ToggleButtonGroup
-        size="small"
-        color="primary"
-        value={inspectorMode}
-        onChange={(_, newMode) => setInspectorMode(newMode)}
-        aria-label="visualization mode">
-        <ToggleButton value="time" aria-label="time">
-          Time
-        </ToggleButton>
-        <ToggleButton value="frequency" aria-label="frequency">
-          Frequency
-        </ToggleButton>
-      </ToggleButtonGroup>
-
-
-      {inspectorMode.includes('time') ?
+      <h3>{props.signal.label}</h3>
        <ChartBox>
          <LabeledSlider
            label="Window Width (s)"
@@ -214,11 +189,8 @@ function SignalInspector(props: { signal: SignalInfo }) {
            max={10}
            step={0.5} />
          <LineChart samples={samples} />
-       </ChartBox> :
-       null}
+       </ChartBox>
 
-
-      {inspectorMode.includes('frequency') ?
        <ChartBox>
          <LabeledSlider
            label="Update Frequency (Hz)"
@@ -228,8 +200,7 @@ function SignalInspector(props: { signal: SignalInfo }) {
            max={15}
            step={1} />
          <Histogram bins={freqBins} labels={freqBinLabels} />
-       </ChartBox> :
-       null}
+       </ChartBox>
     </div>
   );
 }

@@ -13,18 +13,6 @@ import (
 var assets embed.FS
 
 func main() {
-	// scriptFile := os.Args[1]
-	// if scriptFile == "" {
-	// 	fmt.Println("No script file provided")
-	// 	os.Exit(1)
-	// }
-
-	// script, err := ioutil.ReadFile(scriptFile)
-	// if err != nil {
-	// 	fmt.Printf("Error reading script file: %v\n", err)
-	// 	return
-	// }
-
 	msgs := make(chan *mrat.ServerMessage, 1)
 	go func() {
 		for msg := range msgs {
@@ -34,24 +22,6 @@ func main() {
 	srv := mrat.NewServer(msgs)
 	app := mrat.NewApp(srv)
 
-	//srv.Start(string(script), scriptFile)
-
-	// ctx, cancel := context.WithCancel(context.Background())
-	// defer cancel()
-
-	// done := make(chan struct{})
-	// go func() {
-	// 	fmt.Println("Watching", scriptFile)
-	// 	fmt.Println("Press Ctrl+C to exit")
-	// 	err := mrat.WatchFile(ctx, scriptFile, srv)
-	// 	if err != nil {
-	// 		fmt.Printf("error watching file: %v\n", err)
-	// 		return
-	// 	}
-	// 	close(done)
-	// }()
-
-	// Create application with options
 	err := wails.Run(&options.App{
 		Title:            "muscrat",
 		Width:            1024,
