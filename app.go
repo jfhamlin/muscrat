@@ -418,7 +418,7 @@ func (a *App) updateSignalGraphFromScriptFile(filename string) {
 
 	go func() {
 		defer close(graphStopChan)
-		graph.RunGraph(graphCtx, g, ugen.SampleConfig{SampleRateHz: a.sampleRate})
+		g.Run(graphCtx, ugen.SampleConfig{SampleRateHz: a.sampleRate})
 	}()
 
 	graphOutputChannel := make(chan [][]float64)

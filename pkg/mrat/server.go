@@ -36,6 +36,10 @@ func init() {
 	})
 }
 
+const (
+	bufferSize = 256
+)
+
 type (
 	Server struct {
 		// wails context
@@ -49,6 +53,9 @@ type (
 		// channel for raw, unprocessed output samples.
 		// one []float64 per audio channel.
 		outputChannel chan [][]float64
+
+		// buffer to hold output samples not yet sent to the audio sink.
+		getSamplesBuffer []int
 
 		graphRunner *graphRunner
 
@@ -198,47 +205,54 @@ func (s *Server) fadeTo(gr *graphRunner) {
 }
 
 func (s *Server) getSamples(cfg *audio.AudioConfig, n int) []int {
-	var channelSamples [][]float64
-	select {
-	case channelSamples = <-s.outputChannel:
-		if len(channelSamples) < 2 {
-			// fmt.Println("WARNING: expected 2 channels, got", len(channelSamples))
+	for len(s.getSamplesBuffer) < 2*n {
+		var channelSamples [][]float64
+		select {
+		case channelSamples = <-s.outputChannel:
+			if len(channelSamples) < 2 {
+				// fmt.Println("WARNING: expected 2 channels, got", len(channelSamples))
+				channelSamples = [][]float64{make([]float64, n), make([]float64, n)}
+			}
+			// TODO: fix the timeout to handle a buffer size that doesn't match the
+			// audio config.
+		case <-time.After(time.Duration(n) * time.Second / time.Duration(cfg.SampleRate)):
+			// return silence if we can't get samples fast enough.
+			fmt.Println("timeout")
 			channelSamples = [][]float64{make([]float64, n), make([]float64, n)}
 		}
-	case <-time.After(time.Duration(n) * time.Second / time.Duration(cfg.SampleRate)):
-		// return silence if we can't get samples fast enough.
-		fmt.Println("timeout")
-		channelSamples = [][]float64{make([]float64, n), make([]float64, n)}
-	}
 
-	if false {
-		width, height, err := term.GetSize(int(os.Stdout.Fd()))
-		if err != nil {
-			panic(err)
+		if false {
+			width, height, err := term.GetSize(int(os.Stdout.Fd()))
+			if err != nil {
+				panic(err)
+			}
+			plt := plot.LineChartString(channelSamples[0], width, height)
+			fmt.Print("\n" + plt)
 		}
-		plt := plot.LineChartString(channelSamples[0], width, height)
-		fmt.Print("\n" + plt)
-	}
 
-	// update gain to approach target gain.
-	for i, samples := range channelSamples {
-		newSamples := make([]float64, len(samples))
-		target := s.targetGain
-		gainStep := (target - s.gain) / float64(len(samples))
-		for i, smp := range samples {
-			newSamples[i] = smp * s.gain
-			s.gain += gainStep
+		// update gain to approach target gain.
+		for i, samples := range channelSamples {
+			newSamples := make([]float64, len(samples))
+			target := s.targetGain
+			gainStep := (target - s.gain) / float64(len(samples))
+			for i, smp := range samples {
+				newSamples[i] = smp * s.gain
+				s.gain += gainStep
+			}
+			s.gain = target
+			channelSamples[i] = newSamples
 		}
-		s.gain = target
-		channelSamples[i] = newSamples
-	}
 
-	{
-		avgSamples := averageBuffers(channelSamples)
-		go wrt.EventsEmit(s.ctx, "samples", avgSamples)
-	}
+		{
+			avgSamples := averageBuffers(channelSamples)
+			go wrt.EventsEmit(s.ctx, "samples", avgSamples)
+		}
 
-	return transformSampleBuffer(cfg, channelSamples)
+		s.getSamplesBuffer = append(s.getSamplesBuffer, transformSampleBuffer(cfg, channelSamples)...)
+	}
+	res := s.getSamplesBuffer[:2*n]
+	s.getSamplesBuffer = s.getSamplesBuffer[2*n:]
+	return res
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -275,7 +289,7 @@ func (gr *graphRunner) run() {
 
 	go func() {
 		defer close(gr.stopped)
-		graph.RunGraph(ctx, gr.graph, ugen.SampleConfig{SampleRateHz: gr.sampleRate})
+		gr.graph.Run(ctx, ugen.SampleConfig{SampleRateHz: gr.sampleRate})
 	}()
 
 	defer close(gr.graphOutputCh)
@@ -373,7 +387,7 @@ func transformSampleBuffer(cfg *audio.AudioConfig, buf [][]float64) []int {
 ////////////////////////////////////////////////////////////////////////////////
 
 func zeroGraph() *graph.Graph {
-	g := &graph.Graph{}
+	g := &graph.Graph{BufferSize: bufferSize}
 	s0 := g.AddSinkNode()
 	s1 := g.AddSinkNode()
 	zero := g.AddGeneratorNode(ugen.NewConstant(0))

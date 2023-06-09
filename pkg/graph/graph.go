@@ -11,10 +11,6 @@ import (
 	"github.com/jfhamlin/muscrat/pkg/ugen"
 )
 
-const (
-	bufferSize = 1024
-)
-
 type NodeID int
 
 func (id NodeID) String() string {
@@ -173,6 +169,8 @@ func (e *Edge) MarshalJSON() ([]byte, error) {
 type Graph struct {
 	Nodes []Node  `json:"nodes"`
 	Edges []*Edge `json:"edges"`
+
+	BufferSize int `json:"bufferSize"`
 }
 
 func (g *Graph) AddEdge(from, to NodeID, port string) {
@@ -180,7 +178,7 @@ func (g *Graph) AddEdge(from, to NodeID, port string) {
 		From:    from,
 		To:      to,
 		ToPort:  port,
-		Channel: make(chan []float64, 1),
+		Channel: make(chan []float64),
 	})
 }
 
@@ -261,14 +259,18 @@ func (g *Graph) OutgoingEdges(id NodeID) []*Edge {
 	return edges
 }
 
-func RunGraph(ctx context.Context, g *Graph, cfg ugen.SampleConfig) {
+func (g *Graph) Run(ctx context.Context, cfg ugen.SampleConfig) {
+	if g.BufferSize <= 0 {
+		g.BufferSize = 1024
+	}
+
 	bootstrapCycles(ctx, g, cfg)
 
 	var wg sync.WaitGroup
 	for _, node := range g.Nodes {
 		wg.Add(1)
 		go func(n Node) {
-			n.Run(ctx, g, cfg, bufferSize)
+			n.Run(ctx, g, cfg, g.BufferSize)
 			wg.Done()
 		}(node)
 	}
@@ -319,7 +321,7 @@ func bootstrapCycles(ctx context.Context, g *Graph, cfg ugen.SampleConfig) {
 
 			queue = append(queue, choice)
 			delete(blocked, choice)
-			zeros := make([]float64, bufferSize)
+			zeros := make([]float64, g.BufferSize)
 			for _, e := range g.OutgoingEdges(choice) {
 				select {
 				case <-ctx.Done():

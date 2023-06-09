@@ -28,7 +28,7 @@ func EvalScript(filename string) (g *graph.Graph, err error) {
 	require := glj.Var("glojure.core", "require")
 	require.Invoke(glj.Read("mrat.core"))
 
-	g = &graph.Graph{}
+	g = &graph.Graph{BufferSize: bufferSize}
 	value.PushThreadBindings(value.NewMap(
 		glj.Var("mrat.core", "*graph*"), g,
 	))

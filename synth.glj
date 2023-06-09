@@ -25,18 +25,11 @@
       (freeverb :room-size 0.1)
       (pan2 (sin 1 :mul 0.5))))
 
-;; (play (* (decibels -50)
-;;          (sum (map #(instrument ((nth midi-kb %) 0) ((nth midi-kb %) 1)) (range num-voices)))))
-
 (play (* (decibels -20)
          (sum (map #(instrument (% 0) (% 1)) midi-kb))))
 
+;; (play (* (decibels -20)
+;;          (sum (map #(* (sin (% 0))
+;;                        (env (% 1) [0 1 0.5 0] [0.1 1 0.1] :release-node 2)) midi-kb))))
 
-         ;; (-> (sum (map #(wfold (* 2.5 (sin (* (semitones %) (midi-voice 0)))) -1 0.2) [0 3 7 10 2 -12]))
-         ;;     ;;(* (sqr (/ 1.0 note-len) :mul 0.5 :add 0.5 :duty 0.9))
-         ;;     (* (midi-voice 1))
-         ;;     (lores (* (sin 0.2 :mul 5 :add 6) root) 0.8)
-         ;;     (freeverb :room-size 0.1)
-         ;;     (pan2 (sin 1 :mul 0.5)))))
 
-;;(play (sin (midi-kb 0)))

@@ -19,8 +19,11 @@ type (
 	SoftwareKeyboard struct {
 		Name string
 
-		notes []float64
-		gates []float64
+		notes  []float64
+		gates  []float64
+		counts []int
+
+		counter int
 
 		cancel func()
 
@@ -62,9 +65,10 @@ func NewSoftwareKeyboard(name string, opts ...MIDIDeviceOption) *SoftwareKeyboar
 	}
 
 	kb := &SoftwareKeyboard{
-		Name:  name,
-		notes: make([]float64, o.voices),
-		gates: make([]float64, o.voices),
+		Name:   name,
+		notes:  make([]float64, o.voices),
+		gates:  make([]float64, o.voices),
+		counts: make([]int, o.voices),
 	}
 	return kb
 }
@@ -81,18 +85,25 @@ func (s *SoftwareKeyboard) Start(ctx context.Context) error {
 			freq := math.Pow(2, (note-69)/12) * 440
 			switch typ {
 			case "noteOn":
+				// pick the oldest unused voice
+				selectedIdx := -1
+				selectedCount := math.MaxInt
 				for i := range s.notes {
-					if s.notes[i] == 0 {
-						s.notes[i] = freq
-						s.gates[i] = 1
-						break
+					if s.gates[i] == 0 && s.counts[i] < selectedCount {
+						selectedIdx = i
+						selectedCount = s.counts[i]
 					}
+				}
+				if selectedIdx >= 0 {
+					s.notes[selectedIdx] = freq
+					s.gates[selectedIdx] = 1
+					s.counts[selectedIdx] = s.counter
+					s.counter++
 				}
 				// TODO: reassign oldest note
 			case "noteOff":
 				for i := range s.notes {
 					if s.notes[i] == freq {
-						s.notes[i] = 0.0
 						s.gates[i] = 0
 					}
 				}
