@@ -71,7 +71,7 @@ func NewServer(msgChan chan<- *ServerMessage) *Server {
 	return &Server{
 		gain:          0.25,
 		targetGain:    0.25,
-		outputChannel: make(chan [][]float64, 4),
+		outputChannel: make(chan [][]float64, 1),
 		msgChan:       msgChan,
 	}
 }
@@ -135,7 +135,7 @@ func (s *Server) SetGain(gain float64) {
 ////////////////////////////////////////////////////////////////////////////////
 
 func (s *Server) playGraph(g *graph.Graph) {
-	gr := s.newGraphRunner(g)
+	gr := s.newGraphRunner(s.ctx, g)
 	go gr.run()
 
 	if s.graphRunner != nil {
@@ -245,6 +245,8 @@ func (s *Server) getSamples(cfg *audio.AudioConfig, n int) []int {
 
 type (
 	graphRunner struct {
+		ctx context.Context
+
 		sampleRate    int
 		graph         *graph.Graph
 		graphOutputCh chan [][]float64
@@ -257,8 +259,9 @@ type (
 	}
 )
 
-func (s *Server) newGraphRunner(g *graph.Graph) *graphRunner {
+func (s *Server) newGraphRunner(ctx context.Context, g *graph.Graph) *graphRunner {
 	return &graphRunner{
+		ctx:           ctx,
 		sampleRate:    s.sampleRate,
 		graph:         g,
 		graphOutputCh: make(chan [][]float64),
@@ -267,7 +270,7 @@ func (s *Server) newGraphRunner(g *graph.Graph) *graphRunner {
 }
 
 func (gr *graphRunner) run() {
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(gr.ctx)
 	gr.cancel = cancel
 
 	go func() {

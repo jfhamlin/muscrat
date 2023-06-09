@@ -7,6 +7,7 @@ import {
 import {
   EventsOn,
   EventsOff,
+  EventsEmit,
 } from '../wailsjs/runtime';
 
 import logo from './assets/images/muscrat.svg';
@@ -21,6 +22,22 @@ import styled from 'styled-components';
 import Inspector from './components/Inspector';
 import UGenGraph from './components/UGenGraph';
 import type { Graph } from './components/UGenGraph';
+
+import Keyboard from './components/Keyboard';
+
+addEventListener(
+  'keydown',
+  (event) => {
+    if (event.key !== 'Tab') {
+      const ele = event.composedPath()[0];
+      const isInput = ele instanceof HTMLInputElement || ele instanceof HTMLTextAreaElement;
+      if (!ele || !isInput || event.key === 'Escape') {
+        event.preventDefault();
+      }
+    }
+  },
+  { capture: true },
+);
 
 const AppContainer = styled.div`
   display: flex;
@@ -130,6 +147,11 @@ function App() {
         {/* <StyledGraph>
             <UGenGraph graph={graph} />
             </StyledGraph> */}
+        <Keyboard
+          onEvent={(evt: any) => {
+            EventsEmit('midi-event', evt);
+          }}
+        />
         <Inspector
           volume={gain}
           setVolume={handleGainChange}
@@ -149,7 +171,7 @@ function App() {
       </StyledContainer>
     </AppContainer>
   )
-}
+    }
 
 function FloatInput(props: {onValueChange: (value: number) => void}) {
   const [value, setValue] = useState(0.5);

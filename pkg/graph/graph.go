@@ -58,13 +58,13 @@ func (n *GeneratorNode) ID() NodeID {
 
 func (n *GeneratorNode) Run(ctx context.Context, g *Graph, cfg ugen.SampleConfig, numSamples int) {
 	if starter, ok := n.Generator.(ugen.Starter); ok {
-		if err := starter.Start(); err != nil {
+		if err := starter.Start(ctx); err != nil {
 			panic(err)
 		}
 	}
 	defer func() {
 		if stopper, ok := n.Generator.(ugen.Stopper); ok {
-			if err := stopper.Stop(); err != nil {
+			if err := stopper.Stop(ctx); err != nil {
 				panic(err)
 			}
 		}

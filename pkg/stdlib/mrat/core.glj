@@ -25,11 +25,14 @@
            (github.com$jfhamlin$muscrat$pkg$effects NewFreeverb
                                                     NewLowpassFilter
                                                     NewBPF
-                                                    NewDelay)
+                                                    NewDelay
+                                                    NewWaveFolder)
            (github.com$jfhamlin$muscrat$pkg$sampler NewSampler
                                                     LoadSample)
            (github.com$jfhamlin$muscrat$pkg$aio NewInputDevice
                                                 NewQwertyMIDI
+                                                NewMIDIDevice
+                                                WithVoices
                                                 NewWavOut)
            (github.com$jfhamlin$freeverb-go NewRevModel)))
 
@@ -361,14 +364,30 @@
     delay))
 
 (defn pan2
-  [in pos level]
-  (let [pos (as-node pos)
-        mid (as-node 0.707)
-        sq (* -0.207 pos pos)
-        left-scale (+ mid (* -0.5 pos) sq)
-        right-scale (+ mid (* 0.5 pos) sq)]
-    [(* level left-scale in)
-     (* level right-scale in)]))
+  ([in pos] (pan2 in pos 1))
+  ([in pos level]
+   (let [pos (as-node pos)
+         mid (as-node 0.707)
+         sq (* -0.207 pos pos)
+         left-scale (+ mid (* -0.5 pos) sq)
+         right-scale (+ mid (* 0.5 pos) sq)]
+     [(* level left-scale in)
+      (* level right-scale in)])))
+
+(defn wfold
+  "Fold an input signal when it exceeds threshold low/high values.
+  The signal is reflected across the low and high threshold values.
+  Default low and high are -1 and 1."
+  ([in] (wfold in -1 1))
+  ([in lo hi]
+   (let [wf (add-node! (NewWaveFolder) "wfold")
+         in (as-node in)
+         lo (as-node lo)
+         hi (as-node hi)]
+     (add-edge! in wf "in")
+     (add-edge! lo wf "lo")
+     (add-edge! hi wf "hi")
+     wf)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Sampler
@@ -396,6 +415,19 @@
         trig (.AsTrigger midi)]
     [(add-node! midi "qwerty-midi")
      (add-node! trig "qwerty-trig")]))
+
+(defn midi-in
+  [name & flags]
+  (let [flags (validate-flags flags {:voices 1})
+        num-voices (:voices flags)
+        dev (NewMIDIDevice name "sw-keyboard" (WithVoices num-voices))]
+    (map #(vector (add-node! (.Notes dev %) "midi-note")
+                  (add-node! (.Gates dev %) "midi-gate"))
+         (range num-voices))))
+
+    ;; {:notes (map #(add-node! (.Notes dev %) "midi-note") (range num-voices))
+    ;;  :gates (map #(add-node! (.Gates dev %) "midi-gate") (range num-voices))
+    ;;  }))
 
 (defn wavout
   "Save the input to a 32-bit wav file (up to two channels) named by
@@ -455,35 +487,6 @@
                   (recur (concat res smps)
                          n)))))]
     (add-node! (ugen-fn f) "sequencer")))
-
-(defn choose
-  [freq opts] ;; TODO: support dynamic freq. take a gate instead!
-  (let [counter (atom nil)
-        choice-index (atom (rand-int (count opts)))]
-    (let [f (fn [cfg n]
-              (let [inputs (:input-samples cfg)]
-                (if (nil? @counter)
-                  (reset! counter (/ (:sample-rate-hz cfg) freq)))
-                (loop [res nil
-                       remain n]
-                  (if (zero? remain)
-                    res
-                    (let [choice (get inputs (str "$" @choice-index))
-                          nsamp (min @counter remain)
-                          start (- n remain)
-                          end (+ start nsamp)
-                          smps (go/slice choice start end)]
-                      (reset! counter (- @counter nsamp))
-                      (when (zero? @counter)
-                        (reset! counter (/ (:sample-rate-hz cfg) freq))
-                        (reset! choice-index (rand-int (count opts))))
-                      (recur (concat res smps)
-                             (- remain nsamp)))))))]
-      (let [opt-nodes (map as-node opts)
-            node (add-node! (ugen-fn f) "choose")]
-        (doseq [[on i] (map vector opt-nodes (range (count opt-nodes)))]
-          (add-edge! on node (str "$" i)))
-        node))))
 
 (defn- find-retrigger-index
   [slc i last-gate n]

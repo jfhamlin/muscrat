@@ -29,6 +29,8 @@ func RegisterImports(_register func(string, interface{})) {
 	_register("github.com/jfhamlin/muscrat/pkg/ugen.SimpleSampleGeneratorFunc", reflect.TypeOf((*github_com_jfhamlin_muscrat_pkg_ugen.SimpleSampleGeneratorFunc)(nil)).Elem())
 	_register("github.com/jfhamlin/muscrat/pkg/ugen.Starter", reflect.TypeOf((*github_com_jfhamlin_muscrat_pkg_ugen.Starter)(nil)).Elem())
 	_register("github.com/jfhamlin/muscrat/pkg/ugen.Stopper", reflect.TypeOf((*github_com_jfhamlin_muscrat_pkg_ugen.Stopper)(nil)).Elem())
+	_register("github.com/jfhamlin/muscrat/pkg/ugen.UGen", reflect.TypeOf((*github_com_jfhamlin_muscrat_pkg_ugen.UGen)(nil)).Elem())
+	_register("github.com/jfhamlin/muscrat/pkg/ugen.UGenFunc", reflect.TypeOf((*github_com_jfhamlin_muscrat_pkg_ugen.UGenFunc)(nil)).Elem())
 
 	// package github.com/jfhamlin/muscrat/pkg/wavtabs
 	////////////////////////////////////////
@@ -63,6 +65,8 @@ func RegisterImports(_register func(string, interface{})) {
 	_register("github.com/jfhamlin/muscrat/pkg/effects.NewDelay", github_com_jfhamlin_muscrat_pkg_effects.NewDelay)
 	_register("github.com/jfhamlin/muscrat/pkg/effects.NewFreeverb", github_com_jfhamlin_muscrat_pkg_effects.NewFreeverb)
 	_register("github.com/jfhamlin/muscrat/pkg/effects.NewLowpassFilter", github_com_jfhamlin_muscrat_pkg_effects.NewLowpassFilter)
+	_register("github.com/jfhamlin/muscrat/pkg/effects.NewWaveFolder", github_com_jfhamlin_muscrat_pkg_effects.NewWaveFolder)
+	_register("github.com/jfhamlin/muscrat/pkg/effects.WaveFolder", reflect.TypeOf((*github_com_jfhamlin_muscrat_pkg_effects.WaveFolder)(nil)).Elem())
 
 	// package github.com/jfhamlin/muscrat/pkg/mod
 	////////////////////////////////////////
@@ -250,11 +254,17 @@ func RegisterImports(_register func(string, interface{})) {
 	// package github.com/jfhamlin/muscrat/pkg/aio
 	////////////////////////////////////////
 	_register("github.com/jfhamlin/muscrat/pkg/aio.InputDevice", reflect.TypeOf((*github_com_jfhamlin_muscrat_pkg_aio.InputDevice)(nil)).Elem())
+	_register("github.com/jfhamlin/muscrat/pkg/aio.MIDIDevice", reflect.TypeOf((*github_com_jfhamlin_muscrat_pkg_aio.MIDIDevice)(nil)).Elem())
+	_register("github.com/jfhamlin/muscrat/pkg/aio.MIDIDeviceOption", reflect.TypeOf((*github_com_jfhamlin_muscrat_pkg_aio.MIDIDeviceOption)(nil)).Elem())
 	_register("github.com/jfhamlin/muscrat/pkg/aio.NewInputDevice", github_com_jfhamlin_muscrat_pkg_aio.NewInputDevice)
+	_register("github.com/jfhamlin/muscrat/pkg/aio.NewMIDIDevice", github_com_jfhamlin_muscrat_pkg_aio.NewMIDIDevice)
 	_register("github.com/jfhamlin/muscrat/pkg/aio.NewQwertyMIDI", github_com_jfhamlin_muscrat_pkg_aio.NewQwertyMIDI)
+	_register("github.com/jfhamlin/muscrat/pkg/aio.NewSoftwareKeyboard", github_com_jfhamlin_muscrat_pkg_aio.NewSoftwareKeyboard)
 	_register("github.com/jfhamlin/muscrat/pkg/aio.NewWavOut", github_com_jfhamlin_muscrat_pkg_aio.NewWavOut)
+	_register("github.com/jfhamlin/muscrat/pkg/aio.SoftwareKeyboard", reflect.TypeOf((*github_com_jfhamlin_muscrat_pkg_aio.SoftwareKeyboard)(nil)).Elem())
 	_register("github.com/jfhamlin/muscrat/pkg/aio.StdinChan", github_com_jfhamlin_muscrat_pkg_aio.StdinChan)
 	_register("github.com/jfhamlin/muscrat/pkg/aio.WavOut", reflect.TypeOf((*github_com_jfhamlin_muscrat_pkg_aio.WavOut)(nil)).Elem())
+	_register("github.com/jfhamlin/muscrat/pkg/aio.WithVoices", github_com_jfhamlin_muscrat_pkg_aio.WithVoices)
 
 	// package github.com/jfhamlin/muscrat/pkg/graph
 	////////////////////////////////////////
