@@ -12,6 +12,10 @@ import (
 	"github.com/jfhamlin/muscrat/pkg/ugen"
 )
 
+// TODO: prune nodes that aren't connected to any sinks. NB that some
+// nodes today aren't connected to sinks but have side effects; we
+// need a way to identify those nodes.
+
 type NodeID int
 
 func (id NodeID) String() string {
@@ -387,31 +391,6 @@ func bootstrapCycles(ctx context.Context, g *Graph, cfg ugen.SampleConfig) {
 			}
 			delete(blocked, e.To)
 			queue = append(queue, e.To)
-		}
-	}
-}
-
-func RunNode(ctx context.Context, node *GeneratorNode, g *Graph, cfg ugen.SampleConfig, numSamples int) {
-	inEdges := g.IncomingEdges(node.ID())
-	inputSamples := make(map[string][]float64)
-	for _, e := range inEdges {
-		select {
-		case inputSamples[e.ToPort] = <-e.Channel:
-		case <-ctx.Done():
-			return
-		}
-	}
-
-	span := prof.StartSpan(ctx, node.String())
-	cfg.InputSamples = inputSamples
-	outputSamples := node.GenerateSamples(ctx, cfg, numSamples)
-	span.Finish()
-
-	for _, e := range g.OutgoingEdges(node.ID()) {
-		select {
-		case e.Channel <- outputSamples:
-		case <-ctx.Done():
-			return
 		}
 	}
 }
