@@ -14,6 +14,8 @@ import (
 	"github.com/bspaans/bleep/sinks"
 	"golang.org/x/term"
 
+	wrt "github.com/wailsapp/wails/v2/pkg/runtime"
+
 	"github.com/jfhamlin/muscrat/pkg/gen/gljimports"
 	"github.com/jfhamlin/muscrat/pkg/graph"
 	"github.com/jfhamlin/muscrat/pkg/ugen"
@@ -22,8 +24,6 @@ import (
 
 	"github.com/glojurelang/glojure/pkgmap"
 	"github.com/glojurelang/glojure/runtime"
-
-	wrt "github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
 func init() {
@@ -37,7 +37,7 @@ func init() {
 }
 
 const (
-	bufferSize = 256
+	bufferSize = 1024
 )
 
 type (
@@ -215,7 +215,7 @@ func (s *Server) getSamples(cfg *audio.AudioConfig, n int) []int {
 			}
 			// TODO: fix the timeout to handle a buffer size that doesn't match the
 			// audio config.
-		case <-time.After(time.Duration(n) * time.Second / time.Duration(cfg.SampleRate)):
+		case <-time.After(time.Duration(bufferSize) * time.Second / time.Duration(cfg.SampleRate)):
 			// return silence if we can't get samples fast enough.
 			fmt.Println("timeout")
 			channelSamples = [][]float64{make([]float64, n), make([]float64, n)}

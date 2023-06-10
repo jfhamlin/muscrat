@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"sync"
 
+	"github.com/jfhamlin/muscrat/pkg/prof"
 	"github.com/jfhamlin/muscrat/pkg/ugen"
 )
 
@@ -46,6 +47,7 @@ type GeneratorNode struct {
 	id        NodeID
 	Generator ugen.SampleGenerator
 	label     string
+	str       string
 }
 
 func (n *GeneratorNode) ID() NodeID {
@@ -65,6 +67,10 @@ func (n *GeneratorNode) Run(ctx context.Context, g *Graph, cfg ugen.SampleConfig
 			}
 		}
 	}()
+
+	incomingEdges := g.IncomingEdges(n.id)
+	outgoingEdges := g.OutgoingEdges(n.id)
+	inputSamples := make(map[string][]float64)
 	for {
 		select {
 		case <-ctx.Done():
@@ -72,7 +78,26 @@ func (n *GeneratorNode) Run(ctx context.Context, g *Graph, cfg ugen.SampleConfig
 		default:
 		}
 
-		RunNode(ctx, n, g, cfg, numSamples)
+		for _, e := range incomingEdges {
+			select {
+			case inputSamples[e.ToPort] = <-e.Channel:
+			case <-ctx.Done():
+				return
+			}
+		}
+
+		span := prof.StartSpan(ctx, n.String())
+		cfg.InputSamples = inputSamples
+		outputSamples := n.GenerateSamples(ctx, cfg, numSamples)
+		span.Finish()
+
+		for _, e := range outgoingEdges {
+			select {
+			case e.Channel <- outputSamples:
+			case <-ctx.Done():
+				return
+			}
+		}
 	}
 }
 
@@ -91,10 +116,7 @@ func (n *GeneratorNode) GenerateSamples(ctx context.Context, cfg ugen.SampleConf
 }
 
 func (n *GeneratorNode) String() string {
-	if n.label != "" {
-		return n.label
-	}
-	return n.ID().String()
+	return n.str
 }
 
 func (n *GeneratorNode) MarshalJSON() ([]byte, error) {
@@ -193,6 +215,14 @@ func (g *Graph) AddGeneratorNode(gen ugen.SampleGenerator, opts ...NodeOption) N
 		Generator: gen,
 		label:     options.label,
 	}
+	{
+		str := "[" + node.ID().String() + "]"
+		if node.label != "" {
+			str += " " + node.label
+		}
+		node.str = str
+	}
+
 	g.Nodes = append(g.Nodes, node)
 	return node
 }
@@ -367,11 +397,10 @@ func RunNode(ctx context.Context, node *GeneratorNode, g *Graph, cfg ugen.Sample
 		}
 	}
 
-	// start := time.Now()
+	span := prof.StartSpan(ctx, node.String())
 	cfg.InputSamples = inputSamples
 	outputSamples := node.GenerateSamples(ctx, cfg, numSamples)
-	// elapsed := time.Since(start)
-	// fmt.Printf("node %s: %s\n", node.String(), elapsed)
+	span.Finish()
 
 	for _, e := range g.OutgoingEdges(node.ID()) {
 		select {

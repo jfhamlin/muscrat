@@ -31,3 +31,11 @@
                  (lores (* 4 s) 0)
                  (freeverb :room-size 0.6))
         ivals)))
+
+;; (play (sum
+;;        (map #(-> (pad impulses (* s %) (decibels -35))
+;;                  (delayl (* 0.01 (math$rand.Float64)))
+;;                  (lores (* 4 s) 0.8)
+;;                  (freeverb :room-size 0.6))
+;;             [3 7 12])))
+
