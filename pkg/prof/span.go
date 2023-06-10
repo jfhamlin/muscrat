@@ -14,14 +14,14 @@ type (
 	}
 )
 
-func StartSpan(ctx context.Context, name string) *Span {
-	return &Span{
+func StartSpan(ctx context.Context, name string) Span {
+	return Span{
 		start: time.Now(),
 		name:  name,
 	}
 }
 
-func (s *Span) Finish() {
+func (s Span) Finish() {
 	if s.finished {
 		return
 	}

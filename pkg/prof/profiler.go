@@ -6,7 +6,7 @@ func init() {
 
 type (
 	Profiler interface {
-		PublishSpan(span *Span)
+		PublishSpan(span Span)
 	}
 
 	NOPProfiler struct{}
@@ -16,4 +16,4 @@ var (
 	GlobalProfiler Profiler
 )
 
-func (p *NOPProfiler) PublishSpan(span *Span) {}
+func (p *NOPProfiler) PublishSpan(span Span) {}

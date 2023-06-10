@@ -55,6 +55,13 @@ func (n *GeneratorNode) ID() NodeID {
 }
 
 func (n *GeneratorNode) Run(ctx context.Context, g *Graph, cfg ugen.SampleConfig, numSamples int) {
+	incomingEdges := g.IncomingEdges(n.id)
+	outgoingEdges := g.OutgoingEdges(n.id)
+	if len(incomingEdges) == 0 && len(outgoingEdges) == 0 {
+		// this node is not connected to anything, so there's nothing to do
+		return
+	}
+
 	if starter, ok := n.Generator.(ugen.Starter); ok {
 		if err := starter.Start(ctx); err != nil {
 			panic(err)
@@ -68,8 +75,6 @@ func (n *GeneratorNode) Run(ctx context.Context, g *Graph, cfg ugen.SampleConfig
 		}
 	}()
 
-	incomingEdges := g.IncomingEdges(n.id)
-	outgoingEdges := g.OutgoingEdges(n.id)
 	inputSamples := make(map[string][]float64)
 	for {
 		select {
