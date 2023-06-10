@@ -6,8 +6,8 @@ import { Piano, KeyboardShortcuts, MidiNumbers } from 'react-piano';
 import 'react-piano/dist/styles.css';
 
 const noteRange = {
-  first: MidiNumbers.fromNote('c4'),
-  last: MidiNumbers.fromNote('f5'),
+  first: MidiNumbers.fromNote('c3'),
+  last: MidiNumbers.fromNote('f4'),
 };
 const keyboardShortcuts = KeyboardShortcuts.create({
   firstNote: noteRange.first,

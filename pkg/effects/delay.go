@@ -20,9 +20,10 @@ func NewDelay() ugen.SampleGenerator {
 	return ugen.SampleGeneratorFunc(func(ctx context.Context, cfg ugen.SampleConfig, n int) []float64 {
 		res := make([]float64, n)
 		in := cfg.InputSamples["$0"]
+		delays := cfg.InputSamples["delay"]
 
 		for i := 0; i < n; i++ {
-			delaySeconds := cfg.InputSamples["delay"][i]
+			delaySeconds := delays[i]
 			if delaySeconds < 0 {
 				delaySeconds = 0
 			}
