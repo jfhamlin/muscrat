@@ -3,7 +3,10 @@ package ugen
 import "context"
 
 func NewConstant(val float64) SampleGenerator {
-	var buf []float64
+	buf := make([]float64, 1024)
+	for i := range buf {
+		buf[i] = val
+	}
 	return SampleGeneratorFunc(func(ctx context.Context, cfg SampleConfig, n int) []float64 {
 		if len(buf) < n {
 			buf = make([]float64, n)

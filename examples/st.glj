@@ -4,8 +4,6 @@
             [mrat.scales :refer :all] :reload
             [mrat.welsh] :reload))
 
-;; START
-;; silence
 (def song-dur (* 60 3))
 
 (def full-drone-volume-time 5)
@@ -25,13 +23,10 @@
 
 (def song-env (env 1 [0 -10 -15 -15 -100] [room-size-1-time 10 (- song-dur room-size-1-time 10) 15]))
 
-;; TODO:
-;; - louder noise over time
-;; - end at a bit after 3 min
-
-(def melody-freq-seq (sequencer [4 16 32] [melody-cf1-time
-                                           melody-cf2-dur
-                                           100]))
+(def melody-freq-seq (env 1 [4 16 32]
+                          [melody-cf1-time
+                           melody-cf2-dur]
+                          :interp :hold))
 
 (def duty-env (env 1 [0.8 0.8 0.2 0.2] [30 2 100]))
 

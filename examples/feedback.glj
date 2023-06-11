@@ -1,0 +1,39 @@
+(ns examples.feedback
+  (:require [mrat.core :refer :all] :reload
+            [mrat.midi :refer :all]))
+
+(def trig (sqr 8))
+(def trig-half (sqr 4))
+
+(def melody (sequencer trig [C3 G3 Eb3 Bb3 C3 A4
+                             C3 G3 Eb3 Bb3 C3 D6
+                             C3 G3 Eb3 Bb3 C3 Bb5]))
+
+(def sig
+  (* (-> (saw melody)
+         (lores (* 5 melody) 0))
+     (env trig [0.0001 1 0.0001] [0.01 0.6] :interp :exp)))
+
+(def drone
+  (-> (sqr C2 :duty 0.2)
+      (* (env trig-half [0.2 1 0.2] [0.1 0.1] :interp :exp))
+      (lores C7 0)))
+
+(def p (pipe))
+
+(def mixed
+  (+ (* 0.8 sig)
+     (* 0.2 p)))
+
+(pipeset! p
+          (-> (delayl mixed 2)
+              (lores (* 4 melody) (sin 1 :mul 0.4 :add 0.4))
+              (freeverb)))
+
+(def out
+  (* (decibels -8)
+     (+ mixed
+        (* 0.3 drone))))
+
+(play out)
+

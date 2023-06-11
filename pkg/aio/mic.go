@@ -77,7 +77,7 @@ type InputDevice struct {
 	started    bool
 }
 
-func (in *InputDevice) Start() error {
+func (in *InputDevice) Start(ctx context.Context) error {
 	inStreamMtx.Lock()
 	defer inStreamMtx.Unlock()
 	if in.started {
@@ -94,7 +94,7 @@ func (in *InputDevice) Start() error {
 	return nil
 }
 
-func (in *InputDevice) Stop() error {
+func (in *InputDevice) Stop(ctx context.Context) error {
 	inStreamMtx.RLock()
 	if !in.started {
 		inStreamMtx.RUnlock()

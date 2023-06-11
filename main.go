@@ -31,6 +31,7 @@ func main() {
 		OnStartup:        app.Startup,
 		Bind: []interface{}{
 			srv,
+			app,
 		},
 	})
 

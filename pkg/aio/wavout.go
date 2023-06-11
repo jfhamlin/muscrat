@@ -23,7 +23,7 @@ func NewWavOut(fname string) *WavOut {
 	}
 }
 
-func (wo *WavOut) Start() error {
+func (wo *WavOut) Start(ctx context.Context) error {
 	var err error
 	wo.f, err = os.Create(wo.fname)
 	if err != nil {
@@ -32,7 +32,7 @@ func (wo *WavOut) Start() error {
 	return nil
 }
 
-func (wo *WavOut) Stop() error {
+func (wo *WavOut) Stop(ctx context.Context) error {
 	if wo.enc == nil {
 		return fmt.Errorf("WavOut not started")
 	}

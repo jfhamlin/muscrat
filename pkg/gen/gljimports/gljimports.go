@@ -11,6 +11,7 @@ import (
 	github_com_jfhamlin_muscrat_pkg_midi "github.com/jfhamlin/muscrat/pkg/midi"
 	github_com_jfhamlin_muscrat_pkg_aio "github.com/jfhamlin/muscrat/pkg/aio"
 	github_com_jfhamlin_muscrat_pkg_graph "github.com/jfhamlin/muscrat/pkg/graph"
+	github_com_jfhamlin_muscrat_pkg_pattern "github.com/jfhamlin/muscrat/pkg/pattern"
 	github_com_jfhamlin_freeverb_go "github.com/jfhamlin/freeverb-go"
 	github_com_jfhamlin_muscrat_pkg_slice "github.com/jfhamlin/muscrat/pkg/slice"
 	"reflect"
@@ -19,6 +20,7 @@ import (
 func RegisterImports(_register func(string, interface{})) {
 	// package github.com/jfhamlin/muscrat/pkg/ugen
 	////////////////////////////////////////
+	_register("github.com/jfhamlin/muscrat/pkg/ugen.CollectIndexedInputs", github_com_jfhamlin_muscrat_pkg_ugen.CollectIndexedInputs)
 	_register("github.com/jfhamlin/muscrat/pkg/ugen.NewConstant", github_com_jfhamlin_muscrat_pkg_ugen.NewConstant)
 	_register("github.com/jfhamlin/muscrat/pkg/ugen.NewFreqRatio", github_com_jfhamlin_muscrat_pkg_ugen.NewFreqRatio)
 	_register("github.com/jfhamlin/muscrat/pkg/ugen.NewProduct", github_com_jfhamlin_muscrat_pkg_ugen.NewProduct)
@@ -277,6 +279,11 @@ func RegisterImports(_register func(string, interface{})) {
 	_register("github.com/jfhamlin/muscrat/pkg/graph.SinkChan", reflect.TypeOf((*github_com_jfhamlin_muscrat_pkg_graph.SinkChan)(nil)).Elem())
 	_register("github.com/jfhamlin/muscrat/pkg/graph.SinkNode", reflect.TypeOf((*github_com_jfhamlin_muscrat_pkg_graph.SinkNode)(nil)).Elem())
 	_register("github.com/jfhamlin/muscrat/pkg/graph.WithLabel", github_com_jfhamlin_muscrat_pkg_graph.WithLabel)
+
+	// package github.com/jfhamlin/muscrat/pkg/pattern
+	////////////////////////////////////////
+	_register("github.com/jfhamlin/muscrat/pkg/pattern.NewChoose", github_com_jfhamlin_muscrat_pkg_pattern.NewChoose)
+	_register("github.com/jfhamlin/muscrat/pkg/pattern.NewSequencer", github_com_jfhamlin_muscrat_pkg_pattern.NewSequencer)
 
 	// package github.com/jfhamlin/freeverb-go
 	////////////////////////////////////////

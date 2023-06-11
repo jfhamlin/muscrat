@@ -1,7 +1,7 @@
-(ns bells
-  (:require [mrat.core :refer :all] :reload
-            [mrat.midi :refer :all] :reload
-            [mrat.welsh] :reload))
+(ns examples.bells
+  (:require [mrat.core :refer :all]
+            [mrat.midi :refer :all]
+            [mrat.welsh]))
 
 (def bell-ratios
   [0.500
@@ -50,6 +50,3 @@
   (apply + (map #(bell gate %)
                 (map #(* root %) ivals))))
 
-(play (-> (bell (sqr 16) C2)
-          (freeverb :room-size 0.7)
-          (* (decibels -5))))

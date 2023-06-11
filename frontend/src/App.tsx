@@ -17,6 +17,10 @@ import {
   /* GraphJSON */
 } from "../wailsjs/go/mrat/Server";
 
+import {
+  SelectFile,
+} from "../wailsjs/go/mrat/App";
+
 import styled from 'styled-components';
 
 import Inspector from './components/Inspector';
@@ -152,6 +156,7 @@ function App() {
             EventsEmit('midi-event', evt);
           }}
         />
+        <button onClick={() => SelectFile()}>Select Script</button>
         <Inspector
           volume={gain}
           setVolume={handleGainChange}

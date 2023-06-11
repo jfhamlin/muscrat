@@ -26,7 +26,7 @@ func NewQwertyMIDI() ugen.SampleGenerator {
 	return &qwertyMIDI{}
 }
 
-func (q *qwertyMIDI) Start() error {
+func (q *qwertyMIDI) Start(ctx context.Context) error {
 	ctx, cancel := context.WithCancel(context.Background())
 	q.cancel = cancel
 	go func() {
@@ -53,7 +53,7 @@ func (q *qwertyMIDI) Start() error {
 	return nil
 }
 
-func (q *qwertyMIDI) Stop() error {
+func (q *qwertyMIDI) Stop(ctx context.Context) error {
 	q.cancel()
 	return nil
 }

@@ -63,6 +63,7 @@ func (n *GeneratorNode) Run(ctx context.Context, g *Graph, cfg ugen.SampleConfig
 	outgoingEdges := g.OutgoingEdges(n.id)
 	if len(incomingEdges) == 0 && len(outgoingEdges) == 0 {
 		// this node is not connected to anything, so there's nothing to do
+		fmt.Printf("node %s is not connected to anything\n", n)
 		return
 	}
 
@@ -209,7 +210,7 @@ func (g *Graph) AddEdge(from, to NodeID, port string) {
 		From:    from,
 		To:      to,
 		ToPort:  port,
-		Channel: make(chan []float64),
+		Channel: make(chan []float64, 1),
 	})
 }
 
@@ -303,7 +304,7 @@ func (g *Graph) Run(ctx context.Context, cfg ugen.SampleConfig) {
 		g.BufferSize = 1024
 	}
 
-	bootstrapCycles(ctx, g, cfg)
+	g.bootstrapCycles(ctx)
 
 	var wg sync.WaitGroup
 	for _, node := range g.Nodes {
@@ -316,7 +317,7 @@ func (g *Graph) Run(ctx context.Context, cfg ugen.SampleConfig) {
 	wg.Wait()
 }
 
-func bootstrapCycles(ctx context.Context, g *Graph, cfg ugen.SampleConfig) {
+func (g *Graph) bootstrapCycles(ctx context.Context) {
 	// initialize any channels required to bootstrap cycles, preventing
 	// deadlock.
 
