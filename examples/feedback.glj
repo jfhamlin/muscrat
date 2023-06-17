@@ -7,33 +7,48 @@
 
 (def melody (sequencer trig [C3 G3 Eb3 Bb3 C3 A4
                              C3 G3 Eb3 Bb3 C3 D6
-                             C3 G3 Eb3 Bb3 C3 Bb5]))
+                             C3 G3 Eb3 Bb3 C3 Bb5
+                             C3 G3 Eb3 Bb3 C3 0]))
 
 (def sig
-  (* (-> (saw melody)
-         (lores (* 5 melody) 0))
-     (env trig [0.0001 1 0.0001] [0.01 0.6] :interp :exp)))
+  (* (-> (* 0.5 (+ (tri melody) (sin melody)))
+         (wfold -1 0.5)
+         (lores (* 4 melody) 0))
+     (env trig [0.0001 1 0.0001] [0.01 0.4] :interp :exp)))
 
 (def drone
-  (-> (sqr C2 :duty 0.2)
+  (-> (sqr C2 :duty (sin 4 :mul 0.05 :add 0.15))
       (* (env trig-half [0.2 1 0.2] [0.1 0.1] :interp :exp))
-      (lores C7 0)))
+      (lores C3 0.6)))
 
 (def p (pipe))
 
 (def mixed
-  (+ (* 0.8 sig)
-     (* 0.2 p)))
+  (+ (* 0.75 sig)
+     (* 0.25 p)))
 
 (pipeset! p
-          (-> (delayl mixed 2)
+          (-> (delayl mixed 0.2)
               (lores (* 4 melody) (sin 1 :mul 0.4 :add 0.4))
               (freeverb)))
 
+(def kick
+  (let [kps 4
+        trig (sqr kps)]
+  (-> (sin 80)
+      (delayl (env trig [0 0.3 0] [0.12 0.1]))
+      (lores 500 0)
+      (* (env trig [0 1 0 0] [0.01 0.11 0.1])))))
+
 (def out
-  (* (decibels -8)
-     (+ mixed
-        (* 0.3 drone))))
+  (let [amp (decibels -5)
+        melody (* mixed (decibels (env 1 [-100 0 0 -100] [16 120 10])))
+        drone (* drone (decibels (env 1 [-20 -5 0 -100] [16 120 10])))
+        kick (* kick (decibels (env 1 [-100 -100 0 0 -100] [30 1 104 10])))]
+    (* amp
+       (+ melody
+          (pan2 (* 0.2 drone) 0.5)
+          (pan2 kick -0.1 1.5)))))
 
+;; (wavout out :filename "./feedback.wav")
 (play out)
-

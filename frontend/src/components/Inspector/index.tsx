@@ -163,7 +163,11 @@ function SignalInspector(props: { signal: SignalInfo }) {
 
         const bins = fft(fftSamps);
         setFreqBinLabels(fftUtil.fftFreq(bins, signal.sampleRate).map((f: number) => Math.round(f)));
-        setFreqBins(fftUtil.fftMag(bins));
+        const mags = fftUtil.fftMag(bins);
+        mags[0] = 0;
+        mags[1] = 0;
+        mags[2] = 0;
+        setFreqBins(mags);
 
         lastFftUpdate.current = now;
       }

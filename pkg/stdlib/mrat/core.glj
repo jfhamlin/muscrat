@@ -410,9 +410,7 @@
   ([in] (wfold in -1 1))
   ([in lo hi]
    (let [wf (add-node! (NewWaveFolder) "wfold")
-         in (as-node in)
-         lo (as-node lo)
-         hi (as-node hi)]
+         [in lo hi] (map as-node [in lo hi])]
      (add-edge! in wf "in")
      (add-edge! lo wf "lo")
      (add-edge! hi wf "hi")
@@ -461,12 +459,12 @@
 (defn wavout
   "Save the input to a 32-bit wav file (up to two channels) named by
   the :filename flag (default out.wav)."
-  [ch & ch-flags]
-  (let [[chs flags] (split-with #(not (keyword? %)) ch-flags)
+  [chs & flags]
+  (let [chs (if (coll? chs) chs [chs])
         flags (validate-flags flags {:filename "out.wav"})
-        _ (if (> (count chs) 1) (throw (str "wavout: too many channels supplied: " (count chs))))
-        ch0 (as-node ch)
-        ch1 (first chs)
+        _ (if (> (count chs) 2) (throw (str "wavout: too many channels supplied: " (count chs))))
+        ch0 (as-node (first chs))
+        ch1 (second chs)
         n (add-node! (NewWavOut (:filename flags)) "wavout")]
     (add-edge! ch0 n "$0")
     (when ch1

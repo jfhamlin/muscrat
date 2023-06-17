@@ -3,6 +3,7 @@ package aio
 import (
 	"context"
 	"fmt"
+	"math"
 	"os"
 
 	"github.com/go-audio/audio"
@@ -58,7 +59,7 @@ func (wo *WavOut) GenerateSamples(ctx context.Context, cfg ugen.SampleConfig, n 
 	}
 
 	if wo.enc == nil {
-		wo.enc = wav.NewEncoder(wo.f, cfg.SampleRateHz, 24, numChan, 1)
+		wo.enc = wav.NewEncoder(wo.f, cfg.SampleRateHz, 32, numChan, 1)
 	}
 
 	buf := &audio.IntBuffer{
@@ -88,5 +89,6 @@ func float64ToInt32(f float64) int {
 		fmt.Printf("clipping: %f < -1.0\n", f)
 		f = -1.0
 	}
-	return int(f * (1<<31 - 1))
+	res := int(f * math.MaxInt32)
+	return res
 }
