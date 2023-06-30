@@ -1,33 +1,36 @@
 (ns synth
   (:require [mrat.core :refer :all] :reload
             [mrat.midi :refer :all]
-            [mrat.scales :refer :all]
-            [examples.bells :as bells]))
+            [mrat.scales :refer :all]))
 
-(def melody-trig (sqr 8 :duty 0.1))
+(def root G3)
+(def bps 6.5)
+(def trig (sqr bps :duty 0.9))
 
-(def root (choose-gate (noise 4) [G3 C4 Bb4 C3 A2]))
 
-(def melody-ivals [7 7 0 7 7 0])
+(def melody-seq
+  (sequencer trig
+             (map #(* root (semitones %))
+                  [0  7  12  0  7 12  5  7 10  8  3 -2 -4  5])))
+(def melody
+  (-> (sin melody-seq)
+      (* (env-asr trig [0.005 1 0.005]))))
 
-(def s (sequencer melody-trig (map #(* root (semitones %)) melody-ivals)))
+(def drone
+  (let [drone-root G4]
+    (-> (sqr drone-root :duty 0.2)
+        (lores (* 2 drone-root) 0.5))))
+        ;; (* (sin bps :mul 0.25 :add 0.75))
+        ;; (lores (-> (sin 1)
+        ;;            (* 2 drone-root)
+        ;;            (+ (* 4 drone-root)))
+        ;;        0))))
+        ;; (freeverb :room-size 0.5))))
 
-(defn instrument
-  [freq gate]
-  (-> (sum (map #(wfold (* 2.5 (sin (* (semitones %) freq))) -1 0.1) [0 7]))
-      (* (env gate [0 1 1 0] [0.001 0.01 0.1] :release-node 2))
-      (lores (* (env gate [0.5 4 4 2] [3 2 5] :interp :exp) root) 0.8)
-      (freeverb :room-size 0.5)
-      (pan2 (sin 1 :mul 0.5 :iphase (math$rand.Float64)))))
 
-(def melody-sig (instrument s melody-trig))
+(play (let [amp (decibels -10)]
+        (* amp
+           (+ drone
+              ;; melody
+              ))))
 
-(def delay-input (+ (* 0.5 (sum melody-sig))))
-(def delay-feedback
-  (-> delay-input
-      (delayl 2)))
-(add-edge! (* 0.25 delay-feedback) delay-input "$1" )
-
-(play (* (decibels -10)
-         (+ melody-sig
-            delay-feedback)))

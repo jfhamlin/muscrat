@@ -73,6 +73,8 @@ func Generator(wavtabIn Table, opts ...GeneratorOption) ugen.SampleGenerator {
 			}
 		}
 
+		// TODO: band-limited interpolation
+
 		res := make([]float64, n)
 		for i := 0; i < n; i++ {
 			if i < len(phases) {

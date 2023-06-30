@@ -8,7 +8,7 @@ import (
 
 func NewSequencer() ugen.UGen {
 	index := 0
-	lastTrig := 0.0
+	lastTrig := 1.0
 	return ugen.UGenFunc(func(ctx context.Context, cfg ugen.SampleConfig, n int) []float64 {
 		trigs := cfg.InputSamples["trigger"]
 		freqs := ugen.CollectIndexedInputs(cfg)

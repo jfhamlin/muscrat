@@ -452,10 +452,6 @@
                   (add-node! (.Gates dev %) "midi-gate"))
          (range num-voices))))
 
-    ;; {:notes (map #(add-node! (.Notes dev %) "midi-note") (range num-voices))
-    ;;  :gates (map #(add-node! (.Gates dev %) "midi-gate") (range num-voices))
-    ;;  }))
-
 (defn wavout
   "Save the input to a 32-bit wav file (up to two channels) named by
   the :filename flag (default out.wav)."

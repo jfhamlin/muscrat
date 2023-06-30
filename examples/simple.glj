@@ -1,0 +1,4 @@
+(ns examples.simple
+  (:require [mrat.core :refer :all]))
+
+(play (sin 80))

@@ -33,12 +33,13 @@
               (freeverb)))
 
 (def kick
-  (let [kps 4
+  (let [freq C2
+        kps 4
         trig (sqr kps)]
-  (-> (sin 80)
-      (delayl (env trig [0 0.3 0] [0.12 0.1]))
-      (lores 500 0)
-      (* (env trig [0 1 0 0] [0.01 0.11 0.1])))))
+    (-> (sin freq)
+        (delayl (env trig [0 0.3 0] [0.12 0.1]))
+        (lores (* 4 freq) 0)
+        (* (env trig [0 1 0 0] [0.01 0.11 0.1])))))
 
 (def out
   (let [amp (decibels -5)
@@ -52,3 +53,4 @@
 
 ;; (wavout out :filename "./feedback.wav")
 (play out)
+

@@ -1,0 +1,25 @@
+(ns examples.echo
+  (:require [mrat.core :refer :all] :reload))
+
+(def trig (sqr 8))
+
+(def delay-time 0.1)
+
+(def dry
+  (let [freqs (map #(* 260 (semitones %)) [0 7 12 0 7 12 5 7 10 8 3 -2 -4 5])
+        f-seq (sequencer trig freqs)]
+    (-> (sin f-seq)
+        (* (env-perc trig [(choose trig [0.005 0.006 0.01 0.003]) 0.1])))))
+
+(defn echo
+  ([in delay-time decay]
+   (echo in delay-time decay identity))
+  ([in delay-time decay filter-fn]
+   (let [feedback (pipe)
+         in (+ in (* feedback decay))
+         wet (filter-fn (delayl in delay-time))]
+     ;; start with a naive mix; 0 is all dry, 1 is all wet
+     (pipeset! feedback wet)
+     (+ in (* wet (decibels -5))))))
+
+(play (echo dry delay-time (decibels -15)))

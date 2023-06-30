@@ -17,7 +17,7 @@
 
 (def ivals (map semitones [3 7 12 14 15 24]))
 
-(def trig (sqr 0.5))
+(def trig (sqr 0.25))
 
 (def s (sequencer trig [E2 G2 Fs2 A2 C2 B2]))
 
