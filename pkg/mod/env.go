@@ -33,6 +33,14 @@ func NewEnvelope(opts ...EnvOption) ugen.SampleGenerator {
 	// Behavior follows that of SuperCollider's Env/EnvGen
 	// https://doc.sccode.org/Classes/Env.html
 
+	type Interp int
+	const (
+		LinInterp Interp = iota
+		ExpInterp
+		HoldInterp
+		SustainInterp
+	)
+
 	o := envOptions{
 		interp:      "lin",
 		releaseNode: -1,
@@ -41,9 +49,42 @@ func NewEnvelope(opts ...EnvOption) ugen.SampleGenerator {
 		opt(&o)
 	}
 
-	triggered := false
-	triggerTime := 0.0
+	interp := LinInterp
+	switch o.interp {
+	case "lin":
+		interp = LinInterp
+	case "exp":
+		interp = ExpInterp
+	case "hold":
+		interp = HoldInterp
+	default:
+		panic(fmt.Sprintf("unknown interpolation type: %s", o.interp))
+	}
+	inputInterp := interp
+
 	lastGate := false
+
+	level := 0.0
+	stage := 0
+	delta := 0.0
+	counter := 0
+
+	setupStage := func(cfg ugen.SampleConfig, levels, times [][]float64, idx int) {
+		stageLevel := levels[stage][idx]
+		stageTime := times[stage-1][idx]
+
+		interp = inputInterp
+		counter = int(stageTime * float64(cfg.SampleRateHz))
+		switch interp {
+		case LinInterp:
+			delta = (stageLevel - level) / float64(counter)
+		case ExpInterp:
+			delta = math.Pow(stageLevel/level, 1/float64(counter))
+		case HoldInterp:
+			delta = 0
+		}
+	}
+
 	return ugen.SampleGeneratorFunc(func(ctx context.Context, cfg ugen.SampleConfig, n int) []float64 {
 		res := make([]float64, n)
 
@@ -53,79 +94,60 @@ func NewEnvelope(opts ...EnvOption) ugen.SampleGenerator {
 		if len(gate) == 0 {
 			gate = make([]float64, n)
 		}
+		if len(levels) == 0 {
+			return res
+		}
+		if len(levels) == 1 {
+			for i := 0; i < n; i++ {
+				res[i] = levels[0][i]
+			}
+			return res
+		}
 
 		for i := 0; i < n; i++ {
-			var envDur float64
-			for _, t := range times {
-				envDur += t[i]
+			if stage == 0 {
+				level = levels[0][i]
 			}
 
-			if (!triggered || triggerTime > envDur) && gate[i] > 0 && !lastGate {
-				triggered = true
-				triggerTime = 0
+			if gate[i] > 0 && !lastGate {
+				stage = 1
+				setupStage(cfg, levels, times, i)
 			}
-
-			if triggered && gate[i] > 0 && !lastGate {
-				// reset the envelope
-				// TODO: smooth the transition
-				triggerTime = 0
-			}
-
 			lastGate = gate[i] > 0
 
-			if !triggered {
-				res[i] = levels[0][i]
-				continue
-			}
-			if triggerTime > envDur {
-				if len(levels) == 0 {
-					fmt.Println("EMPTY LEVELS???", len(times))
-				}
-				res[i] = levels[len(levels)-1][i]
+			if stage == 0 {
+				res[i] = level
 				continue
 			}
 
-			// interpolate between the two levels adjacent to the current
-			// time. Find the next node by finding the first node time that
-			// is greater than the current time.
-			//
-			// Or, if the previous node is the release node and the gate is
-			// still high, hold the release node level.
-			//
-			// For example
-			//   A    D    R
-			// |----|----|----|
-			// 0    1    2    3
-			var timeSum float64
-			for j, t := range times {
-				if lastGate && j == o.releaseNode {
-					res[i] = levels[j][i]
-					break
+			switch interp {
+			case LinInterp:
+				level += delta
+			case ExpInterp:
+				level *= delta
+			case HoldInterp:
+				level = levels[stage-1][i]
+			case SustainInterp:
+				// do nothing
+			}
+
+			counter--
+			if counter <= 0 {
+				if stage < len(levels) {
+					level = levels[stage][i]
 				}
-				timeSum += t[i]
-				if timeSum >= triggerTime {
-					level1 := levels[j][i]
-					level2 := levels[j+1][i]
-					// interpolate between levels[j] and levels[j+1]
-					// at time triggerTime
-					if t[i] == 0 {
-						res[i] = level2
+				if lastGate && stage == o.releaseNode {
+					interp = SustainInterp
+				} else {
+					stage++
+					if stage < len(levels) {
+						setupStage(cfg, levels, times, i)
 					} else {
-						switch o.interp {
-						case "lin":
-							res[i] = level1 + (level2-level1)*(triggerTime-(timeSum-t[i]))/t[i]
-						case "exp":
-							res[i] = level1 * math.Pow(level2/level1, (triggerTime-(timeSum-t[i]))/t[i])
-						case "hold":
-							res[i] = level1
-						default:
-							panic(fmt.Sprintf("unknown interpolation type: %s", o.interp))
-						}
+						interp = SustainInterp
 					}
-					triggerTime += 1 / float64(cfg.SampleRateHz)
-					break
 				}
 			}
+			res[i] = level
 		}
 		return res
 	})
