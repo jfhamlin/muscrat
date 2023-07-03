@@ -81,6 +81,7 @@ func NewEnvelope(opts ...EnvOption) ugen.SampleGenerator {
 		case ExpInterp:
 			delta = math.Pow(stageLevel/level, 1/float64(counter))
 		case HoldInterp:
+			level = stageLevel
 			delta = 0
 		}
 	}
@@ -126,7 +127,7 @@ func NewEnvelope(opts ...EnvOption) ugen.SampleGenerator {
 			case ExpInterp:
 				level *= delta
 			case HoldInterp:
-				level = levels[stage-1][i]
+				// do nothing
 			case SustainInterp:
 				// do nothing
 			}
