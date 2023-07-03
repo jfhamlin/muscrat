@@ -3,7 +3,6 @@ package stochastic
 import (
 	"context"
 	"math"
-	"math/rand"
 
 	"github.com/jfhamlin/muscrat/pkg/ugen"
 )
@@ -12,24 +11,17 @@ import (
 // Supercollider's Noise2, generates quadratically interpolated random
 // values at a rate given by the nearest integer division of the
 // sample rate by the freq argument.
-func NewNoiseQuad(opts ...Option) ugen.SampleGenerator {
-	o := options{
-		seed: rand.Int63(),
-		add:  0.0,
-		mul:  1.0,
-	}
+func NewNoiseQuad(opts ...ugen.Option) ugen.SampleGenerator {
+	o := ugen.DefaultOptions()
 	for _, opt := range opts {
 		opt(&o)
 	}
 
-	rnd := o.rand
-	if rnd == nil {
-		rnd = rand.New(rand.NewSource(o.seed))
-	}
-	add := o.add
-	mul := o.mul
+	rnd := o.Rand
+	add := o.Add
+	mul := o.Mul
 
-	level := 0.0
+	level := mul*(2*rnd.Float64()-1) + add
 	slope := 0.0
 	curve := 0.0
 	nextValue := 0.0
@@ -53,7 +45,7 @@ func NewNoiseQuad(opts ...Option) ugen.SampleGenerator {
 
 			if counter <= 0 {
 				value := nextValue
-				nextValue = mul*2*rnd.Float64() - 1 + add
+				nextValue = mul*(2*rnd.Float64()-1) + add
 				level = nextMidPt
 				nextMidPt = (value + nextValue) * 0.5
 

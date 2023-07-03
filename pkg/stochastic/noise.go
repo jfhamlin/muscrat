@@ -3,26 +3,21 @@ package stochastic
 import (
 	"context"
 	"math"
-	"math/rand"
 
 	"github.com/jfhamlin/muscrat/pkg/ugen"
 )
 
 // NewNoise returns a new Noise ugen. If freq is 0, the noise will be
 // white.
-func NewNoise(opts ...Option) ugen.SampleGenerator {
-	o := options{
-		rand: rand.New(rand.NewSource(0)),
-		add:  0.0,
-		mul:  1.0,
-	}
+func NewNoise(opts ...ugen.Option) ugen.SampleGenerator {
+	o := ugen.DefaultOptions()
 	for _, opt := range opts {
 		opt(&o)
 	}
 
-	rnd := o.rand
-	add := o.add
-	mul := o.mul
+	rnd := o.Rand
+	add := o.Add
+	mul := o.Mul
 
 	last := mul*2*rnd.Float64() - 1 + add
 	counter := 0
@@ -40,13 +35,13 @@ func NewNoise(opts ...Option) ugen.SampleGenerator {
 			freq = math.Max(0, freq)
 			if freq == 0 {
 				counter = 1
-				last = mul*2*rnd.Float64() - 1 + add
+				last = mul*(2*rnd.Float64()-1) + add
 			} else if counter <= 0 {
 				counter = int(float64(cfg.SampleRateHz) / freq)
 				if counter <= 0 {
 					counter = 1
 				}
-				last = mul*2*rnd.Float64() - 1 + add
+				last = mul*(2*rnd.Float64()-1) + add
 			}
 			nsamp := counter
 			if nsamp > remain {

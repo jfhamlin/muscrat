@@ -1,0 +1,6 @@
+(ns examples.wavout
+  (:require [mrat.core :refer :all] :reload))
+
+(def sig (sin))
+(wavout sig)
+(play sig)

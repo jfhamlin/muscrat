@@ -7,73 +7,70 @@ import (
 	"github.com/jfhamlin/muscrat/pkg/ugen"
 )
 
-func NewDelay() ugen.SampleGenerator {
-	// Simulate a tape delay by using a buffer of samples with a read
-	// and write pointer. If the delay is changed, we simulate a
-	// physical read/write head by maintaining a sample velocity for the
-	// read head. The write head is always at the end of the buffer. The
-	// read head can never move backwards, so if the delay is decreased,
-	// the read head will accelerate, and if the delay is increased, the
-	// read head will decelerate.
-	var tape []float64
-	var readHead float64
-	return ugen.SampleGeneratorFunc(func(ctx context.Context, cfg ugen.SampleConfig, n int) []float64 {
+func NewDelay(maxDelay float64, opts ...ugen.Option) ugen.UGen {
+	o := ugen.DefaultOptions()
+	for _, opt := range opts {
+		opt(&o)
+	}
+
+	add := o.Add
+	mul := o.Mul
+
+	var mask int
+	var buf []float64
+	var writePos int
+
+	var interp func(idx int, frac float64) float64
+	switch o.Interp {
+	case ugen.InterpNone:
+		interp = func(idx int, frac float64) float64 {
+			return buf[idx&mask]
+		}
+	case ugen.InterpLinear:
+		interp = func(idx int, frac float64) float64 {
+			return ugen.LinInterp(frac, buf[idx&mask], buf[(idx-1)&mask])
+		}
+	case ugen.InterpCubic:
+		interp = func(idx int, frac float64) float64 {
+			x0 := buf[(idx+1)&mask]
+			x1 := buf[idx&mask]
+			x2 := buf[(idx-1)&mask]
+			x3 := buf[(idx-2)&mask]
+			return ugen.CubInterp(frac, x0, x1, x2, x3)
+		}
+	default:
+		panic("unknown interpolation type")
+	}
+
+	return ugen.UGenFunc(func(ctx context.Context, cfg ugen.SampleConfig, n int) []float64 {
+		if buf == nil {
+			sz := ugen.NextPowerOf2(int(math.Ceil(maxDelay*float64(cfg.SampleRateHz) + 1)))
+			mask = sz - 1
+			buf = make([]float64, sz)
+		}
+
 		res := make([]float64, n)
-		in := cfg.InputSamples["$0"]
+
+		in := cfg.InputSamples["in"]
 		delays := cfg.InputSamples["delay"]
 
 		for i := 0; i < n; i++ {
 			delaySeconds := delays[i]
+			if delaySeconds > maxDelay {
+				delaySeconds = maxDelay
+			}
 			if delaySeconds < 0 {
 				delaySeconds = 0
 			}
+			buf[writePos&mask] = in[i]
+
 			delaySamples := delaySeconds * float64(cfg.SampleRateHz)
-			// handle the initialization case, where the tape hasn't been set up yet.
-			if tape == nil {
-				tape = make([]float64, int(delaySeconds*float64(cfg.SampleRateHz)))
-			}
-			actualDelaySamples := float64(len(tape)) - readHead
+			delaySamplesInt, delaySamplesFrac := math.Modf(delaySamples)
 
-			tape = append(tape, in[i])
+			readPos := writePos - int(delaySamplesInt)
+			res[i] = mul*interp(readPos, delaySamplesFrac) + add
 
-			if len(tape) == 1 {
-				res[i] = tape[0]
-			} else {
-				// read the sample from the tape at the read head with linear interpolation
-				// between the two adjacent samples.
-				readHeadInt := int(readHead)
-				readHeadFrac := readHead - float64(readHeadInt)
-				res[i] = tape[readHeadInt]*(1-readHeadFrac) + tape[readHeadInt+1]*readHeadFrac
-			}
-
-			const maxStep = 2
-			const minStep = 1 / maxStep
-
-			// update the read head position with max and min bounds to prevent
-			// the read head from moving backwards or infinitely forward.
-			if delaySamples == 0 && actualDelaySamples > 0 {
-				readHead += maxStep
-			} else if actualDelaySamples > maxStep*delaySamples {
-				readHead += maxStep
-			} else if actualDelaySamples < minStep*delaySamples {
-				readHead += minStep
-			} else {
-				vel := actualDelaySamples / delaySamples
-				if math.IsNaN(vel) {
-					readHead += maxStep
-				} else {
-					readHead += math.Max(minStep, math.Min(maxStep, vel))
-				}
-			}
-			if readHead >= float64(len(tape)) {
-				readHead = 0
-				tape = tape[:0]
-			}
-			// drop samples that have already been read from the tape.
-			if readHead > 1 {
-				tape = tape[int(readHead):]
-				readHead = readHead - math.Floor(readHead)
-			}
+			writePos++
 		}
 
 		return res

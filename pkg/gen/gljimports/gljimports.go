@@ -21,10 +21,25 @@ func RegisterImports(_register func(string, interface{})) {
 	// package github.com/jfhamlin/muscrat/pkg/ugen
 	////////////////////////////////////////
 	_register("github.com/jfhamlin/muscrat/pkg/ugen.CollectIndexedInputs", github_com_jfhamlin_muscrat_pkg_ugen.CollectIndexedInputs)
+	_register("github.com/jfhamlin/muscrat/pkg/ugen.CubInterp", github_com_jfhamlin_muscrat_pkg_ugen.CubInterp)
+	_register("github.com/jfhamlin/muscrat/pkg/ugen.DefaultOptions", github_com_jfhamlin_muscrat_pkg_ugen.DefaultOptions)
+	_register("github.com/jfhamlin/muscrat/pkg/ugen.Interp", reflect.TypeOf((*github_com_jfhamlin_muscrat_pkg_ugen.Interp)(nil)).Elem())
+	_register("github.com/jfhamlin/muscrat/pkg/ugen.InterpCubic", github_com_jfhamlin_muscrat_pkg_ugen.InterpCubic)
+	_register("github.com/jfhamlin/muscrat/pkg/ugen.InterpLinear", github_com_jfhamlin_muscrat_pkg_ugen.InterpLinear)
+	_register("github.com/jfhamlin/muscrat/pkg/ugen.InterpNone", github_com_jfhamlin_muscrat_pkg_ugen.InterpNone)
+	_register("github.com/jfhamlin/muscrat/pkg/ugen.LinInterp", github_com_jfhamlin_muscrat_pkg_ugen.LinInterp)
+	_register("github.com/jfhamlin/muscrat/pkg/ugen.NewAbs", github_com_jfhamlin_muscrat_pkg_ugen.NewAbs)
 	_register("github.com/jfhamlin/muscrat/pkg/ugen.NewConstant", github_com_jfhamlin_muscrat_pkg_ugen.NewConstant)
+	_register("github.com/jfhamlin/muscrat/pkg/ugen.NewCopySign", github_com_jfhamlin_muscrat_pkg_ugen.NewCopySign)
+	_register("github.com/jfhamlin/muscrat/pkg/ugen.NewExp", github_com_jfhamlin_muscrat_pkg_ugen.NewExp)
 	_register("github.com/jfhamlin/muscrat/pkg/ugen.NewFreqRatio", github_com_jfhamlin_muscrat_pkg_ugen.NewFreqRatio)
+	_register("github.com/jfhamlin/muscrat/pkg/ugen.NewImpulse", github_com_jfhamlin_muscrat_pkg_ugen.NewImpulse)
 	_register("github.com/jfhamlin/muscrat/pkg/ugen.NewProduct", github_com_jfhamlin_muscrat_pkg_ugen.NewProduct)
+	_register("github.com/jfhamlin/muscrat/pkg/ugen.NewQuotient", github_com_jfhamlin_muscrat_pkg_ugen.NewQuotient)
 	_register("github.com/jfhamlin/muscrat/pkg/ugen.NewSum", github_com_jfhamlin_muscrat_pkg_ugen.NewSum)
+	_register("github.com/jfhamlin/muscrat/pkg/ugen.NextPowerOf2", github_com_jfhamlin_muscrat_pkg_ugen.NextPowerOf2)
+	_register("github.com/jfhamlin/muscrat/pkg/ugen.Option", reflect.TypeOf((*github_com_jfhamlin_muscrat_pkg_ugen.Option)(nil)).Elem())
+	_register("github.com/jfhamlin/muscrat/pkg/ugen.Options", reflect.TypeOf((*github_com_jfhamlin_muscrat_pkg_ugen.Options)(nil)).Elem())
 	_register("github.com/jfhamlin/muscrat/pkg/ugen.SampleConfig", reflect.TypeOf((*github_com_jfhamlin_muscrat_pkg_ugen.SampleConfig)(nil)).Elem())
 	_register("github.com/jfhamlin/muscrat/pkg/ugen.SampleGenerator", reflect.TypeOf((*github_com_jfhamlin_muscrat_pkg_ugen.SampleGenerator)(nil)).Elem())
 	_register("github.com/jfhamlin/muscrat/pkg/ugen.SampleGeneratorFunc", reflect.TypeOf((*github_com_jfhamlin_muscrat_pkg_ugen.SampleGeneratorFunc)(nil)).Elem())
@@ -33,6 +48,11 @@ func RegisterImports(_register func(string, interface{})) {
 	_register("github.com/jfhamlin/muscrat/pkg/ugen.Stopper", reflect.TypeOf((*github_com_jfhamlin_muscrat_pkg_ugen.Stopper)(nil)).Elem())
 	_register("github.com/jfhamlin/muscrat/pkg/ugen.UGen", reflect.TypeOf((*github_com_jfhamlin_muscrat_pkg_ugen.UGen)(nil)).Elem())
 	_register("github.com/jfhamlin/muscrat/pkg/ugen.UGenFunc", reflect.TypeOf((*github_com_jfhamlin_muscrat_pkg_ugen.UGenFunc)(nil)).Elem())
+	_register("github.com/jfhamlin/muscrat/pkg/ugen.WithAdd", github_com_jfhamlin_muscrat_pkg_ugen.WithAdd)
+	_register("github.com/jfhamlin/muscrat/pkg/ugen.WithInterp", github_com_jfhamlin_muscrat_pkg_ugen.WithInterp)
+	_register("github.com/jfhamlin/muscrat/pkg/ugen.WithMul", github_com_jfhamlin_muscrat_pkg_ugen.WithMul)
+	_register("github.com/jfhamlin/muscrat/pkg/ugen.WithRand", github_com_jfhamlin_muscrat_pkg_ugen.WithRand)
+	_register("github.com/jfhamlin/muscrat/pkg/ugen.WithSeed", github_com_jfhamlin_muscrat_pkg_ugen.WithSeed)
 
 	// package github.com/jfhamlin/muscrat/pkg/wavtabs
 	////////////////////////////////////////
@@ -54,19 +74,17 @@ func RegisterImports(_register func(string, interface{})) {
 	_register("github.com/jfhamlin/muscrat/pkg/stochastic.NewNoise", github_com_jfhamlin_muscrat_pkg_stochastic.NewNoise)
 	_register("github.com/jfhamlin/muscrat/pkg/stochastic.NewNoiseQuad", github_com_jfhamlin_muscrat_pkg_stochastic.NewNoiseQuad)
 	_register("github.com/jfhamlin/muscrat/pkg/stochastic.NewPinkNoise", github_com_jfhamlin_muscrat_pkg_stochastic.NewPinkNoise)
-	_register("github.com/jfhamlin/muscrat/pkg/stochastic.Option", reflect.TypeOf((*github_com_jfhamlin_muscrat_pkg_stochastic.Option)(nil)).Elem())
 	_register("github.com/jfhamlin/muscrat/pkg/stochastic.PinkNoise", reflect.TypeOf((*github_com_jfhamlin_muscrat_pkg_stochastic.PinkNoise)(nil)).Elem())
-	_register("github.com/jfhamlin/muscrat/pkg/stochastic.WithAdd", github_com_jfhamlin_muscrat_pkg_stochastic.WithAdd)
-	_register("github.com/jfhamlin/muscrat/pkg/stochastic.WithMul", github_com_jfhamlin_muscrat_pkg_stochastic.WithMul)
-	_register("github.com/jfhamlin/muscrat/pkg/stochastic.WithRand", github_com_jfhamlin_muscrat_pkg_stochastic.WithRand)
-	_register("github.com/jfhamlin/muscrat/pkg/stochastic.WithSeed", github_com_jfhamlin_muscrat_pkg_stochastic.WithSeed)
 
 	// package github.com/jfhamlin/muscrat/pkg/effects
 	////////////////////////////////////////
 	_register("github.com/jfhamlin/muscrat/pkg/effects.NewBPF", github_com_jfhamlin_muscrat_pkg_effects.NewBPF)
+	_register("github.com/jfhamlin/muscrat/pkg/effects.NewBitcrusher", github_com_jfhamlin_muscrat_pkg_effects.NewBitcrusher)
+	_register("github.com/jfhamlin/muscrat/pkg/effects.NewClip", github_com_jfhamlin_muscrat_pkg_effects.NewClip)
 	_register("github.com/jfhamlin/muscrat/pkg/effects.NewDelay", github_com_jfhamlin_muscrat_pkg_effects.NewDelay)
 	_register("github.com/jfhamlin/muscrat/pkg/effects.NewFreeverb", github_com_jfhamlin_muscrat_pkg_effects.NewFreeverb)
 	_register("github.com/jfhamlin/muscrat/pkg/effects.NewLowpassFilter", github_com_jfhamlin_muscrat_pkg_effects.NewLowpassFilter)
+	_register("github.com/jfhamlin/muscrat/pkg/effects.NewTapeDelay", github_com_jfhamlin_muscrat_pkg_effects.NewTapeDelay)
 	_register("github.com/jfhamlin/muscrat/pkg/effects.NewWaveFolder", github_com_jfhamlin_muscrat_pkg_effects.NewWaveFolder)
 	_register("github.com/jfhamlin/muscrat/pkg/effects.WaveFolder", reflect.TypeOf((*github_com_jfhamlin_muscrat_pkg_effects.WaveFolder)(nil)).Elem())
 

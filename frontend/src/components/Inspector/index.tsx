@@ -108,7 +108,7 @@ function SignalInspector(props: { signal: SignalInfo }) {
     setOscilloscopeWindow(newValue as number);
   };
 
-  const [oscilloscopeFreq, setOscilloscopeFreq] = useState(1);
+  const [oscilloscopeFreq, setOscilloscopeFreq] = useState(10);
   const handleOscilloscopeFreqChange = (
     event: Event,
     newValue: number | Array<number>,
@@ -116,7 +116,7 @@ function SignalInspector(props: { signal: SignalInfo }) {
     setOscilloscopeFreq(newValue as number);
   };
 
-  const [fftFreq, setFftFreq] = useState(4);
+  const [fftFreq, setFftFreq] = useState(15);
   const handleFftFreqChange = (
     event: Event,
     newValue: number | Array<number>,
@@ -164,9 +164,6 @@ function SignalInspector(props: { signal: SignalInfo }) {
         const bins = fft(fftSamps);
         setFreqBinLabels(fftUtil.fftFreq(bins, signal.sampleRate).map((f: number) => Math.round(f)));
         const mags = fftUtil.fftMag(bins);
-        mags[0] = 0;
-        mags[1] = 0;
-        mags[2] = 0;
         setFreqBins(mags);
 
         lastFftUpdate.current = now;

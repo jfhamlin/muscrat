@@ -4,8 +4,17 @@
            (github.com$jfhamlin$muscrat$pkg$ugen NewConstant
                                                  NewSum
                                                  NewProduct
+                                                 NewQuotient
+                                                 NewAbs
+                                                 NewExp
+                                                 NewCopySign
                                                  NewFreqRatio
-                                                 SimpleSampleGeneratorFunc)
+                                                 NewImpulse
+                                                 SimpleSampleGeneratorFunc
+                                                 WithInterp
+                                                 InterpNone
+                                                 InterpLinear
+                                                 InterpCubic)
            (github.com$jfhamlin$muscrat$pkg$wavtabs Generator
                                                     Table
                                                     WithDefaultDutyCycle
@@ -26,7 +35,9 @@
                                                     NewLowpassFilter
                                                     NewBPF
                                                     NewDelay
-                                                    NewWaveFolder)
+                                                    NewTapeDelay
+                                                    NewWaveFolder
+                                                    NewClip)
            (github.com$jfhamlin$muscrat$pkg$sampler NewSampler
                                                     LoadSample)
            (github.com$jfhamlin$muscrat$pkg$aio NewInputDevice
@@ -86,6 +97,31 @@
 (defn pow
   [b e] (math.Pow b e)) ;; TODO: use glojure.math
 
+(defn abs
+  [x]
+  (if (instance? Node x)
+    (let [n (add-node! (NewAbs) "abs")]
+      (add-edge! x n "in")
+      n)
+    (math.Abs x)))
+
+(defn exp
+  [x]
+  (if (instance? Node x)
+    (let [n (add-node! (NewExp) "exp")]
+      (add-edge! x n "in")
+      n)
+    (math.Exp x)))
+
+(defn copy-sign
+  [x s]
+  (if (or (instance? Node x) (instance? Node s))
+    (let [n (add-node! (NewCopySign) "copy-sign")]
+      (add-edge! (as-node x) n "in")
+      (add-edge! (as-node s) n "sign")
+      n)
+    (math.Copysign x s)))
+
 (defn- freq-ratio
   [x kind]
   (let [n (add-node! (NewFreqRatio kind) kind)]
@@ -98,7 +134,13 @@
     (freq-ratio db "decibels")
     (pow 10 (/ db 20.0))))
 
-(defn cents [x] (pow 2 (/ x 1200.0)))
+(defn cents
+  [x]
+  (if (instance? Node x)
+    (let [cnt (add-node! (NewFreqRatio "cents") "cents")]
+      (add-edge! x cnt "in")
+      cnt)
+    (pow 2 (/ x 1200.0))))
 
 (defn semitones
   [x]
@@ -133,8 +175,9 @@
     (if (empty? ugens)
       num-sum
       (let [sum-node (add-node! (NewSum) "+")
-            nodes (if (zero? num-sum) ugens
-                      (conj ugens (add-node! (NewConstant num-sum) num-sum)))]
+            nodes (if (zero? num-sum)
+                    ugens
+                    (conj ugens (add-node! (NewConstant num-sum) num-sum)))]
         (doseq [[n i] (map vector nodes (range (count nodes)))]
           (add-edge! n sum-node (str \$ i)))
         sum-node))))
@@ -192,6 +235,29 @@
              colls (map #(take max-len (cycle %)) colls)]
          (apply map * colls))
        (apply *-internal args)))))
+
+(defn- div-internal
+  [& xs]
+  (if (every? #(not (instance? Node %)) xs)
+    (apply glojure.core// xs)
+    (let [quot-node (add-node! (NewQuotient) "/")
+          nodes (map as-node xs)]
+      (doseq [[n i] (map vector nodes (range (count nodes)))]
+        (add-edge! n quot-node (str \$ i)))
+      quot-node)))
+
+(defn /
+  "Return the quotient of any combination of numbers or ugens.
+  If any argument to / is a node, then the result of / is a node."
+  ([x] (/ 1 x))
+  ([x & more]
+   (let [args (cons x more)]
+     (if (some coll? args)
+       (let [colls (map #(if (coll? %) % [%]) args)
+             max-len (apply max (map count colls))
+             colls (map #(take max-len (cycle %)) colls)]
+         (apply map / colls))
+       (apply div-internal args)))))
 
 (defn sum
   [coll] (apply + coll))
@@ -255,6 +321,17 @@
 (defwtosc pulse Pulse :default-duty 0.5)
 (defwtosc sqr Pulse :default-duty 0.5)
 
+(defn impulse
+  [freq & flags]
+  (let [flags (validate-flags flags {:iphase 0})
+        iphase (:iphase flags)
+        iphase (if iphase (as-node iphase))
+        freq-node (as-node freq)
+        node (add-node! (NewImpulse) (WithLabel "impulse"))]
+    (if iphase (add-edge! iphase node "iphase"))
+    (add-edge! freq-node node "w")
+    node))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Noise
 
@@ -265,8 +342,11 @@
   If frequency is zero or not provided, generates white noise. Currently,
   frequency must be a number, not a node."
   ([] (noise 0))
-  ([freq]
-   (let [n (add-node! (NewNoise) "noise")
+  ([freq & flags]
+   (let [flags (validate-flags flags {:mul 1.0 :add 0.0})
+         opts [(github.com$jfhamlin$muscrat$pkg$ugen.WithMul (:mul flags))
+               (github.com$jfhamlin$muscrat$pkg$ugen.WithAdd (:add flags))]
+         n (add-node! (apply NewNoise opts) "noise")
          f (as-node freq)]
      (add-edge! f n "w")
      n)))
@@ -280,8 +360,11 @@
   -1 and 1 at the given frequency. If frequency is zero or not
   provided, generates at 500 hz."
   ([] (noise-quad 500.0))
-  ([freq]
-   (let [n (add-node! (NewNoiseQuad) "noise-quad")
+  ([freq & flags]
+   (let [flags (validate-flags flags {:mul 1.0 :add 0.0})
+         opts [(github.com$jfhamlin$muscrat$pkg$ugen.WithMul (:mul flags))
+               (github.com$jfhamlin$muscrat$pkg$ugen.WithAdd (:add flags))]
+         n (add-node! (apply NewNoiseQuad opts) "noise-quad")
          f (as-node freq)]
      (add-edge! f n "w")
      n)))
@@ -384,13 +467,72 @@
     (add-edge! bw filter "bw")
     filter))
 
+(defn- -delay
+  [in max-delay-time delay-time interp-opt & flags]
+  (let [flags (validate-flags flags {:mul 1.0 :add 0.0})
+        opts [(github.com$jfhamlin$muscrat$pkg$ugen.WithMul (:mul flags))
+              (github.com$jfhamlin$muscrat$pkg$ugen.WithAdd (:add flags))]
+        delay (add-node! (apply NewDelay max-delay-time interp-opt opts) "delay")]
+    (add-edge! (as-node in) delay "in")
+    (add-edge! (as-node delay-time) delay "delay")
+    delay))
+
+(defn delayn
+  [in max-delay-time delay-time & flags]
+  (apply -delay in max-delay-time delay-time (WithInterp InterpNone) flags))
+
 (defn delayl
-  "Delay line with linear interpolation."
+  [in max-delay-time delay-time & flags]
+  (apply -delay in max-delay-time delay-time (WithInterp InterpLinear) flags))
+
+(defn delayc
+  [in max-delay-time delay-time & flags]
+  (apply -delay in max-delay-time delay-time (WithInterp InterpCubic) flags))
+
+(defn tape-delayl
+  "Tape delay line with linear interpolation. This generator simulates a
+  tape read head such that changes to the delay value are not
+  instantaneous - the 'tape' is sped up or slowed down to reach the
+  target delay time."
   [n delay-time]
-  (let [delay (add-node! (NewDelay) "delay")]
+  (let [delay (add-node! (NewTapeDelay) "tape-delay")]
     (add-edge! (as-node n) delay "$0")
     (add-edge! (as-node delay-time) delay "delay")
     delay))
+
+(defn- comb-feedback
+  [delay-time decay-time]
+  (if (or (and (not (instance? Node delay-time)) (zero? delay-time))
+          (and (not (instance? Node decay-time)) (zero? decay-time)))
+    0.0
+    (let [abs-decay (abs decay-time)
+          power (/ (* (math.Log 0.001) delay-time) abs-decay)
+          absret (exp power)]
+      (copy-sign absret decay-time))))
+
+(defn- -comb
+  [in max-delay-time delay-time decay-time delay-fn & flags]
+  (let [flags (validate-flags flags {:mul 1.0 :add 0.0})
+        opts [(github.com$jfhamlin$muscrat$pkg$ugen.WithMul (:mul flags))
+              (github.com$jfhamlin$muscrat$pkg$ugen.WithAdd (:add flags))]
+        feedback (pipe)
+        delay (delay-fn feedback max-delay-time delay-time)
+        fb-coefficient (comb-feedback delay-time decay-time)
+        comb (+ in (* fb-coefficient delay))]
+    (pipeset! feedback comb)
+    comb))
+
+(defn combn
+  [in max-delay-time delay-time decay-time & flags]
+  (apply -comb in max-delay-time delay-time decay-time delayn flags))
+
+(defn combl
+  [in max-delay-time delay-time decay-time & flags]
+  (apply -comb in max-delay-time delay-time decay-time delayl flags))
+
+(defn combc
+  [in max-delay-time delay-time decay-time & flags]
+  (apply -comb in max-delay-time delay-time decay-time delayc flags))
 
 (defn pan2
   ([in pos] (pan2 in pos 1))
@@ -402,6 +544,16 @@
          right-scale (+ mid (* 0.5 pos) sq)]
      [(* level left-scale in)
       (* level right-scale in)])))
+
+(defn clip
+  ([in] (clip in -1 1))
+  ([in lo hi]
+   (let [c (add-node! (NewClip) "clip")
+         [in lo hi] (map as-node [in lo hi])]
+     (add-edge! in c "in")
+     (add-edge! lo c "lo")
+     (add-edge! hi c "hi")
+     c)))
 
 (defn wfold
   "Fold an input signal when it exceeds threshold low/high values.
@@ -416,6 +568,17 @@
      (add-edge! hi wf "hi")
      wf)))
 
+(defn bitcrusher
+  ([in bits] (bitcrusher in bits 44100.0))
+  ([in bits rate]
+   (let [rate (as-node rate)
+         bits (as-node bits)
+         out (add-node! (github.com$jfhamlin$muscrat$pkg$effects.NewBitcrusher) "bitcrusher")]
+     (add-edge! in out "in")
+     (add-edge! rate out "rate")
+     (add-edge! bits out "bits")
+     out)))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Sampler
 
@@ -424,10 +587,19 @@
 
 (defn sampler
   ([sample & flags]
-   (let [flags (validate-flags flags {:loop true})
+   (let [[gate flags] (if-not (keyword? (first flags))
+                        [(first flags) (rest flags)]
+                        [nil flags])
+         [rate flags] (if-not (keyword? (first flags))
+                        [(first flags) (rest flags)]
+                        [nil flags])
+         flags (validate-flags flags {:loop false})
          node (add-node! (NewSampler (seq sample) (:loop flags)) "sampler")]
+     (if gate
+       (add-edge! (as-node gate) node "trigger"))
+     (if (and rate (not= rate 1.0))
+       (add-edge! (as-node rate) node "rate"))
      node)))
-
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; I/O devices
@@ -469,6 +641,18 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Pattern utilities
+
+(defn clock-grid
+  "Generates an impulse given beats per minute and a number of impulses
+  per beat. The impulses are emitted evenly over the beat."
+  [bpm res & flags]
+  (let [bps (/ bpm 60.0)]
+    (apply impulse (* bps res) flags)))
+
+(defn trig-pattern
+  [clock pattern]
+  (let [s (sequencer clock pattern)]
+    (* s clock)))
 
 (defn- find-retrigger-index
   [slc i last-gate n]

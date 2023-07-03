@@ -25,25 +25,21 @@ type PinkNoise struct {
 }
 
 // NewPinkNoise returns a new PinkNoise stochastic generator.
-func NewPinkNoise(opts ...Option) *PinkNoise {
-	o := options{
-		rand: rand.New(rand.NewSource(0)),
-		add:  0.0,
-		mul:  1.0,
-	}
+func NewPinkNoise(opts ...ugen.Option) *PinkNoise {
+	o := ugen.DefaultOptions()
 	for _, opt := range opts {
 		opt(&o)
 	}
 
 	dice := [numVMCOctaves]float64{}
 	for i := range dice {
-		dice[i] = pinkNoiseRandom(o.rand)
+		dice[i] = pinkNoiseRandom(o.Rand)
 	}
 	return &PinkNoise{
-		rand: o.rand,
+		rand: o.Rand,
 		dice: dice,
-		add:  o.add,
-		mul:  o.mul,
+		add:  o.Add,
+		mul:  o.Mul,
 	}
 }
 
