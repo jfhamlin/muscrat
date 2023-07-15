@@ -66,6 +66,9 @@ const StyledContainer = styled.div`
   justify-content: center;
   background-color: #fff;
   padding: 1rem;
+
+
+  width: 100%;
 `;
 
 function ChartBox(props: any) {
@@ -76,6 +79,7 @@ function ChartBox(props: any) {
         borderColor: 'divider',
         marginBottom: '0.25rem',
         padding: '1rem',
+        width: '512px',
       }}
       {...props}
     >
@@ -172,8 +176,8 @@ function SignalInspector(props: { signal: SignalInfo }) {
   }, [samplesCallback, numOscSamples, oscilloscopeFreq, fftFreq, signal.sampleRate]);
 
   return (
-    <div>
-      <h3>{props.signal.label}</h3>
+    <>
+    <h3>{props.signal.label}</h3>
        <ChartBox>
          <LabeledSlider
            label="Window Width (s)"
@@ -202,7 +206,7 @@ function SignalInspector(props: { signal: SignalInfo }) {
            step={1} />
          <Histogram bins={freqBins} labels={freqBinLabels} />
        </ChartBox>
-    </div>
+    </>
   );
 }
 

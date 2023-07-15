@@ -1,6 +1,8 @@
 (ns mrat.midi
   (:import (github.com$jfhamlin$muscrat$pkg$midi Notes)))
 
+;; TODO: reimplement the whole go package here.
+
 (dorun (map
         (fn [note]
           (eval

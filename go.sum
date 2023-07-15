@@ -110,6 +110,8 @@ github.com/wailsapp/mimetype v1.4.1/go.mod h1:9aV5k31bBOv5z6u+QP8TltzvNGJPmNJD4X
 github.com/wailsapp/wails/v2 v2.5.1 h1:mfG+2kWqQXYOwdgI43HEILjOZDXbk5woPYI3jP2b+js=
 github.com/wailsapp/wails/v2 v2.5.1/go.mod h1:jbOZbcr/zm79PxXxAjP8UoVlDd9wLW3uDs+isIthDfs=
 gitlab.com/gomidi/midi v1.13.0/go.mod h1:3ohtNOhqoSakkuLG/Li1OI6I3J1c2LErnJF5o/VBq1c=
+gitlab.com/gomidi/midi/v2 v2.0.30 h1:RgRYbQeQSab5ZaP1lqRcCTnTSBQroE3CE6V9HgMmOAc=
+gitlab.com/gomidi/midi/v2 v2.0.30/go.mod h1:Y6IFFyABN415AYsFMPJb0/43TRIuVYDpGKp2gDYLTLI=
 go4.org/intern v0.0.0-20230205224052-192e9f60865c h1:b8WZ7Ja8nKegYxfwDLLwT00ZKv4lXAQrw8LYPK+cHSI=
 go4.org/intern v0.0.0-20230205224052-192e9f60865c/go.mod h1:RJ0SVrOMpxLhgb5noIV+09zI1RsRlMsbUcSxpWHqbrE=
 go4.org/unsafe/assume-no-moving-gc v0.0.0-20230204201903-c31fa085b70e/go.mod h1:FftLjUGFEDu5k8lt0ddY+HcrH/qU/0qk+H8j9/nTl3E=

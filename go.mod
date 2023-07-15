@@ -13,6 +13,7 @@ require (
 	github.com/mjibson/go-dsp v0.0.0-20180508042940-11479a337f12
 	github.com/stretchr/testify v1.8.1
 	github.com/wailsapp/wails/v2 v2.5.1
+	gitlab.com/gomidi/midi/v2 v2.0.30
 	golang.org/x/term v0.8.0
 )
 

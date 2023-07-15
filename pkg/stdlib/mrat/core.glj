@@ -9,6 +9,7 @@
                                                  NewExp
                                                  NewCopySign
                                                  NewFreqRatio
+                                                 NewMIDIFreq
                                                  NewImpulse
                                                  SimpleSampleGeneratorFunc
                                                  WithInterp
@@ -42,8 +43,13 @@
                                                     LoadSample)
            (github.com$jfhamlin$muscrat$pkg$aio NewInputDevice
                                                 NewQwertyMIDI
-                                                NewMIDIDevice
+                                                NewMIDIInputDevice
                                                 WithVoices
+                                                WithDeviceID
+                                                WithDeviceName
+                                                WithChannel
+                                                WithController
+                                                WithDefaultValue
                                                 NewWavOut)
            (github.com$jfhamlin$freeverb-go NewRevModel)))
 
@@ -150,7 +156,21 @@
       stn)
     (pow 2 (/ x 12.0))))
 
-(defn octaves [x] (pow 2 x))
+(defn octaves
+  [x]
+  (if (instance? Node x)
+    (let [oct (add-node! (NewFreqRatio "octaves") "octaves")]
+      (add-edge! x oct "in")
+      oct)
+    (pow 2 x)))
+
+(defn midifreq
+  [note]
+  (if (instance? Node note)
+    (let [mf (add-node! (NewMIDIFreq) "midifreq")]
+      (add-edge! note mf "in")
+      mf)
+    (* 440.0 (pow 2 (/ (- note 69.0) 12.0)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Helper for custom sample generators
@@ -608,21 +628,74 @@
   []
   (add-node! (NewInputDevice) "in"))
 
-(defn qwerty-midi
-  []
-  (let [midi (NewQwertyMIDI)
-        trig (.AsTrigger midi)]
-    [(add-node! midi "qwerty-midi")
-     (add-node! trig "qwerty-trig")]))
-
 (defn midi-in
-  [name & flags]
-  (let [flags (validate-flags flags {:voices 1})
+  "Registers one or more input ugens that emit values from MIDI events.
+  The 'name' argument is a user-defined name for the input, which is
+  used to identify the input in the user interface. The 'typ' argument
+  is the type of event to track, one of:
+
+  - :note - returns a seq, one element per voice (see flags), of
+     maps with elements for note on/off (1/0), midi note number, and
+     velocity: {:onoff <node> :note <node> :velocity <node>}
+  - :bend - returns a single ugen node for the pitch bend value
+  - :cc - returns a single ugen node for a single controller change
+    value.
+  - :after-touch - returns a single ugen node for mono aftertouch
+
+  # Voices
+
+  The :note input type is monophonic by default, with a single set of
+  ugens tracking the latest note. To enable polyphony, provide the
+  number of voices with the :voices flag. Notes on the mapped channel
+  will be automatically allocated across the returned voices.
+
+  # Device Mappings
+
+  Input ugens can be (re-)mapped in the user interface, but the
+  default mapping can be controlled with the following flags:
+
+  - :device-id - The MIDI device ID, or a seq of IDs. If a seq, the
+    first matching device in the seq is used. Default is 0.
+  - :device-name - A regular expression to match against the device
+    name.
+  - :channel - The channel to map to. Default is 0.
+  - :controller - For :cc type, the controller ID to map to. Default
+    is 0."
+  [name typ & flags]
+  (let [_ (if-not (contains? #{:note :bend :cc :after-touch} typ)
+            (throw (fmt.Errorf "unsupported midi-in type: %s" typ)))
+        flags (validate-flags flags {:voices 1
+                                     :device-id 0
+                                     :device-name nil
+                                     :channel 0
+                                     :controller 0
+                                     :default 0})
         num-voices (:voices flags)
-        dev (NewMIDIDevice name "sw-keyboard" (WithVoices num-voices))]
-    (map #(vector (add-node! (.Notes dev %) "midi-note")
-                  (add-node! (.Gates dev %) "midi-gate"))
-         (range num-voices))))
+        opts [(WithVoices num-voices)
+              (WithDeviceID (:device-id flags))
+              (WithChannel (:channel flags))
+              (WithController (:controller flags))
+              (WithDefaultValue (:default flags))]
+        opts (if-let [name (:device-name flags)]
+               (conj opts (WithDeviceName name))
+               opts)
+        dev (apply NewMIDIInputDevice name opts)]
+    (case typ
+      :note     (map #(do {:note (add-node! (.Note dev %) "midi-note")
+                           :onoff (add-node! (.Gate dev %) "midi-gate")})
+                     (range num-voices))
+      :cc (add-node! (.Control dev) "midi-cc")
+      (throw (fmt.Errorf "unsupported midi-in type: %s" typ))
+      )))
+
+;; (defn midi-in
+;;   [name & flags]
+;;   (let [flags (validate-flags flags {:voices 1})
+;;         num-voices (:voices flags)
+;;         dev (NewMIDIInputDevice name "sw-keyboard" (WithVoices num-voices))]
+;;     (map #(vector (add-node! (.Notes dev %) "midi-note")
+;;                   (add-node! (.Gates dev %) "midi-gate"))
+;;          (range num-voices))))
 
 (defn wavout
   "Save the input to a 32-bit wav file (up to two channels) named by

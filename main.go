@@ -24,6 +24,7 @@ func main() {
 
 	err := wails.Run(&options.App{
 		Title:            "muscrat",
+		Frameless:        false,
 		Width:            1024,
 		Height:           768,
 		Assets:           assets,

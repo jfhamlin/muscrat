@@ -37,7 +37,7 @@ func init() {
 }
 
 const (
-	bufferSize = 1024
+	bufferSize = 128
 )
 
 type (
@@ -56,6 +56,8 @@ type (
 
 		// buffer to hold output samples not yet sent to the audio sink.
 		getSamplesBuffer []int
+		// buffer to hold raw average samples for visualization. TODO: there's a viz bug, fix it.
+		vizSamplesBuffer []float64
 
 		graphRunner *graphRunner
 
@@ -245,11 +247,14 @@ func (s *Server) getSamples(cfg *audio.AudioConfig, n int) []int {
 
 		{
 			avgSamples := averageBuffers(channelSamples)
-			go wrt.EventsEmit(s.ctx, "samples", avgSamples)
+			s.vizSamplesBuffer = append(s.vizSamplesBuffer, avgSamples...)
 		}
 
 		s.getSamplesBuffer = append(s.getSamplesBuffer, transformSampleBuffer(cfg, channelSamples)...)
 	}
+	go wrt.EventsEmit(s.ctx, "samples", s.vizSamplesBuffer)
+	s.vizSamplesBuffer = s.vizSamplesBuffer[n:]
+
 	res := s.getSamplesBuffer[:2*n]
 	s.getSamplesBuffer = s.getSamplesBuffer[2*n:]
 	return res

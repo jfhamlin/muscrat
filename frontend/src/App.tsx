@@ -14,7 +14,6 @@ import logo from './assets/images/muscrat.svg';
 
 import {
   SetGain,
-  /* GraphJSON */
 } from "../wailsjs/go/mrat/Server";
 
 import {
@@ -151,11 +150,11 @@ function App() {
         {/* <StyledGraph>
             <UGenGraph graph={graph} />
             </StyledGraph> */}
-        <Keyboard
-          onEvent={(evt: any) => {
+        {/* <Keyboard
+            onEvent={(evt: any) => {
             EventsEmit('midi-event', evt);
-          }}
-        />
+            }}
+            /> */}
         <button onClick={() => SelectFile()}>Select Script</button>
         <Inspector
           volume={gain}

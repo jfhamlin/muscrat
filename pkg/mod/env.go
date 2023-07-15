@@ -140,8 +140,8 @@ func NewEnvelope(opts ...EnvOption) ugen.SampleGenerator {
 				if lastGate && stage == o.releaseNode {
 					interp = SustainInterp
 				} else {
-					stage++
-					if stage < len(levels) {
+					if stage+1 < len(levels) {
+						stage++
 						setupStage(cfg, levels, times, i)
 					} else {
 						interp = SustainInterp
