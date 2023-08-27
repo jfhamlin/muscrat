@@ -11,7 +11,7 @@
                                                  NewFreqRatio
                                                  NewMIDIFreq
                                                  NewImpulse
-                                                 SimpleSampleGeneratorFunc
+                                                 SimpleUGenFunc
                                                  WithInterp
                                                  InterpNone
                                                  InterpLinear
@@ -179,11 +179,11 @@
 
 (defn ugen-fn
   [f]
-  (let [wrapped (fn [cfg n]
+  (let [wrapped (fn [cfg out]
                   (f {:sample-rate-hz (.SampleRateHz cfg)
                       :input-samples (.InputSamples cfg)}
-                     n))]
-    (SimpleSampleGeneratorFunc wrapped)))
+                     out))]
+    (SimpleUGenFunc wrapped)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Operators
@@ -430,10 +430,9 @@
 
 (defn pipe
   []
-  (let [f (fn [cfg n]
-            (if-let [in (get (:input-samples cfg) "in")]
-              in
-              (go/slice-of float64 n)))]
+  (let [f (fn [cfg out]
+            (when-let [in (get (:input-samples cfg) "in")]
+              (go/copy out in)))]
     (add-node! (ugen-fn f) "pipe")))
 
 (defn pipeset!

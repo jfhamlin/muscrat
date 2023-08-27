@@ -23,7 +23,7 @@ type (
 	// UGenFunc is a function that implements UGen.
 	UGenFunc func(context.Context, SampleConfig, []float64)
 
-	SimpleUGenFunc func(SampleConfig, []float64) []float64
+	SimpleUGenFunc func(SampleConfig, []float64)
 )
 
 func (gs UGenFunc) Gen(ctx context.Context, cfg SampleConfig, out []float64) {
