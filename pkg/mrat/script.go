@@ -7,9 +7,9 @@ import (
 	"runtime/debug"
 	"strings"
 
-	"github.com/glojurelang/glojure/glj"
-	"github.com/glojurelang/glojure/runtime"
-	"github.com/glojurelang/glojure/value"
+	"github.com/glojurelang/glojure/pkg/glj"
+	value "github.com/glojurelang/glojure/pkg/lang"
+	"github.com/glojurelang/glojure/pkg/runtime"
 
 	"github.com/jfhamlin/muscrat/pkg/graph"
 )

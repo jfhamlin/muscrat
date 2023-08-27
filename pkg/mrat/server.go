@@ -22,8 +22,8 @@ import (
 
 	"github.com/jfhamlin/muscrat/internal/pkg/plot"
 
-	"github.com/glojurelang/glojure/pkgmap"
-	"github.com/glojurelang/glojure/runtime"
+	"github.com/glojurelang/glojure/pkg/pkgmap"
+	"github.com/glojurelang/glojure/pkg/runtime"
 )
 
 func init() {

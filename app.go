@@ -17,8 +17,8 @@ import (
 	"time"
 
 	"github.com/fsnotify/fsnotify"
-	"github.com/glojurelang/glojure/glj"
-	"github.com/glojurelang/glojure/value"
+	"github.com/glojurelang/glojure/pkg/glj"
+	value "github.com/glojurelang/glojure/pkg/lang"
 	"github.com/mjibson/go-dsp/fft"
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 	"golang.org/x/term"
