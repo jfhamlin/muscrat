@@ -16,8 +16,8 @@ github.com/fogleman/gg v1.3.0/go.mod h1:R/bRT+9gY/C5z7JzPU0zXsXHKM4/ayA+zqcVNZzP
 github.com/fsnotify/fsnotify v1.5.4 h1:jRbGcIw6P2Meqdwuo0H1p6JVLbL5DHKAKlYndzMwVZI=
 github.com/fsnotify/fsnotify v1.5.4/go.mod h1:OVB6XrOHzAwXMpEM7uPOzcehqUV2UqJxmVXmkdnm1bU=
 github.com/gizak/termui/v3 v3.0.0/go.mod h1:uinu2dMdtMI+FTIdEFUJQT5y+KShnhQRshvPblXq3lY=
-github.com/glojurelang/glojure v0.0.0-20230826233238-5ec0fddea839 h1:rVzfRcy2HUcfhT7gwpbZzUbZSdtYqCHOqCs74lUQOK8=
-github.com/glojurelang/glojure v0.0.0-20230826233238-5ec0fddea839/go.mod h1:zG+MF25WFMXeyBc7P3/NA/ZOmYvXnYQjn/lRFI7D8Ms=
+github.com/glojurelang/glojure v0.0.0-20230827181509-ecfce2f0d6be h1:EQhXtYT7rjvOK167Wh6lfmpARDd3RXRQekZvGUnO2SI=
+github.com/glojurelang/glojure v0.0.0-20230827181509-ecfce2f0d6be/go.mod h1:zG+MF25WFMXeyBc7P3/NA/ZOmYvXnYQjn/lRFI7D8Ms=
 github.com/go-audio/aiff v0.0.0-20180403003018-6c3a8a6aff12/go.mod h1:AMSAp6W1zd0koOdX6QDgGIuBDTUvLa2SLQtm7d9eM3c=
 github.com/go-audio/audio v0.0.0-20180206231410-b697a35b5608/go.mod h1:6uAu0+H2lHkwdGsAY+j2wHPNPpPoeg5AaEFh9FlA+Zs=
 github.com/go-audio/audio v0.0.0-20181013203223-7b2a6ca21480/go.mod h1:6uAu0+H2lHkwdGsAY+j2wHPNPpPoeg5AaEFh9FlA+Zs=
