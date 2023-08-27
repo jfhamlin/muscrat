@@ -5,7 +5,7 @@ go 1.19
 require (
 	github.com/bspaans/bleep v0.0.0-20220414232837-486f92844ed7
 	github.com/fsnotify/fsnotify v1.5.4
-	github.com/glojurelang/glojure v0.0.0-20230512061700-6d3a1890f55c
+	github.com/glojurelang/glojure v0.0.0-20230826233238-5ec0fddea839
 	github.com/go-audio/audio v1.0.0
 	github.com/go-audio/wav v1.0.0
 	github.com/gordonklaus/portaudio v0.0.0-20221027163845-7c3b689db3cc
@@ -16,8 +16,6 @@ require (
 	gitlab.com/gomidi/midi/v2 v2.0.30
 	golang.org/x/term v0.8.0
 )
-
-replace github.com/glojurelang/glojure => ../glojure
 
 require (
 	github.com/bep/debounce v1.2.1 // indirect
@@ -45,7 +43,7 @@ require (
 	github.com/veandco/go-sdl2 v0.4.0 // indirect
 	github.com/wailsapp/mimetype v1.4.1 // indirect
 	go4.org/intern v0.0.0-20230205224052-192e9f60865c // indirect
-	go4.org/unsafe/assume-no-moving-gc v0.0.0-20230426161633-7e06285ff160 // indirect
+	go4.org/unsafe/assume-no-moving-gc v0.0.0-20230525183740-e7c30c78aeb2 // indirect
 	golang.org/x/crypto v0.1.0 // indirect
 	golang.org/x/exp v0.0.0-20220303212507-bbda1eaf7a17 // indirect
 	golang.org/x/net v0.7.0 // indirect

@@ -17,5 +17,6 @@ pkgs.mkShell {
     frameworks.Cocoa
     frameworks.WebKit
     frameworks.UniformTypeIdentifiers
+    frameworks.ForceFeedback
   ];
 }

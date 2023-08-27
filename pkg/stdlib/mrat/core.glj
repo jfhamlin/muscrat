@@ -55,6 +55,8 @@
 
 (def ^:dynamic *graph* nil)
 
+(println "*graph*" #'*graph* (meta #'*graph*))
+
 (defmacro doseq-idx
   [[locals seq-expr] & body]
   `(let [s# ~seq-expr]
@@ -77,11 +79,11 @@
   (as-node [n] n))
 
 (extend-protocol AsNode
-  float64
+  go/float64
   (as-node [x] (add-node! (NewConstant x) x)))
 
 (extend-protocol AsNode
-  int64
+  go/int64
   (as-node [x] (add-node! (NewConstant x) x)))
 
 (defn play
@@ -431,7 +433,7 @@
   (let [f (fn [cfg n]
             (if-let [in (get (:input-samples cfg) "in")]
               in
-              (go/sliceof float64 n)))]
+              (go/slice-of float64 n)))]
     (add-node! (ugen-fn f) "pipe")))
 
 (defn pipeset!
