@@ -7,6 +7,7 @@ import (
 	"runtime/debug"
 	"strconv"
 	"sync"
+	"sync/atomic"
 
 	"github.com/jfhamlin/muscrat/pkg/prof"
 	"github.com/jfhamlin/muscrat/pkg/ugen"
@@ -50,11 +51,17 @@ type (
 		label  string
 	}
 
+	edgeVal struct {
+		samples []float64
+		waiters atomic.Int32
+	}
+
 	Edge struct {
-		From    NodeID
-		To      NodeID
-		ToPort  string
-		Channel chan []float64
+		From   NodeID
+		To     NodeID
+		ToPort string
+
+		channel chan *edgeVal
 	}
 
 	// Graph is a graph of SampleGenerators.
@@ -63,6 +70,14 @@ type (
 		Edges []*Edge `json:"edges"`
 
 		BufferSize int `json:"bufferSize"`
+	}
+)
+
+var (
+	inputMapPool = sync.Pool{
+		New: func() any {
+			return make(map[string][]float64)
+		},
 	}
 )
 
@@ -102,7 +117,7 @@ func (n *GeneratorNode) Run(ctx context.Context, g *Graph, cfg ugen.SampleConfig
 		}
 	}()
 
-	inputSamples := make(map[string][]float64) // TODO: use a pool
+	inputSamples := make(map[string][]float64)
 	for {
 		select {
 		case <-ctx.Done():
@@ -112,7 +127,8 @@ func (n *GeneratorNode) Run(ctx context.Context, g *Graph, cfg ugen.SampleConfig
 
 		for _, e := range incomingEdges {
 			select {
-			case inputSamples[e.ToPort] = <-e.Channel:
+			case val := <-e.channel:
+				inputSamples[e.ToPort] = val.samples
 			case <-ctx.Done():
 				return
 			}
@@ -124,9 +140,10 @@ func (n *GeneratorNode) Run(ctx context.Context, g *Graph, cfg ugen.SampleConfig
 		n.GenerateSamples(ctx, cfg, outputSamples)
 		span.Finish()
 
+		ev := newEdgeVal(outputSamples, len(outgoingEdges))
 		for _, e := range outgoingEdges {
 			select {
-			case e.Channel <- outputSamples:
+			case e.channel <- ev:
 			case <-ctx.Done():
 				return
 			}
@@ -178,7 +195,8 @@ func (n *SinkNode) Run(ctx context.Context, g *Graph, cfg ugen.SampleConfig, num
 			select {
 			case <-ctx.Done():
 				return
-			case inputSamples[i] = <-e.Channel:
+			case val := <-e.channel:
+				inputSamples[i] = val.samples
 			}
 		}
 		if len(inputSamples) == 0 {
@@ -212,7 +230,7 @@ func (g *Graph) AddEdge(from, to NodeID, port string) {
 		From:    from,
 		To:      to,
 		ToPort:  port,
-		Channel: make(chan []float64, 1),
+		channel: make(chan *edgeVal, 1),
 	})
 }
 
@@ -363,12 +381,12 @@ func (g *Graph) bootstrapCycles(ctx context.Context) {
 
 			queue = append(queue, choice)
 			delete(blocked, choice)
-			zeros := make([]float64, g.BufferSize)
+			zeros := newEdgeVal(make([]float64, g.BufferSize), len(g.OutgoingEdges(choice)))
 			for _, e := range g.OutgoingEdges(choice) {
 				select {
 				case <-ctx.Done():
 					return
-				case e.Channel <- zeros:
+				case e.channel <- zeros:
 				}
 			}
 		}
@@ -412,4 +430,12 @@ func (g *Graph) Dot() string {
 	}
 	dot += "}\n"
 	return dot
+}
+
+func newEdgeVal(s []float64, waiters int) *edgeVal {
+	ev := &edgeVal{
+		samples: s,
+	}
+	ev.waiters.Store(int32(waiters))
+	return ev
 }
