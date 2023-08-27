@@ -7,19 +7,18 @@ import (
 	"github.com/jfhamlin/muscrat/pkg/ugen"
 )
 
-func NewLowpassFilter() ugen.SampleGenerator {
+func NewLowpassFilter() ugen.UGen {
 	// Translated from the SuperCollider extension source code here, which in turn mimics the
 	// max/msp lores~ object:
 	// https://github.com/v7b1/vb_UGens/blob/fea1587dd2165457c4a016214d17216987b56f00/projects/vbUtils/vbUtils.cpp
 	var a1, a2, fqterm, resterm, scale, ym1, ym2 float64
 	lastCut, lastRes := -1.0, -1.0
-	return ugen.SampleGeneratorFunc(func(ctx context.Context, cfg ugen.SampleConfig, n int) []float64 {
+	return ugen.UGenFunc(func(ctx context.Context, cfg ugen.SampleConfig, out []float64) {
 		in := cfg.InputSamples["in"]
 		cuts := cfg.InputSamples["cutoff"]
 		ress := cfg.InputSamples["resonance"]
-		out := make([]float64, n)
 
-		for i := 0; i < n; i++ {
+		for i := range out {
 			cut := cuts[i]
 			res := ress[i]
 			// clamp resonance to [0, 1)
@@ -48,6 +47,5 @@ func NewLowpassFilter() ugen.SampleGenerator {
 			ym2 = temp
 			out[i] = ym1
 		}
-		return out
 	})
 }

@@ -123,18 +123,14 @@ func (s *SoftwareKeyboard) PitchBend() ugen.UGen {
 	return nil
 }
 
-func (s *softwareKeyboardNotes) GenerateSamples(ctx context.Context, cfg ugen.SampleConfig, n int) []float64 {
-	res := make([]float64, n)
-	for i := 0; i < n; i++ {
-		res[i] = s.notes[s.idx]
+func (s *softwareKeyboardNotes) Gen(ctx context.Context, cfg ugen.SampleConfig, out []float64) {
+	for i := range out {
+		out[i] = s.notes[s.idx]
 	}
-	return res
 }
 
-func (s *softwareKeyboardGate) GenerateSamples(ctx context.Context, cfg ugen.SampleConfig, n int) []float64 {
-	res := make([]float64, n)
-	for i := 0; i < n; i++ {
-		res[i] = s.gates[s.idx]
+func (s *softwareKeyboardGate) Gen(ctx context.Context, cfg ugen.SampleConfig, out []float64) {
+	for i := range out {
+		out[i] = s.gates[s.idx]
 	}
-	return res
 }

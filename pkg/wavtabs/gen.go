@@ -36,7 +36,7 @@ func WithAdd(a float64) GeneratorOption {
 }
 
 // Generator is a generator that generates a wavetable.
-func Generator(wavtabIn Table, opts ...GeneratorOption) ugen.SampleGenerator {
+func Generator(wavtabIn Table, opts ...GeneratorOption) ugen.UGen {
 	options := genOpts{
 		defaultDutyCycle: 1,
 		multiply:         1,
@@ -55,7 +55,7 @@ func Generator(wavtabIn Table, opts ...GeneratorOption) ugen.SampleGenerator {
 
 	initialised := false
 
-	return ugen.SampleGeneratorFunc(func(ctx context.Context, cfg ugen.SampleConfig, n int) []float64 {
+	return ugen.UGenFunc(func(ctx context.Context, cfg ugen.SampleConfig, out []float64) {
 		ws := cfg.InputSamples["w"]
 		phases := cfg.InputSamples["phase"]
 		syncs := cfg.InputSamples["sync"]
@@ -75,8 +75,7 @@ func Generator(wavtabIn Table, opts ...GeneratorOption) ugen.SampleGenerator {
 
 		// TODO: band-limited interpolation
 
-		res := make([]float64, n)
-		for i := 0; i < n; i++ {
+		for i := range out {
 			if i < len(phases) {
 				phase = phases[i]
 			}
@@ -86,15 +85,15 @@ func Generator(wavtabIn Table, opts ...GeneratorOption) ugen.SampleGenerator {
 			}
 			switch dc {
 			case 0:
-				res[i] = wavtab[0]
+				out[i] = wavtab[0]
 			case 1:
-				res[i] = wavtab.Lerp(phase)
+				out[i] = wavtab.Lerp(phase)
 			default:
 				t := (phase - math.Floor(phase)) / dc
 				if t > 1 {
-					res[i] = wavtab[len(wavtab)-1]
+					out[i] = wavtab[len(wavtab)-1]
 				} else {
-					res[i] = wavtab.Lerp(t)
+					out[i] = wavtab.Lerp(t)
 				}
 			}
 
@@ -114,6 +113,5 @@ func Generator(wavtabIn Table, opts ...GeneratorOption) ugen.SampleGenerator {
 				lastSync = syncs[i]
 			}
 		}
-		return res
 	})
 }

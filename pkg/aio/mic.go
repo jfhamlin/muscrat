@@ -113,16 +113,14 @@ func (in *InputDevice) Stop(ctx context.Context) error {
 	return nil
 }
 
-func NewInputDevice() ugen.SampleGenerator {
+func NewInputDevice() ugen.UGen {
 	return &InputDevice{
 		sampleChan: make(chan float64, 1024),
 	}
 }
 
-func (in *InputDevice) GenerateSamples(ctx context.Context, cfg ugen.SampleConfig, n int) []float64 {
-	samples := make([]float64, n)
-	for i := range samples {
-		samples[i] = <-in.sampleChan
+func (in *InputDevice) Gen(ctx context.Context, cfg ugen.SampleConfig, out []float64) {
+	for i := range out {
+		out[i] = <-in.sampleChan
 	}
-	return samples
 }

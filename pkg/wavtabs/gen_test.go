@@ -16,12 +16,13 @@ func BenchmarkGenerator(b *testing.B) {
 		w[i] = 440
 	}
 
+	out := make([]float64, numSamples)
 	for i := 0; i < b.N; i++ {
-		g.GenerateSamples(context.Background(), ugen.SampleConfig{
+		g.Gen(context.Background(), ugen.SampleConfig{
 			SampleRateHz: 44100,
 			InputSamples: map[string][]float64{
 				"w": w,
 			},
-		}, numSamples)
+		}, out)
 	}
 }

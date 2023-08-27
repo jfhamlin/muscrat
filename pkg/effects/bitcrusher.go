@@ -16,7 +16,9 @@ func NewBitcrusher() ugen.UGen {
 
 	var count, lastOut float64
 
-	return ugen.UGenFunc(func(ctx context.Context, cfg ugen.SampleConfig, n int) []float64 {
+	return ugen.UGenFunc(func(ctx context.Context, cfg ugen.SampleConfig, out []float64) {
+		n := len(out)
+
 		in := cfg.InputSamples["in"]
 		rate := cfg.InputSamples["rate"]
 		bits := cfg.InputSamples["bits"]
@@ -38,8 +40,7 @@ func NewBitcrusher() ugen.UGen {
 			bits = defaultDepths
 		}
 
-		res := make([]float64, n)
-		for i := 0; i < n; i++ {
+		for i := range out {
 			var step, stepr, ratio float64
 			if bits[i] >= 31 || bits[i] < 1 {
 				step = 0
@@ -65,8 +66,7 @@ func NewBitcrusher() ugen.UGen {
 				delta *= step
 				lastOut = in[i] - delta
 			}
-			res[i] = lastOut
+			out[i] = lastOut
 		}
-		return res
 	})
 }

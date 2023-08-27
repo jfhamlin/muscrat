@@ -7,13 +7,12 @@ import (
 )
 
 func NewClip() ugen.UGen {
-	return ugen.UGenFunc(func(ctx context.Context, cfg ugen.SampleConfig, n int) []float64 {
+	return ugen.UGenFunc(func(ctx context.Context, cfg ugen.SampleConfig, out []float64) {
 		in := cfg.InputSamples["in"]
 		los := cfg.InputSamples["lo"]
 		his := cfg.InputSamples["hi"]
 
-		res := make([]float64, n)
-		for i := 0; i < n; i++ {
+		for i := range out {
 			x := in[i]
 			lo := los[i]
 			hi := his[i]
@@ -23,8 +22,7 @@ func NewClip() ugen.UGen {
 			if x > hi {
 				x = hi
 			}
-			res[i] = x
+			out[i] = x
 		}
-		return res
 	})
 }

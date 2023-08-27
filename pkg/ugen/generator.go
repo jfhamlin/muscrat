@@ -12,26 +12,26 @@ type (
 		InputSamples map[string][]float64
 	}
 
-	// SampleGenerator is an abstract interface for generating samples.
-	SampleGenerator interface {
-		GenerateSamples(ctx context.Context, cfg SampleConfig, n int) []float64
+	// UGen is an abstract interface for generating samples.
+	// Implementations should fill the output slice with samples. They
+	// should *not* retain a reference to the output slice, as it may be
+	// reused.
+	UGen interface {
+		Gen(ctx context.Context, cfg SampleConfig, out []float64)
 	}
 
-	// SampleGeneratorFunc is a function that implements SampleGenerator.
-	SampleGeneratorFunc func(context.Context, SampleConfig, int) []float64
+	// UGenFunc is a function that implements UGen.
+	UGenFunc func(context.Context, SampleConfig, []float64)
 
-	SimpleSampleGeneratorFunc func(SampleConfig, int) []float64
-
-	UGen     = SampleGenerator
-	UGenFunc = SampleGeneratorFunc
+	SimpleUGenFunc func(SampleConfig, []float64) []float64
 )
 
-func (gs SampleGeneratorFunc) GenerateSamples(ctx context.Context, cfg SampleConfig, n int) []float64 {
-	return gs(ctx, cfg, n)
+func (gs UGenFunc) Gen(ctx context.Context, cfg SampleConfig, out []float64) {
+	gs(ctx, cfg, out)
 }
 
-func (gs SimpleSampleGeneratorFunc) GenerateSamples(ctx context.Context, cfg SampleConfig, n int) []float64 {
-	return gs(cfg, n)
+func (gs SimpleUGenFunc) Gen(ctx context.Context, cfg SampleConfig, out []float64) {
+	gs(cfg, out)
 }
 
 // Starter is an interface for starting a sample generator. If a

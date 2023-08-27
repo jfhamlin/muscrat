@@ -7,7 +7,7 @@ import (
 	"github.com/jfhamlin/muscrat/pkg/ugen"
 )
 
-func NewSampler(buf []float64, loop bool) ugen.SampleGenerator {
+func NewSampler(buf []float64, loop bool) ugen.UGen {
 	if len(buf) == 0 {
 		return ugen.NewConstant(0)
 	}
@@ -16,8 +16,7 @@ func NewSampler(buf []float64, loop bool) ugen.SampleGenerator {
 	index := 0.0
 	lastGate := false
 	stopped := true
-	return ugen.SampleGeneratorFunc(func(ctx context.Context, cfg ugen.SampleConfig, n int) []float64 {
-		res := make([]float64, n)
+	return ugen.UGenFunc(func(ctx context.Context, cfg ugen.SampleConfig, out []float64) {
 		gate := cfg.InputSamples["trigger"]
 		rates := cfg.InputSamples["rate"]
 		if len(gate) == 0 {
@@ -26,7 +25,7 @@ func NewSampler(buf []float64, loop bool) ugen.SampleGenerator {
 			lastGate = true
 		}
 
-		for i := 0; i < n; i++ {
+		for i := range out {
 			if !lastGate && gate[i] > 0 {
 				stopped = false
 				index = 0
@@ -43,12 +42,11 @@ func NewSampler(buf []float64, loop bool) ugen.SampleGenerator {
 			}
 
 			if stopped {
-				res[i] = 0
 				continue
 			}
 
 			if index >= sampleLen {
-				res[i] = 0
+				out[i] = 0
 			} else {
 				// cubic interpolation
 				sampleIndexF, frac := math.Modf(index)
@@ -70,7 +68,7 @@ func NewSampler(buf []float64, loop bool) ugen.SampleGenerator {
 					sample += (-0.5*s3 + 1.5*s2 - 1.5*s1 + 0.5*s0) * frac * frac * frac
 				}
 
-				res[i] = sample
+				out[i] = sample
 			}
 
 			index += rate
@@ -81,6 +79,5 @@ func NewSampler(buf []float64, loop bool) ugen.SampleGenerator {
 				}
 			}
 		}
-		return res
 	})
 }

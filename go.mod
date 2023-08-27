@@ -1,6 +1,6 @@
 module github.com/jfhamlin/muscrat
 
-go 1.19
+go 1.21
 
 require (
 	github.com/bspaans/bleep v0.0.0-20220414232837-486f92844ed7

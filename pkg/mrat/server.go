@@ -18,6 +18,7 @@ import (
 
 	"github.com/jfhamlin/muscrat/pkg/gen/gljimports"
 	"github.com/jfhamlin/muscrat/pkg/graph"
+	"github.com/jfhamlin/muscrat/pkg/stdlib"
 	"github.com/jfhamlin/muscrat/pkg/ugen"
 
 	"github.com/jfhamlin/muscrat/internal/pkg/plot"
@@ -28,7 +29,12 @@ import (
 
 func init() {
 	// TODO: enable setting a dynamic stdlib path vs. using the default.
-	runtime.AddLoadPath(os.DirFS("./pkg/stdlib")) //stdlib.StdLib)
+	if os.Getenv("MUSCRAT_STDLIB_PATH") == "" {
+		runtime.AddLoadPath(stdlib.StdLib)
+	} else {
+		runtime.AddLoadPath(os.DirFS(os.Getenv("MUSCRAT_STDLIB_PATH")))
+	}
+
 	runtime.AddLoadPath(os.DirFS("."))
 
 	gljimports.RegisterImports(func(export string, val interface{}) {

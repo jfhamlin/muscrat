@@ -40,10 +40,11 @@ func TestPulseSample(t *testing.T) {
 	for i := 0; i < numSamples; i++ {
 		freqSamples[i] = freq
 	}
-	samps := gen.GenerateSamples(context.Background(), ugen.SampleConfig{
+	samps := make([]float64, numSamples)
+	gen.Gen(context.Background(), ugen.SampleConfig{
 		SampleRateHz: sampleRate,
 		InputSamples: map[string][]float64{"w": freqSamples},
-	}, numSamples)
+	}, samps)
 
 	countHigh := 0
 	countLow := 0
