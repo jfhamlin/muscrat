@@ -16,6 +16,7 @@ import (
 
 	wrt "github.com/wailsapp/wails/v2/pkg/runtime"
 
+	"github.com/jfhamlin/muscrat/pkg/bufferpool"
 	"github.com/jfhamlin/muscrat/pkg/gen/gljimports"
 	"github.com/jfhamlin/muscrat/pkg/graph"
 	"github.com/jfhamlin/muscrat/pkg/stdlib"
@@ -257,6 +258,7 @@ func (s *Server) getSamples(cfg *audio.AudioConfig, n int) []int {
 		}
 
 		s.getSamplesBuffer = append(s.getSamplesBuffer, transformSampleBuffer(cfg, channelSamples)...)
+		bufferpool.Put(channelSamples)
 	}
 	go wrt.EventsEmit(s.ctx, "samples", s.vizSamplesBuffer)
 	s.vizSamplesBuffer = s.vizSamplesBuffer[n:]

@@ -9,6 +9,7 @@ import (
 	"sync"
 	"sync/atomic"
 
+	"github.com/jfhamlin/muscrat/pkg/bufferpool"
 	"github.com/jfhamlin/muscrat/pkg/prof"
 	"github.com/jfhamlin/muscrat/pkg/ugen"
 )
@@ -74,9 +75,9 @@ type (
 )
 
 var (
-	inputMapPool = sync.Pool{
+	edgeValPool = sync.Pool{
 		New: func() any {
-			return make(map[string][]float64)
+			return &edgeVal{}
 		},
 	}
 )
@@ -118,6 +119,7 @@ func (n *GeneratorNode) Run(ctx context.Context, g *Graph, cfg ugen.SampleConfig
 	}()
 
 	inputSamples := make(map[string][]float64)
+	inputEdgeVals := make([]*edgeVal, 0, len(incomingEdges))
 	for {
 		select {
 		case <-ctx.Done():
@@ -129,6 +131,7 @@ func (n *GeneratorNode) Run(ctx context.Context, g *Graph, cfg ugen.SampleConfig
 			select {
 			case val := <-e.channel:
 				inputSamples[e.ToPort] = val.samples
+				inputEdgeVals = append(inputEdgeVals, val)
 			case <-ctx.Done():
 				return
 			}
@@ -136,11 +139,15 @@ func (n *GeneratorNode) Run(ctx context.Context, g *Graph, cfg ugen.SampleConfig
 
 		span := prof.StartSpan(ctx, n.String())
 		cfg.InputSamples = inputSamples
-		outputSamples := make([]float64, numSamples) // TODO: use a pool
-		n.GenerateSamples(ctx, cfg, outputSamples)
+		ev := newEdgeVal(numSamples, len(outgoingEdges))
+		n.GenerateSamples(ctx, cfg, ev.samples)
 		span.Finish()
+		// signal to the input edge vals that we're done with them
+		for _, ev := range inputEdgeVals {
+			ev.done()
+		}
+		inputEdgeVals = inputEdgeVals[:0]
 
-		ev := newEdgeVal(outputSamples, len(outgoingEdges))
 		for _, e := range outgoingEdges {
 			select {
 			case e.channel <- ev:
@@ -182,6 +189,8 @@ func (n *SinkNode) Chan() SinkChan {
 }
 
 func (n *SinkNode) Run(ctx context.Context, g *Graph, cfg ugen.SampleConfig, numSamples int) {
+	inEdges := g.IncomingEdges(n.id)
+	inputEdgeVals := make([]*edgeVal, 0, len(inEdges))
 	for {
 		select {
 		case <-ctx.Done():
@@ -189,14 +198,16 @@ func (n *SinkNode) Run(ctx context.Context, g *Graph, cfg ugen.SampleConfig, num
 		default:
 		}
 
-		inEdges := g.IncomingEdges(n.id)
 		inputSamples := make([][]float64, len(inEdges))
 		for i, e := range inEdges {
 			select {
 			case <-ctx.Done():
 				return
 			case val := <-e.channel:
-				inputSamples[i] = val.samples
+				out := bufferpool.Get(len(val.samples))
+				copy(out, val.samples)
+				inputSamples[i] = out
+				inputEdgeVals = append(inputEdgeVals, val)
 			}
 		}
 		if len(inputSamples) == 0 {
@@ -207,6 +218,10 @@ func (n *SinkNode) Run(ctx context.Context, g *Graph, cfg ugen.SampleConfig, num
 		case <-ctx.Done():
 			return
 		}
+		for _, ev := range inputEdgeVals {
+			ev.done()
+		}
+		inputEdgeVals = inputEdgeVals[:0]
 	}
 }
 
@@ -381,7 +396,7 @@ func (g *Graph) bootstrapCycles(ctx context.Context) {
 
 			queue = append(queue, choice)
 			delete(blocked, choice)
-			zeros := newEdgeVal(make([]float64, g.BufferSize), len(g.OutgoingEdges(choice)))
+			zeros := newEdgeVal(g.BufferSize, len(g.OutgoingEdges(choice)))
 			for _, e := range g.OutgoingEdges(choice) {
 				select {
 				case <-ctx.Done():
@@ -432,10 +447,16 @@ func (g *Graph) Dot() string {
 	return dot
 }
 
-func newEdgeVal(s []float64, waiters int) *edgeVal {
-	ev := &edgeVal{
-		samples: s,
-	}
+func newEdgeVal(numSamples, waiters int) *edgeVal {
+	ev := edgeValPool.Get().(*edgeVal)
+	ev.samples = bufferpool.Get(numSamples)
 	ev.waiters.Store(int32(waiters))
 	return ev
+}
+
+func (ev *edgeVal) done() {
+	if ev.waiters.Add(-1) <= 0 {
+		bufferpool.Put(ev.samples)
+		edgeValPool.Put(ev)
+	}
 }
