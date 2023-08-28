@@ -55,8 +55,6 @@
 
 (def ^:dynamic *graph* nil)
 
-(println "*graph*" #'*graph* (meta #'*graph*))
-
 (defmacro doseq-idx
   [[locals seq-expr] & body]
   `(let [s# ~seq-expr]
