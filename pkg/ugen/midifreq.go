@@ -6,12 +6,10 @@ import (
 )
 
 func NewMIDIFreq() UGen {
-	return UGenFunc(func(ctx context.Context, cfg SampleConfig, n int) []float64 {
-		res := make([]float64, n)
+	return UGenFunc(func(ctx context.Context, cfg SampleConfig, out []float64) {
 		in := cfg.InputSamples["in"]
-		for i := 0; i < n; i++ {
-			res[i] = 440 * math.Pow(2, (in[i]-69)/12)
+		for i := range out {
+			out[i] = 440 * math.Pow(2, (in[i]-69)/12)
 		}
-		return res
 	})
 }

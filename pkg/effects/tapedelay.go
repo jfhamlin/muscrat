@@ -7,7 +7,7 @@ import (
 	"github.com/jfhamlin/muscrat/pkg/ugen"
 )
 
-func NewTapeDelay() ugen.SampleGenerator {
+func NewTapeDelay() ugen.UGen {
 	// Simulate a tape delay by using a buffer of samples with a read
 	// and write pointer. If the delay is changed, we simulate a
 	// physical read/write head by maintaining a sample velocity for the
@@ -17,12 +17,11 @@ func NewTapeDelay() ugen.SampleGenerator {
 	// read head will decelerate.
 	var tape []float64
 	var readHead float64
-	return ugen.SampleGeneratorFunc(func(ctx context.Context, cfg ugen.SampleConfig, n int) []float64 {
-		res := make([]float64, n)
+	return ugen.UGenFunc(func(ctx context.Context, cfg ugen.SampleConfig, out []float64) {
 		in := cfg.InputSamples["$0"]
 		delays := cfg.InputSamples["delay"]
 
-		for i := 0; i < n; i++ {
+		for i := range out {
 			delaySeconds := delays[i]
 			if delaySeconds < 0 {
 				delaySeconds = 0
@@ -37,12 +36,12 @@ func NewTapeDelay() ugen.SampleGenerator {
 			tape = append(tape, in[i])
 
 			if len(tape) == 1 {
-				res[i] = tape[0]
+				out[i] = tape[0]
 			} else {
 				// read the sample from the tape at the read head with linear interpolation
 				// between the two adjacent samples.
 				readHeadInt, readHeadFrac := math.Modf(readHead)
-				res[i] = tape[int(readHeadInt)]*(1-readHeadFrac) + tape[int(readHeadInt)+1]*readHeadFrac
+				out[i] = tape[int(readHeadInt)]*(1-readHeadFrac) + tape[int(readHeadInt)+1]*readHeadFrac
 			}
 
 			const maxStep = 2
@@ -74,7 +73,5 @@ func NewTapeDelay() ugen.SampleGenerator {
 				readHead = readHead - math.Floor(readHead)
 			}
 		}
-
-		return res
 	})
 }

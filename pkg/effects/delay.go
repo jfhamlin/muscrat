@@ -42,19 +42,17 @@ func NewDelay(maxDelay float64, opts ...ugen.Option) ugen.UGen {
 		panic("unknown interpolation type")
 	}
 
-	return ugen.UGenFunc(func(ctx context.Context, cfg ugen.SampleConfig, n int) []float64 {
+	return ugen.UGenFunc(func(ctx context.Context, cfg ugen.SampleConfig, out []float64) {
 		if buf == nil {
 			sz := ugen.NextPowerOf2(int(math.Ceil(maxDelay*float64(cfg.SampleRateHz) + 1)))
 			mask = sz - 1
 			buf = make([]float64, sz)
 		}
 
-		res := make([]float64, n)
-
 		in := cfg.InputSamples["in"]
 		delays := cfg.InputSamples["delay"]
 
-		for i := 0; i < n; i++ {
+		for i := range out {
 			delaySeconds := delays[i]
 			if delaySeconds > maxDelay {
 				delaySeconds = maxDelay
@@ -68,11 +66,9 @@ func NewDelay(maxDelay float64, opts ...ugen.Option) ugen.UGen {
 			delaySamplesInt, delaySamplesFrac := math.Modf(delaySamples)
 
 			readPos := writePos - int(delaySamplesInt)
-			res[i] = mul*interp(readPos, delaySamplesFrac) + add
+			out[i] = mul*interp(readPos, delaySamplesFrac) + add
 
 			writePos++
 		}
-
-		return res
 	})
 }

@@ -51,8 +51,8 @@ type App struct {
 	gain       float64
 	targetGain float64
 
-	generator     ugen.SampleGenerator
-	nextGenerator ugen.SampleGenerator
+	generator     ugen.UGen
+	nextGenerator ugen.UGen
 	fade          float64
 
 	showSpectrum     bool

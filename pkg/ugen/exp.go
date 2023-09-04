@@ -6,12 +6,10 @@ import (
 )
 
 func NewExp() UGen {
-	return UGenFunc(func(ctx context.Context, cfg SampleConfig, n int) []float64 {
-		res := make([]float64, n)
+	return UGenFunc(func(ctx context.Context, cfg SampleConfig, out []float64) {
 		in := cfg.InputSamples["in"]
-		for i := 0; i < n; i++ {
-			res[i] = math.Exp(in[i])
+		for i := range out {
+			out[i] = math.Exp(in[i])
 		}
-		return res
 	})
 }

@@ -7,20 +7,18 @@ import (
 	"github.com/jfhamlin/muscrat/pkg/ugen"
 )
 
-func NewBPF() ugen.SampleGenerator {
+func NewBPF() ugen.UGen {
 	// Logic from SuperCollider's BPF
 
 	var freq, bw float64
 	var y1, y2, a0, b1, b2 float64
 
-	return ugen.SampleGeneratorFunc(func(ctx context.Context, cfg ugen.SampleConfig, n int) []float64 {
+	return ugen.UGenFunc(func(ctx context.Context, cfg ugen.SampleConfig, out []float64) {
 		in := cfg.InputSamples["in"]
 		ws := cfg.InputSamples["w"]
 		bws := cfg.InputSamples["bw"]
 
-		res := make([]float64, n)
-
-		for i := 0; i < n; i++ {
+		for i := range out {
 			if ws[i] != freq || bws[i] != bw {
 				pfreq := ws[i] * 2 * math.Pi / float64(cfg.SampleRateHz)
 				pbw := bws[i] * pfreq * 0.5
@@ -36,12 +34,10 @@ func NewBPF() ugen.SampleGenerator {
 				bw = bws[i]
 			}
 			y0 := in[i] + b1*y1 + b2*y2
-			res[i] = a0 * (y0 - y2)
+			out[i] = a0 * (y0 - y2)
 			y2 = zapgremlins(y1)
 			y1 = zapgremlins(y0)
 		}
-
-		return res
 	})
 }
 

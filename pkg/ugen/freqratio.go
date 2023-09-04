@@ -6,7 +6,7 @@ import (
 	"math"
 )
 
-func NewFreqRatio(typ string) SampleGenerator {
+func NewFreqRatio(typ string) UGen {
 	base := 2.0
 	divisor := 12.0
 	switch typ {
@@ -22,16 +22,14 @@ func NewFreqRatio(typ string) SampleGenerator {
 	default:
 		panic(fmt.Errorf("unknown freq ratio type: %s", typ))
 	}
-	return SampleGeneratorFunc(func(ctx context.Context, cfg SampleConfig, n int) []float64 {
-		res := make([]float64, n)
-		for i := 0; i < n; i++ {
-			res[i] = 1
+	return UGenFunc(func(ctx context.Context, cfg SampleConfig, out []float64) {
+		for i := range out {
+			out[i] = 1
 		}
 		for _, s := range cfg.InputSamples {
-			for i := range res {
-				res[i] *= math.Pow(base, s[i]/divisor)
+			for i := range out {
+				out[i] *= math.Pow(base, s[i]/divisor)
 			}
 		}
-		return res
 	})
 }

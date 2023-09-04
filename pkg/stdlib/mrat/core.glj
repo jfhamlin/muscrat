@@ -7,11 +7,12 @@
                                                  NewQuotient
                                                  NewAbs
                                                  NewExp
+                                                 NewPow
                                                  NewCopySign
                                                  NewFreqRatio
                                                  NewMIDIFreq
                                                  NewImpulse
-                                                 SimpleSampleGeneratorFunc
+                                                 SimpleUGenFunc
                                                  WithInterp
                                                  InterpNone
                                                  InterpLinear
@@ -54,8 +55,6 @@
            (github.com$jfhamlin$freeverb-go NewRevModel)))
 
 (def ^:dynamic *graph* nil)
-
-(println "*graph*" #'*graph* (meta #'*graph*))
 
 (defmacro doseq-idx
   [[locals seq-expr] & body]
@@ -103,7 +102,13 @@
 ;; Utilities
 
 (defn pow
-  [b e] (math.Pow b e)) ;; TODO: use glojure.math
+  [b e]
+  (if (some (partial instance? Node) [b e])
+    (let [n (add-node! (NewPow) "pow")]
+      (add-edge! (as-node b) n "base")
+      (add-edge! (as-node e) n "exp")
+      n)
+    (math.Pow b e)))
 
 (defn abs
   [x]
@@ -179,11 +184,11 @@
 
 (defn ugen-fn
   [f]
-  (let [wrapped (fn [cfg n]
+  (let [wrapped (fn [cfg out]
                   (f {:sample-rate-hz (.SampleRateHz cfg)
                       :input-samples (.InputSamples cfg)}
-                     n))]
-    (SimpleSampleGeneratorFunc wrapped)))
+                     out))]
+    (SimpleUGenFunc wrapped)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Operators
@@ -430,10 +435,9 @@
 
 (defn pipe
   []
-  (let [f (fn [cfg n]
-            (if-let [in (get (:input-samples cfg) "in")]
-              in
-              (go/slice-of float64 n)))]
+  (let [f (fn [cfg out]
+            (when-let [in (get (:input-samples cfg) "in")]
+              (go/copy out in)))]
     (add-node! (ugen-fn f) "pipe")))
 
 (defn pipeset!

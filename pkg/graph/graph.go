@@ -7,7 +7,9 @@ import (
 	"runtime/debug"
 	"strconv"
 	"sync"
+	"sync/atomic"
 
+	"github.com/jfhamlin/muscrat/pkg/bufferpool"
 	"github.com/jfhamlin/muscrat/pkg/prof"
 	"github.com/jfhamlin/muscrat/pkg/ugen"
 )
@@ -16,42 +18,78 @@ import (
 // nodes today aren't connected to sinks but have side effects; we
 // need a way to identify those nodes.
 
-type NodeID int
+type (
+	NodeID int
+
+	SinkChan <-chan []float64
+
+	nodeOptions struct {
+		label string
+	}
+
+	// NodeOptions is a functional option for configuring a node.
+	NodeOption func(*nodeOptions)
+
+	Node interface {
+		ID() NodeID
+		Run(ctx context.Context, g *Graph, cfg ugen.SampleConfig, numSamples int)
+
+		String() string
+
+		json.Marshaler
+	}
+
+	GeneratorNode struct {
+		id        NodeID
+		Generator ugen.UGen
+		label     string
+		str       string
+	}
+
+	SinkNode struct {
+		id     NodeID
+		output chan []float64
+		label  string
+	}
+
+	edgeVal struct {
+		samples []float64
+		waiters atomic.Int32
+	}
+
+	Edge struct {
+		From   NodeID
+		To     NodeID
+		ToPort string
+
+		channel chan *edgeVal
+	}
+
+	// Graph is a graph of SampleGenerators.
+	Graph struct {
+		Nodes []Node  `json:"nodes"`
+		Edges []*Edge `json:"edges"`
+
+		BufferSize int `json:"bufferSize"`
+	}
+)
+
+var (
+	edgeValPool = sync.Pool{
+		New: func() any {
+			return &edgeVal{}
+		},
+	}
+)
 
 func (id NodeID) String() string {
 	return strconv.Itoa(int(id))
 }
 
-type SinkChan <-chan []float64
-
-type Node interface {
-	ID() NodeID
-	Run(ctx context.Context, g *Graph, cfg ugen.SampleConfig, numSamples int)
-
-	String() string
-
-	json.Marshaler
-}
-
-type nodeOptions struct {
-	label string
-}
-
-// NodeOptions is a functional option for configuring a node.
-type NodeOption func(*nodeOptions)
-
 func WithLabel(label string) NodeOption {
 	return func(o *nodeOptions) {
 		o.label = label
 	}
-}
-
-// Node is a node in a graph of nodes.
-type GeneratorNode struct {
-	id        NodeID
-	Generator ugen.SampleGenerator
-	label     string
-	str       string
 }
 
 func (n *GeneratorNode) ID() NodeID {
@@ -81,6 +119,7 @@ func (n *GeneratorNode) Run(ctx context.Context, g *Graph, cfg ugen.SampleConfig
 	}()
 
 	inputSamples := make(map[string][]float64)
+	inputEdgeVals := make([]*edgeVal, 0, len(incomingEdges))
 	for {
 		select {
 		case <-ctx.Done():
@@ -90,7 +129,9 @@ func (n *GeneratorNode) Run(ctx context.Context, g *Graph, cfg ugen.SampleConfig
 
 		for _, e := range incomingEdges {
 			select {
-			case inputSamples[e.ToPort] = <-e.Channel:
+			case val := <-e.channel:
+				inputSamples[e.ToPort] = val.samples
+				inputEdgeVals = append(inputEdgeVals, val)
 			case <-ctx.Done():
 				return
 			}
@@ -98,12 +139,18 @@ func (n *GeneratorNode) Run(ctx context.Context, g *Graph, cfg ugen.SampleConfig
 
 		span := prof.StartSpan(ctx, n.String())
 		cfg.InputSamples = inputSamples
-		outputSamples := n.GenerateSamples(ctx, cfg, numSamples)
+		ev := newEdgeVal(numSamples, len(outgoingEdges))
+		n.GenerateSamples(ctx, cfg, ev.samples)
 		span.Finish()
+		// signal to the input edge vals that we're done with them
+		for _, ev := range inputEdgeVals {
+			ev.done()
+		}
+		inputEdgeVals = inputEdgeVals[:0]
 
 		for _, e := range outgoingEdges {
 			select {
-			case e.Channel <- outputSamples:
+			case e.channel <- ev:
 			case <-ctx.Done():
 				return
 			}
@@ -111,7 +158,7 @@ func (n *GeneratorNode) Run(ctx context.Context, g *Graph, cfg ugen.SampleConfig
 	}
 }
 
-func (n *GeneratorNode) GenerateSamples(ctx context.Context, cfg ugen.SampleConfig, numSamples int) (outputSamples []float64) {
+func (n *GeneratorNode) GenerateSamples(ctx context.Context, cfg ugen.SampleConfig, out []float64) {
 	defer func() {
 		if r := recover(); r != nil {
 			// TODO: make the failure of this node visible to the user.
@@ -119,10 +166,10 @@ func (n *GeneratorNode) GenerateSamples(ctx context.Context, cfg ugen.SampleConf
 			// print stack trace
 			fmt.Printf("node %s failed: %v\n", n, r)
 			fmt.Printf("stack trace: %s\n", debug.Stack())
-			outputSamples = make([]float64, numSamples)
+			clear(out)
 		}
 	}()
-	return n.Generator.GenerateSamples(ctx, cfg, numSamples)
+	n.Generator.Gen(ctx, cfg, out)
 }
 
 func (n *GeneratorNode) String() string {
@@ -131,12 +178,6 @@ func (n *GeneratorNode) String() string {
 
 func (n *GeneratorNode) MarshalJSON() ([]byte, error) {
 	return []byte(fmt.Sprintf(`{"id":%d,"type":"generator","label":"%s"}`, n.id, n.String())), nil
-}
-
-type SinkNode struct {
-	id     NodeID
-	output chan []float64
-	label  string
 }
 
 func (n *SinkNode) ID() NodeID {
@@ -148,6 +189,8 @@ func (n *SinkNode) Chan() SinkChan {
 }
 
 func (n *SinkNode) Run(ctx context.Context, g *Graph, cfg ugen.SampleConfig, numSamples int) {
+	inEdges := g.IncomingEdges(n.id)
+	inputEdgeVals := make([]*edgeVal, 0, len(inEdges))
 	for {
 		select {
 		case <-ctx.Done():
@@ -155,23 +198,35 @@ func (n *SinkNode) Run(ctx context.Context, g *Graph, cfg ugen.SampleConfig, num
 		default:
 		}
 
-		inEdges := g.IncomingEdges(n.id)
+		//start := time.Now()
+
 		inputSamples := make([][]float64, len(inEdges))
 		for i, e := range inEdges {
 			select {
 			case <-ctx.Done():
 				return
-			case inputSamples[i] = <-e.Channel:
+			case val := <-e.channel:
+				out := bufferpool.Get(len(val.samples))
+				copy(out, val.samples)
+				inputSamples[i] = out
+				inputEdgeVals = append(inputEdgeVals, val)
 			}
 		}
 		if len(inputSamples) == 0 {
 			continue
 		}
+		// if dur := time.Since(start); dur > time.Duration(numSamples)*time.Second/time.Duration(cfg.SampleRateHz) {
+		// 	fmt.Printf("[SLOW] got samples in %s\n", time.Since(start))
+		// }
 		select {
 		case n.output <- inputSamples[0]:
 		case <-ctx.Done():
 			return
 		}
+		for _, ev := range inputEdgeVals {
+			ev.done()
+		}
+		inputEdgeVals = inputEdgeVals[:0]
 	}
 }
 
@@ -186,23 +241,8 @@ func (n *SinkNode) MarshalJSON() ([]byte, error) {
 	return []byte(fmt.Sprintf(`{"id":%d,"type":"sink","label":"%s"}`, n.id, n.String())), nil
 }
 
-type Edge struct {
-	From    NodeID
-	To      NodeID
-	ToPort  string
-	Channel chan []float64
-}
-
 func (e *Edge) MarshalJSON() ([]byte, error) {
 	return []byte(fmt.Sprintf(`{"from":%d,"to":%d,"toPort":"%s"}`, e.From, e.To, e.ToPort)), nil
-}
-
-// Graph is a graph of SampleGenerators.
-type Graph struct {
-	Nodes []Node  `json:"nodes"`
-	Edges []*Edge `json:"edges"`
-
-	BufferSize int `json:"bufferSize"`
 }
 
 func (g *Graph) AddEdge(from, to NodeID, port string) {
@@ -210,11 +250,11 @@ func (g *Graph) AddEdge(from, to NodeID, port string) {
 		From:    from,
 		To:      to,
 		ToPort:  port,
-		Channel: make(chan []float64, 1),
+		channel: make(chan *edgeVal, 1),
 	})
 }
 
-func (g *Graph) AddGeneratorNode(gen ugen.SampleGenerator, opts ...NodeOption) Node {
+func (g *Graph) AddGeneratorNode(gen ugen.UGen, opts ...NodeOption) Node {
 	var options nodeOptions
 	for _, opt := range opts {
 		opt(&options)
@@ -361,12 +401,12 @@ func (g *Graph) bootstrapCycles(ctx context.Context) {
 
 			queue = append(queue, choice)
 			delete(blocked, choice)
-			zeros := make([]float64, g.BufferSize)
+			zeros := newEdgeVal(g.BufferSize, len(g.OutgoingEdges(choice)))
 			for _, e := range g.OutgoingEdges(choice) {
 				select {
 				case <-ctx.Done():
 					return
-				case e.Channel <- zeros:
+				case e.channel <- zeros:
 				}
 			}
 		}
@@ -410,4 +450,18 @@ func (g *Graph) Dot() string {
 	}
 	dot += "}\n"
 	return dot
+}
+
+func newEdgeVal(numSamples, waiters int) *edgeVal {
+	ev := edgeValPool.Get().(*edgeVal)
+	ev.samples = bufferpool.Get(numSamples)
+	ev.waiters.Store(int32(waiters))
+	return ev
+}
+
+func (ev *edgeVal) done() {
+	if ev.waiters.Add(-1) <= 0 {
+		bufferpool.Put(ev.samples)
+		edgeValPool.Put(ev)
+	}
 }

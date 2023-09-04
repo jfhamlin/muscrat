@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/jfhamlin/muscrat/pkg/bufferpool"
 	"github.com/jfhamlin/muscrat/pkg/ugen"
 )
 
@@ -29,7 +30,7 @@ func WithInterpolation(interp string) EnvOption {
 	}
 }
 
-func NewEnvelope(opts ...EnvOption) ugen.SampleGenerator {
+func NewEnvelope(opts ...EnvOption) ugen.UGen {
 	// Behavior follows that of SuperCollider's Env/EnvGen
 	// https://doc.sccode.org/Classes/Env.html
 
@@ -86,23 +87,24 @@ func NewEnvelope(opts ...EnvOption) ugen.SampleGenerator {
 		}
 	}
 
-	return ugen.SampleGeneratorFunc(func(ctx context.Context, cfg ugen.SampleConfig, n int) []float64 {
-		res := make([]float64, n)
+	return ugen.UGenFunc(func(ctx context.Context, cfg ugen.SampleConfig, out []float64) {
+		n := len(out)
 
 		levels := getSampleArrays(cfg.InputSamples, "level")
 		times := getSampleArrays(cfg.InputSamples, "time")
 		gate := cfg.InputSamples["trigger"]
 		if len(gate) == 0 {
-			gate = make([]float64, n)
+			gate = bufferpool.Get(n)
+			defer bufferpool.Put(gate)
 		}
 		if len(levels) == 0 {
-			return res
+			return
 		}
 		if len(levels) == 1 {
 			for i := 0; i < n; i++ {
-				res[i] = levels[0][i]
+				out[i] = levels[0][i]
 			}
-			return res
+			return
 		}
 
 		for i := 0; i < n; i++ {
@@ -117,7 +119,7 @@ func NewEnvelope(opts ...EnvOption) ugen.SampleGenerator {
 			lastGate = gate[i] > 0
 
 			if stage == 0 {
-				res[i] = level
+				out[i] = level
 				continue
 			}
 
@@ -148,9 +150,8 @@ func NewEnvelope(opts ...EnvOption) ugen.SampleGenerator {
 					}
 				}
 			}
-			res[i] = level
+			out[i] = level
 		}
-		return res
 	})
 }
 

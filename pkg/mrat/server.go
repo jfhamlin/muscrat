@@ -16,8 +16,10 @@ import (
 
 	wrt "github.com/wailsapp/wails/v2/pkg/runtime"
 
+	"github.com/jfhamlin/muscrat/pkg/bufferpool"
 	"github.com/jfhamlin/muscrat/pkg/gen/gljimports"
 	"github.com/jfhamlin/muscrat/pkg/graph"
+	"github.com/jfhamlin/muscrat/pkg/stdlib"
 	"github.com/jfhamlin/muscrat/pkg/ugen"
 
 	"github.com/jfhamlin/muscrat/internal/pkg/plot"
@@ -28,7 +30,12 @@ import (
 
 func init() {
 	// TODO: enable setting a dynamic stdlib path vs. using the default.
-	runtime.AddLoadPath(os.DirFS("./pkg/stdlib")) //stdlib.StdLib)
+	if os.Getenv("MUSCRAT_STDLIB_PATH") == "" {
+		runtime.AddLoadPath(stdlib.StdLib)
+	} else {
+		runtime.AddLoadPath(os.DirFS(os.Getenv("MUSCRAT_STDLIB_PATH")))
+	}
+
 	runtime.AddLoadPath(os.DirFS("."))
 
 	gljimports.RegisterImports(func(export string, val interface{}) {
@@ -207,20 +214,16 @@ func (s *Server) fadeTo(gr *graphRunner) {
 }
 
 func (s *Server) getSamples(cfg *audio.AudioConfig, n int) []int {
+	timePerBuf := time.Duration(bufferSize) * time.Second / time.Duration(cfg.SampleRate)
 	for len(s.getSamplesBuffer) < 2*n {
-		var channelSamples [][]float64
-		select {
-		case channelSamples = <-s.outputChannel:
-			if len(channelSamples) < 2 {
-				// fmt.Println("WARNING: expected 2 channels, got", len(channelSamples))
-				channelSamples = [][]float64{make([]float64, n), make([]float64, n)}
-			}
-			// TODO: fix the timeout to handle a buffer size that doesn't match the
-			// audio config.
-		case <-time.After(time.Duration(bufferSize) * time.Second / time.Duration(cfg.SampleRate)):
-			// return silence if we can't get samples fast enough.
-			fmt.Println("timeout")
+		start := time.Now()
+		channelSamples := <-s.outputChannel
+		if len(channelSamples) < 2 {
+			// fmt.Println("WARNING: expected 2 channels, got", len(channelSamples))
 			channelSamples = [][]float64{make([]float64, n), make([]float64, n)}
+		}
+		if dur := time.Since(start); dur > timePerBuf {
+			fmt.Printf("WARNING: buffer took %s to fill, expected %s\n", dur, timePerBuf)
 		}
 
 		if false {
@@ -251,6 +254,9 @@ func (s *Server) getSamples(cfg *audio.AudioConfig, n int) []int {
 		}
 
 		s.getSamplesBuffer = append(s.getSamplesBuffer, transformSampleBuffer(cfg, channelSamples)...)
+		for _, smps := range channelSamples {
+			bufferpool.Put(smps)
+		}
 	}
 	go wrt.EventsEmit(s.ctx, "samples", s.vizSamplesBuffer)
 	s.vizSamplesBuffer = s.vizSamplesBuffer[n:]

@@ -6,12 +6,10 @@ import (
 )
 
 func NewAbs() UGen {
-	return UGenFunc(func(ctx context.Context, cfg SampleConfig, n int) []float64 {
-		res := make([]float64, n)
+	return UGenFunc(func(ctx context.Context, cfg SampleConfig, out []float64) {
 		in := cfg.InputSamples["in"]
-		for i := 0; i < n; i++ {
-			res[i] = math.Abs(in[i])
+		for i := range out {
+			out[i] = math.Abs(in[i])
 		}
-		return res
 	})
 }

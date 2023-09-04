@@ -3,19 +3,16 @@ package ugen
 import "context"
 
 func NewQuotient() UGen {
-	return UGenFunc(func(ctx context.Context, cfg SampleConfig, n int) []float64 {
-		res := make([]float64, n)
-
+	return UGenFunc(func(ctx context.Context, cfg SampleConfig, out []float64) {
 		xs := CollectIndexedInputs(cfg)
 		if len(xs) == 0 {
-			return res
+			return
 		}
-		for i := 0; i < n; i++ {
-			res[i] = xs[0][i]
+		for i := range out {
+			out[i] = xs[0][i]
 			for _, x := range xs[1:] {
-				res[i] /= x[i]
+				out[i] /= x[i]
 			}
 		}
-		return res
 	})
 }

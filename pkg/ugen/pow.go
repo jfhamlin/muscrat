@@ -5,12 +5,12 @@ import (
 	"math"
 )
 
-func NewCopySign() UGen {
+func NewPow() UGen {
 	return UGenFunc(func(ctx context.Context, cfg SampleConfig, out []float64) {
-		in := cfg.InputSamples["in"]
-		sign := cfg.InputSamples["sign"]
+		base := cfg.InputSamples["base"]
+		exp := cfg.InputSamples["exp"]
 		for i := range out {
-			out[i] = math.Copysign(in[i], sign[i])
+			out[i] = math.Pow(base[i], exp[i])
 		}
 	})
 }

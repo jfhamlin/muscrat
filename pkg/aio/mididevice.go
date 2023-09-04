@@ -116,7 +116,11 @@ func findAndListenToMIDIPort(ctx context.Context, id int, namePattern *regexp.Re
 		}
 	}
 	if found == nil {
-		return 0, fmt.Errorf("no MIDI port found")
+		var name string
+		if namePattern != nil {
+			name = namePattern.String()
+		}
+		return 0, fmt.Errorf("no MIDI port found with id %d or name matching %q", id, name)
 	}
 
 	_, err := midi.ListenTo(found, func(msg midi.Message, timestampms int32) {
@@ -301,28 +305,22 @@ func (s *Keyboard) Control() ugen.UGen {
 	return &MIDIControl{Keyboard: s}
 }
 
-func (s *KeyboardNotes) GenerateSamples(ctx context.Context, cfg ugen.SampleConfig, n int) []float64 {
-	res := make([]float64, n)
-	for i := 0; i < n; i++ {
+func (s *KeyboardNotes) Gen(ctx context.Context, cfg ugen.SampleConfig, out []float64) {
+	for i := range out {
 		v := s.voices[s.voice].Load().(voice)
-		res[i] = v.note
+		out[i] = v.note
 	}
-	return res
 }
 
-func (s *KeyboardGate) GenerateSamples(ctx context.Context, cfg ugen.SampleConfig, n int) []float64 {
-	res := make([]float64, n)
-	for i := 0; i < n; i++ {
+func (s *KeyboardGate) Gen(ctx context.Context, cfg ugen.SampleConfig, out []float64) {
+	for i := range out {
 		v := s.voices[s.voice].Load().(voice)
-		res[i] = v.gate
+		out[i] = v.gate
 	}
-	return res
 }
 
-func (c *MIDIControl) GenerateSamples(ctx context.Context, cfg ugen.SampleConfig, n int) []float64 {
-	res := make([]float64, n)
-	for i := 0; i < n; i++ {
-		res[i] = float64(c.controller.Load()) / 127
+func (c *MIDIControl) Gen(ctx context.Context, cfg ugen.SampleConfig, out []float64) {
+	for i := range out {
+		out[i] = float64(c.controller.Load()) / 127
 	}
-	return res
 }

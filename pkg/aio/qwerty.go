@@ -22,7 +22,7 @@ type qwertyTrig struct {
 	lastTrig *bool
 }
 
-func NewQwertyMIDI() ugen.SampleGenerator {
+func NewQwertyMIDI() ugen.UGen {
 	return &qwertyMIDI{}
 }
 
@@ -58,28 +58,24 @@ func (q *qwertyMIDI) Stop(ctx context.Context) error {
 	return nil
 }
 
-func (q *qwertyMIDI) GenerateSamples(ctx context.Context, cfg ugen.SampleConfig, n int) []float64 {
-	res := make([]float64, n)
-	for i := range res {
-		res[i] = q.lastNote
+func (q *qwertyMIDI) Gen(ctx context.Context, cfg ugen.SampleConfig, out []float64) {
+	for i := range out {
+		out[i] = q.lastNote
 	}
-	return res
 }
 
-func (q *qwertyMIDI) AsTrigger() ugen.SampleGenerator {
+func (q *qwertyMIDI) AsTrigger() ugen.UGen {
 	return &qwertyTrig{lastTrig: &q.lastTrig}
 }
 
-func (q *qwertyTrig) GenerateSamples(ctx context.Context, cfg ugen.SampleConfig, n int) []float64 {
-	res := make([]float64, n)
-	for i := range res {
+func (q *qwertyTrig) Gen(ctx context.Context, cfg ugen.SampleConfig, out []float64) {
+	for i := range out {
 		if *q.lastTrig {
-			res[i] = 1
+			out[i] = 1
 		} else {
-			res[i] = -1
+			out[i] = -1
 		}
 	}
-	return res
 }
 
 var (

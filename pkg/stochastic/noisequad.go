@@ -11,7 +11,7 @@ import (
 // Supercollider's Noise2, generates quadratically interpolated random
 // values at a rate given by the nearest integer division of the
 // sample rate by the freq argument.
-func NewNoiseQuad(opts ...ugen.Option) ugen.SampleGenerator {
+func NewNoiseQuad(opts ...ugen.Option) ugen.UGen {
 	o := ugen.DefaultOptions()
 	for _, opt := range opts {
 		opt(&o)
@@ -31,11 +31,10 @@ func NewNoiseQuad(opts ...ugen.Option) ugen.SampleGenerator {
 	const defaultFreq = 500.0
 
 	// Logic taken from supercollider LFNoise2 ugen
-	return ugen.SampleGeneratorFunc(func(ctx context.Context, cfg ugen.SampleConfig, n int) []float64 {
+	return ugen.UGenFunc(func(ctx context.Context, cfg ugen.SampleConfig, out []float64) {
 		ws := cfg.InputSamples["w"]
-		res := make([]float64, n)
 
-		remain := n
+		remain := len(out)
 		i := 0
 		for remain > 0 {
 			freq := defaultFreq
@@ -63,12 +62,11 @@ func NewNoiseQuad(opts ...ugen.Option) ugen.SampleGenerator {
 			remain -= nsamp
 			counter -= nsamp
 			for j := 0; j < nsamp; j++ {
-				res[i] = level
+				out[i] = level
 				slope += curve
 				level += slope
 				i++
 			}
 		}
-		return res
 	})
 }
