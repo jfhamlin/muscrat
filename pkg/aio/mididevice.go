@@ -116,7 +116,11 @@ func findAndListenToMIDIPort(ctx context.Context, id int, namePattern *regexp.Re
 		}
 	}
 	if found == nil {
-		return 0, fmt.Errorf("no MIDI port found with id %d or name matching %s", id, namePattern.String())
+		var name string
+		if namePattern != nil {
+			name = namePattern.String()
+		}
+		return 0, fmt.Errorf("no MIDI port found with id %d or name matching %q", id, name)
 	}
 
 	_, err := midi.ListenTo(found, func(msg midi.Message, timestampms int32) {

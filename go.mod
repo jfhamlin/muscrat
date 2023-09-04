@@ -5,7 +5,7 @@ go 1.21
 require (
 	github.com/bspaans/bleep v0.0.0-20220414232837-486f92844ed7
 	github.com/fsnotify/fsnotify v1.5.4
-	github.com/glojurelang/glojure v0.0.0-20230827181509-ecfce2f0d6be
+	github.com/glojurelang/glojure v0.0.0-20230903213614-fcddfd4847be
 	github.com/go-audio/audio v1.0.0
 	github.com/go-audio/wav v1.0.0
 	github.com/gordonklaus/portaudio v0.0.0-20221027163845-7c3b689db3cc
@@ -18,6 +18,7 @@ require (
 )
 
 require (
+	bitbucket.org/pcastools/hash v1.0.5 // indirect
 	github.com/bep/debounce v1.2.1 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/go-audio/riff v1.0.0 // indirect
@@ -31,6 +32,7 @@ require (
 	github.com/leaanthony/slicer v1.5.0 // indirect
 	github.com/mattn/go-colorable v0.1.11 // indirect
 	github.com/mattn/go-isatty v0.0.14 // indirect
+	github.com/mitchellh/hashstructure/v2 v2.0.2 // indirect
 	github.com/modern-go/gls v0.0.0-20220109145502-612d0167dce5 // indirect
 	github.com/modern-go/reflect2 v1.0.2 // indirect
 	github.com/pkg/browser v0.0.0-20210706143420-7d21f8c997e2 // indirect

@@ -7,6 +7,7 @@
                                                  NewQuotient
                                                  NewAbs
                                                  NewExp
+                                                 NewPow
                                                  NewCopySign
                                                  NewFreqRatio
                                                  NewMIDIFreq
@@ -101,7 +102,13 @@
 ;; Utilities
 
 (defn pow
-  [b e] (math.Pow b e)) ;; TODO: use glojure.math
+  [b e]
+  (if (some (partial instance? Node) [b e])
+    (let [n (add-node! (NewPow) "pow")]
+      (add-edge! (as-node b) n "base")
+      (add-edge! (as-node e) n "exp")
+      n)
+    (math.Pow b e)))
 
 (defn abs
   [x]

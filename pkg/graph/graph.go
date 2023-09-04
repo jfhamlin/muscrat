@@ -198,6 +198,8 @@ func (n *SinkNode) Run(ctx context.Context, g *Graph, cfg ugen.SampleConfig, num
 		default:
 		}
 
+		//start := time.Now()
+
 		inputSamples := make([][]float64, len(inEdges))
 		for i, e := range inEdges {
 			select {
@@ -213,6 +215,9 @@ func (n *SinkNode) Run(ctx context.Context, g *Graph, cfg ugen.SampleConfig, num
 		if len(inputSamples) == 0 {
 			continue
 		}
+		// if dur := time.Since(start); dur > time.Duration(numSamples)*time.Second/time.Duration(cfg.SampleRateHz) {
+		// 	fmt.Printf("[SLOW] got samples in %s\n", time.Since(start))
+		// }
 		select {
 		case n.output <- inputSamples[0]:
 		case <-ctx.Done():

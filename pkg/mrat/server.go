@@ -44,7 +44,7 @@ func init() {
 }
 
 const (
-	bufferSize = 256
+	bufferSize = 128
 )
 
 type (
