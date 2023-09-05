@@ -50,6 +50,8 @@ type (
 		id     NodeID
 		output chan []float64
 		label  string
+
+		sinkID int
 	}
 
 	edgeVal struct {
@@ -71,6 +73,8 @@ type (
 		Edges []*Edge `json:"edges"`
 
 		BufferSize int `json:"bufferSize"`
+
+		sinks []*SinkNode
 	}
 )
 
@@ -246,6 +250,18 @@ func (e *Edge) MarshalJSON() ([]byte, error) {
 }
 
 func (g *Graph) AddEdge(from, to NodeID, port string) {
+	// panic on edges whose source or destination is not in the graph,
+	// or whose source is a sink
+	if int(from) >= len(g.Nodes) {
+		panic(fmt.Sprintf("edge source %d is not in the graph", from))
+	}
+	if int(to) >= len(g.Nodes) {
+		panic(fmt.Sprintf("edge destination %d is not in the graph", to))
+	}
+	if _, ok := g.Nodes[from].(*SinkNode); ok {
+		panic(fmt.Sprintf("cannot add edge whose source %d is a sink node", from))
+	}
+
 	g.Edges = append(g.Edges, &Edge{
 		From:    from,
 		To:      to,
@@ -287,8 +303,10 @@ func (g *Graph) AddSinkNode(opts ...NodeOption) *SinkNode {
 		id:     NodeID(len(g.Nodes)),
 		output: make(chan []float64),
 		label:  options.label,
+		sinkID: len(g.sinks),
 	}
 	g.Nodes = append(g.Nodes, node)
+	g.sinks = append(g.sinks, node)
 	return node
 }
 
@@ -356,6 +374,269 @@ func (g *Graph) Run(ctx context.Context, cfg ugen.SampleConfig) {
 	}
 	wg.Wait()
 }
+
+////////////////////////////////////////////////////////////////////////////////
+// exploratory
+
+type (
+	// we evaluate the graph in epochs, where each epoch is a buffer
+	// sent to all sinks.
+	//
+	// every epoch, we evaluate the graph in topological order using multiple
+	// goroutines. each node has an atomic value containing the epoch number
+	// of the last time it was evaluated. if the epoch number is less than
+	// the current epoch, we evaluate the node and update the epoch number.
+	runState struct {
+		nodeEpochs  []atomic.Int64
+		nodeEvaling []atomic.Bool
+		nodeValues  []atomic.Value
+
+		incomingEdges    [][]*Edge
+		numOutgoingEdges []int
+	}
+)
+
+func (g *Graph) RunWorkers(ctx context.Context, cfg ugen.SampleConfig) {
+	if g.BufferSize <= 0 {
+		g.BufferSize = 1024
+	}
+
+	// using 1/2 the number of CPUs gives good performance when
+	// benchmarking. using all CPUs gives worse performance.
+	numWorkers := 1 //runtime.NumCPU() / 2
+
+	var wg sync.WaitGroup
+	wg.Add(numWorkers)
+
+	rs := &runState{
+		nodeEpochs:       make([]atomic.Int64, len(g.Nodes)),
+		nodeEvaling:      make([]atomic.Bool, len(g.Nodes)),
+		nodeValues:       make([]atomic.Value, len(g.Nodes)),
+		incomingEdges:    make([][]*Edge, len(g.Nodes)),
+		numOutgoingEdges: make([]int, len(g.Nodes)),
+	}
+	for i, n := range g.Nodes {
+		rs.incomingEdges[i] = g.IncomingEdges(n.ID())
+		rs.numOutgoingEdges[i] = len(g.OutgoingEdges(n.ID()))
+	}
+
+	g.bootstrapCyclesWorkers(ctx, rs)
+
+	// start any generator nodes whose generator is a ugen.Starter
+	for _, node := range g.Nodes {
+		if gen, ok := node.(*GeneratorNode); ok {
+			if starter, ok := gen.Generator.(ugen.Starter); ok {
+				starter.Start(ctx)
+			}
+		}
+	}
+	// defer stopping any generator nodes whose generator is a ugen.Stopper
+	defer func() {
+		for _, node := range g.Nodes {
+			if gen, ok := node.(*GeneratorNode); ok {
+				if stopper, ok := gen.Generator.(ugen.Stopper); ok {
+					stopper.Stop(ctx)
+				}
+			}
+		}
+	}()
+
+	for i := 0; i < numWorkers; i++ {
+		id := i
+		go func() {
+			defer wg.Done()
+			g.runWorker(ctx, cfg, rs, id)
+		}()
+	}
+	wg.Wait()
+}
+
+func (g *Graph) runWorker(ctx context.Context, cfg ugen.SampleConfig, rs *runState, workerID int) {
+	// invariants:
+	// 1. rs.nodeEpochs[i] is the next unevaluated epoch of node i
+	// 2. rs.nodeEvaling[i] is true if node i is currently being evaluated
+	// 3. rs.nodeValues[i] is the value of node i for the previous epoch of node i
+
+	numSinks := len(g.Sinks())
+	sinksDoneBits := (int64(1) << numSinks) - 1
+
+	var epoch int64 = 0    // the epoch being evaluated by this worker
+	var sinkDoneMask int64 // assumes numSinks <= 64
+	if numSinks > 64 {
+		panic("too many sinks")
+	}
+
+	inputSampleMap := make(map[string][]float64) // cleared after every node evaluation
+	inputEdgeVals := make([]*edgeVal, 0, 8)      // cleared after every node evaluation
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		default:
+		}
+
+		// fmt.Printf("- [%d] worker epoch %d\n", workerID, epoch)
+		// fmt.Printf("  - [%d] sinkDoneMask:  %064b\n", workerID, sinkDoneMask)
+		// fmt.Printf("  - [%d] sinksDoneBits: %064b\n", workerID, sinksDoneBits)
+
+	NodeLoop:
+		for i := range g.Nodes {
+			if sinkDoneMask == sinksDoneBits {
+				epoch++
+				sinkDoneMask = 0
+			}
+
+			if !rs.nodeEvaling[i].CompareAndSwap(false, true) {
+				// fmt.Println("  - node", i, "already being evaluated")
+				continue
+			}
+			if rs.nodeEpochs[i].Load() > epoch {
+				if sink, ok := g.Nodes[i].(*SinkNode); ok {
+					sinkDoneMask |= 1 << sink.sinkID
+				}
+				rs.nodeEvaling[i].Store(false)
+				continue
+			}
+
+			// first, check that all nodes with incoming edges have been
+			// evaluated for this epoch
+			for _, e := range rs.incomingEdges[i] {
+				if rs.nodeEpochs[e.From].Load() <= epoch {
+					rs.nodeEvaling[i].Store(false)
+					continue NodeLoop
+				}
+			}
+
+			////////////////////////////////////////////////////////////////////////////
+			// evaluate node i
+
+			// then, collect the inputs
+			for _, e := range rs.incomingEdges[i] {
+				ev := rs.nodeValues[e.From].Load().(*edgeVal)
+				inputSampleMap[e.ToPort] = ev.samples
+				inputEdgeVals = append(inputEdgeVals, ev)
+			}
+
+			// process the node
+			n := g.Nodes[i]
+			cfg.InputSamples = inputSampleMap
+			switch n := n.(type) {
+			case *GeneratorNode:
+				ev := newEdgeVal(g.BufferSize, rs.numOutgoingEdges[i])
+				n.GenerateSamples(ctx, cfg, ev.samples)
+				// set the node value
+				rs.nodeValues[i].Store(ev)
+			case *SinkNode:
+				for _, ev := range inputEdgeVals { // TODO: disallow sinks with multiple inputs
+					out := bufferpool.Get(len(ev.samples))
+					copy(out, ev.samples)
+					//fmt.Printf("  - [%d] SENDING sink %d\n", workerID, n.sinkID)
+					select {
+					case n.output <- out:
+						//fmt.Printf("  - [%d] DONE SENDING sink %d\n", workerID, n.sinkID)
+					case <-ctx.Done():
+						//fmt.Printf("  - [%d] EARLY EXIT DONE SENDING sink %d\n", workerID, n.sinkID)
+						return
+					}
+					break
+				}
+				sinkDoneMask |= 1 << n.sinkID
+			}
+
+			// update the epoch
+			rs.nodeEpochs[i].Store(epoch + 1)
+
+			// release the node
+			rs.nodeEvaling[i].Store(false)
+
+			// release the inputs
+			for _, ev := range inputEdgeVals {
+				ev.done()
+			}
+
+			// reset the eval state
+			inputEdgeVals = inputEdgeVals[:0]
+			clear(inputSampleMap)
+		}
+	}
+}
+
+func (g *Graph) bootstrapCyclesWorkers(ctx context.Context, rs *runState) {
+	// initialize any channels required to bootstrap cycles, preventing
+	// deadlock.
+
+	queue := make([]NodeID, 0, len(g.Nodes))
+	blocked := map[NodeID]struct{}{}
+	for _, node := range g.Nodes {
+		if _, ok := node.(*SinkNode); ok {
+			continue
+		}
+		if len(g.IncomingEdges(node.ID())) == 0 {
+			queue = append(queue, node.ID())
+		} else {
+			blocked[node.ID()] = struct{}{}
+		}
+	}
+
+	satisfiedNodes := make(map[NodeID]struct{})
+	for len(queue) > 0 || len(blocked) > 0 {
+		if len(queue) == 0 {
+			// all nodes are blocked. pick an unsatisfied dependency of the
+			// node with the most satisfied dependencies, and treat it as
+			// "satisfied," generating a buffer of zero samples for it.
+			maxSatisfied := -1
+			var choice NodeID = -1
+
+			for id := range blocked {
+				satisfiedDeps := 0
+				var unsatisfiedDep NodeID
+				for _, e := range g.IncomingEdges(id) {
+					if _, ok := satisfiedNodes[e.From]; ok {
+						satisfiedDeps++
+					} else {
+						unsatisfiedDep = e.From
+					}
+				}
+				if satisfiedDeps > maxSatisfied {
+					maxSatisfied = satisfiedDeps
+					choice = unsatisfiedDep
+				}
+			}
+
+			queue = append(queue, choice)
+			delete(blocked, choice)
+			zeros := newEdgeVal(g.BufferSize, len(g.OutgoingEdges(choice)))
+			rs.nodeValues[choice].Store(zeros)
+			rs.nodeEpochs[choice].Store(1)
+		}
+
+		var nodeID NodeID
+		nodeID, queue = queue[0], queue[1:]
+
+		satisfiedNodes[nodeID] = struct{}{}
+		// check for any unblocked nodes
+		for _, e := range g.OutgoingEdges(nodeID) {
+			if _, ok := satisfiedNodes[e.To]; ok {
+				continue
+			}
+			satisfied := true
+			for _, inEdge := range g.IncomingEdges(e.To) {
+				if _, ok := satisfiedNodes[inEdge.From]; !ok {
+					satisfied = false
+					break
+				}
+			}
+			if !satisfied {
+				continue
+			}
+			delete(blocked, e.To)
+			queue = append(queue, e.To)
+		}
+	}
+}
+
+// end exploratory
+////////////////////////////////////////////////////////////////////////////////
 
 func (g *Graph) bootstrapCycles(ctx context.Context) {
 	// initialize any channels required to bootstrap cycles, preventing

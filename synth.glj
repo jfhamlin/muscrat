@@ -18,7 +18,7 @@
              (map #(* root (semitones %))
                   [0  7  12  0  7 12  5  7 10  8  3 -2 -4  5])))
 (def melody
-  (-> (sin melody-seq 0.75 detune)
+  (-> (sin melody-seq)
       (+ (* (decibels (+ -40 (* 40 noise-volume))) (noise)))
       (* (env-asr trig [0.005 1 0.005]))))
 

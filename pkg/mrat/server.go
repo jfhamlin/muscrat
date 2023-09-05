@@ -300,7 +300,7 @@ func (gr *graphRunner) run() {
 
 	go func() {
 		defer close(gr.stopped)
-		gr.graph.Run(ctx, ugen.SampleConfig{SampleRateHz: gr.sampleRate})
+		gr.graph.RunWorkers(ctx, ugen.SampleConfig{SampleRateHz: gr.sampleRate})
 	}()
 
 	defer close(gr.graphOutputCh)
