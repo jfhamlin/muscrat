@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"runtime"
 	"runtime/debug"
 	"strconv"
 	"sync"
@@ -403,7 +404,10 @@ func (g *Graph) RunWorkers(ctx context.Context, cfg ugen.SampleConfig) {
 
 	// using 1/2 the number of CPUs gives good performance when
 	// benchmarking. using all CPUs gives worse performance.
-	numWorkers := 1 //runtime.NumCPU() / 2
+	numWorkers := runtime.NumCPU() / 2
+	if numWorkers < 1 {
+		numWorkers = 1
+	}
 
 	var wg sync.WaitGroup
 	wg.Add(numWorkers)
@@ -478,6 +482,9 @@ func (g *Graph) runWorker(ctx context.Context, cfg ugen.SampleConfig, rs *runSta
 		// fmt.Printf("- [%d] worker epoch %d\n", workerID, epoch)
 		// fmt.Printf("  - [%d] sinkDoneMask:  %064b\n", workerID, sinkDoneMask)
 		// fmt.Printf("  - [%d] sinksDoneBits: %064b\n", workerID, sinksDoneBits)
+		// for i := range rs.nodeEpochs {
+		// 	fmt.Printf("  - [%d] node %d epoch: %d\n", workerID, i, rs.nodeEpochs[i].Load())
+		// }
 
 	NodeLoop:
 		for i := range g.Nodes {
@@ -486,10 +493,19 @@ func (g *Graph) runWorker(ctx context.Context, cfg ugen.SampleConfig, rs *runSta
 				sinkDoneMask = 0
 			}
 
-			if !rs.nodeEvaling[i].CompareAndSwap(false, true) {
-				// fmt.Println("  - node", i, "already being evaluated")
+			// if the node has already been evaluated for this epoch, skip it
+			if rs.nodeEpochs[i].Load() > epoch {
+				if sink, ok := g.Nodes[i].(*SinkNode); ok {
+					sinkDoneMask |= 1 << sink.sinkID
+				}
 				continue
 			}
+
+			if !rs.nodeEvaling[i].CompareAndSwap(false, true) {
+				continue
+			}
+			// check again if the node has already been evaluated for this
+			// epoch after we've acquired the lock.
 			if rs.nodeEpochs[i].Load() > epoch {
 				if sink, ok := g.Nodes[i].(*SinkNode); ok {
 					sinkDoneMask |= 1 << sink.sinkID
@@ -530,12 +546,9 @@ func (g *Graph) runWorker(ctx context.Context, cfg ugen.SampleConfig, rs *runSta
 				for _, ev := range inputEdgeVals { // TODO: disallow sinks with multiple inputs
 					out := bufferpool.Get(len(ev.samples))
 					copy(out, ev.samples)
-					//fmt.Printf("  - [%d] SENDING sink %d\n", workerID, n.sinkID)
 					select {
 					case n.output <- out:
-						//fmt.Printf("  - [%d] DONE SENDING sink %d\n", workerID, n.sinkID)
 					case <-ctx.Done():
-						//fmt.Printf("  - [%d] EARLY EXIT DONE SENDING sink %d\n", workerID, n.sinkID)
 						return
 					}
 					break
