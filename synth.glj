@@ -17,41 +17,8 @@
   (sequencer trig
              (map #(* root (semitones %))
                   [0  7  12  0  7 12  5  7 10  8  3 -2 -4  5])))
-
-(defn supersaw
-  "SuperSaw (Roland JP-8000 and JP-8080)"
-  ([freq] (supersaw freq 0.75))
-  ([freq mix] (supersaw freq mix 0.75))
-  ([freq mix detune]
-   (letfn [(detune-curve [x]
-             (+ (* 10028.7312891634 (pow x 11))
-                (* -50818.8652045924 (pow x 10))
-                (* 111363.4808729368 (pow x 9))
-                (* -138150.6761080548 (pow x 8))
-                (* 106649.6679158292 (pow x 7))
-                (* -53046.9642751875 (pow x 6))
-                (* 17019.9518580080 (pow x 5))
-                (* -3425.0836591318 (pow x 4))
-                (* 404.2703938388 (pow x 3))
-                (* -24.1878824391 (pow x 2))
-                (* 0.6717417634 x)
-                0.0030115596))
-           (center-gain [x] (+ (* -0.55366 x) 0.99785))
-           (side-gain [x] (+ (* -0.73764 (pow x 2)) (* 1.2841 x) 0.044372))]
-     (let [center (saw freq :iphase (math$rand.Float64))
-           detune-factor (* freq (detune-curve detune))
-           freqs [(+ freq (* detune-factor 0.11002313))
-                  (+ freq (* detune-factor 0.06288439))
-                  (+ freq (* detune-factor 0.01952356))
-                  (+ freq (* detune-factor 0.01991221))
-                  (+ freq (* detune-factor 0.06216538))
-                  (+ freq (* detune-factor 0.10745242))]
-           side (sum (map #(saw % :iphase (math$rand.Float64)) freqs))
-           sig (+ (* center (center-gain mix)) (* side (side-gain mix)))]
-        sig))))
-
 (def melody
-  (-> (supersaw melody-seq 0.75 detune)
+  (-> (sin melody-seq 0.75 detune)
       (+ (* (decibels (+ -40 (* 40 noise-volume))) (noise)))
       (* (env-asr trig [0.005 1 0.005]))))
 
