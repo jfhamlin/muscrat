@@ -1,5 +1,6 @@
 (ns mrat.core
-  (:import (github.com$jfhamlin$muscrat$pkg$graph Node
+  (:import (github.com$glojurelang$glojure$pkg$lang *Ratio)
+           (github.com$jfhamlin$muscrat$pkg$graph Node
                                                   WithLabel)
            (github.com$jfhamlin$muscrat$pkg$ugen NewConstant
                                                  NewSum
@@ -84,6 +85,10 @@
 (extend-protocol AsNode
   go/int64
   (as-node [x] (add-node! (NewConstant x) x)))
+
+(extend-protocol AsNode
+  *Ratio
+  (as-node [x] (add-node! (NewConstant (double x)) x)))
 
 (defn play
   [channels]
@@ -728,15 +733,6 @@
   (let [bps (/ bpm 60.0)]
     (apply impulse (* bps res) flags)))
 
-(defn trig-pattern
-  [clock pattern]
-  (let [s (sequencer clock pattern)]
-    (* s clock)))
-
-(defn- find-retrigger-index
-  [slc i last-gate n]
-  (github.com$jfhamlin$muscrat$pkg$slice.FindIndexOfRisingEdge slc i last-gate))
-
 (defn sequencer
   [gate freqs]
   (let [node (add-node! (github.com$jfhamlin$muscrat$pkg$pattern.NewSequencer) "sequencer")
@@ -746,6 +742,11 @@
     (doseq-idx [[freq i] freqs]
                (add-edge! freq node (str \$ i)))
     node))
+
+(defn trig-pattern
+  [clock pattern]
+  (let [s (sequencer clock pattern)]
+    (* s clock)))
 
 (defn choose
   [gate opts]

@@ -53,6 +53,10 @@ var (
 	// TODO: reconsider this
 	midiPorts    []drivers.In
 	midiPortsMtx sync.Mutex
+
+	// map from port number to map of controller number to last value
+	lastMidiPortControllerValues    = make(map[int]map[int]int32)
+	lastMidiPortControllerValuesMtx sync.RWMutex
 )
 
 func WithDeviceID(id int) MIDIDeviceOption {
@@ -123,7 +127,19 @@ func findAndListenToMIDIPort(ctx context.Context, id int, namePattern *regexp.Re
 		return 0, fmt.Errorf("no MIDI port found with id %d or name matching %q", id, name)
 	}
 
+	portID := found.Number()
+
 	_, err := midi.ListenTo(found, func(msg midi.Message, timestampms int32) {
+		if msg.Type() == midi.ControlChangeMsg { // store last value for each controller
+			var channel, controller, value uint8
+			msg.GetControlChange(&channel, &controller, &value)
+			lastMidiPortControllerValuesMtx.Lock()
+			if _, ok := lastMidiPortControllerValues[portID]; !ok {
+				lastMidiPortControllerValues[portID] = make(map[int]int32)
+			}
+			lastMidiPortControllerValues[portID][int(controller)] = int32(value)
+			lastMidiPortControllerValuesMtx.Unlock()
+		}
 		runtime.EventsEmit(ctx, "midi", &MIDIEnvelope{
 			DeviceID:   found.Number(),
 			DeviceName: found.String(),
@@ -196,7 +212,17 @@ func NewMIDIInputDevice(name string, opts ...MIDIDeviceOption) *Keyboard {
 	for i := range kb.voices {
 		kb.voices[i].Store(voice{})
 	}
-	kb.controller.Store(int32(127 * o.defaultValue))
+
+	value := int32(127 * o.defaultValue)
+	lastMidiPortControllerValuesMtx.RLock()
+	defer lastMidiPortControllerValuesMtx.RUnlock()
+	if lastValues, ok := lastMidiPortControllerValues[o.deviceID]; ok {
+		if lastValue, ok := lastValues[o.controller]; ok {
+			value = lastValue
+		}
+	}
+
+	kb.controller.Store(value)
 	return kb
 }
 
