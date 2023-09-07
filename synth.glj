@@ -35,7 +35,6 @@
         ;;        0))))
         ;; (freeverb :room-size 0.5))))
 
-
 (play (let [amp (decibels -10)]
         (* amp
            (+ ;; drone

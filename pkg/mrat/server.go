@@ -10,10 +10,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/bspaans/bleep/audio"
-	"github.com/bspaans/bleep/sinks"
-	"golang.org/x/term"
-
 	wrt "github.com/wailsapp/wails/v2/pkg/runtime"
 
 	"github.com/jfhamlin/muscrat/pkg/bufferpool"
@@ -22,7 +18,7 @@ import (
 	"github.com/jfhamlin/muscrat/pkg/stdlib"
 	"github.com/jfhamlin/muscrat/pkg/ugen"
 
-	"github.com/jfhamlin/muscrat/internal/pkg/plot"
+	"github.com/jfhamlin/muscrat/pkg/audio"
 
 	"github.com/glojurelang/glojure/pkg/pkgmap"
 	"github.com/glojurelang/glojure/pkg/runtime"
@@ -45,6 +41,8 @@ func init() {
 
 const (
 	bufferSize = 128
+
+	vizBufferFlushSize = 1024
 )
 
 type (
@@ -61,9 +59,6 @@ type (
 		// one []float64 per audio channel.
 		outputChannel chan [][]float64
 
-		// buffer to hold output samples not yet sent to the audio sink.
-		getSamplesBuffer []int
-		// buffer to hold raw average samples for visualization. TODO: there's a viz bug, fix it.
 		vizSamplesBuffer []float64
 
 		graphRunner *graphRunner
@@ -102,15 +97,22 @@ func (s *Server) Start(ctx context.Context) error {
 
 	s.ctx = ctx
 
-	cfg := audio.NewAudioConfig()
-	s.sampleRate = cfg.SampleRate
-
-	// set up the audio output
-	sink, err := sinks.NewSDLSink(cfg)
-	if err != nil {
-		panic(err)
+	if err := audio.Open(); err != nil {
+		return err
 	}
-	sink.Start(s.getSamples)
+	s.sampleRate = audio.SampleRate()
+
+	go s.sendSamples()
+
+	// cfg := audio.NewAudioConfig()
+	// s.sampleRate = cfg.SampleRate
+
+	// // set up the audio output
+	// sink, err := sinks.NewSDLSink(cfg)
+	// if err != nil {
+	// 	panic(err)
+	// }
+	// sink.Start(s.getSamples)
 
 	s.playGraph(zeroGraph())
 	return nil
@@ -213,26 +215,17 @@ func (s *Server) fadeTo(gr *graphRunner) {
 	}
 }
 
-func (s *Server) getSamples(cfg *audio.AudioConfig, n int) []int {
-	timePerBuf := time.Duration(bufferSize) * time.Second / time.Duration(cfg.SampleRate)
-	for len(s.getSamplesBuffer) < 2*n {
+func (s *Server) sendSamples() {
+	timePerBuf := time.Duration(bufferSize) * time.Second / time.Duration(audio.SampleRate())
+	for {
 		start := time.Now()
 		channelSamples := <-s.outputChannel
-		if len(channelSamples) < 2 {
-			// fmt.Println("WARNING: expected 2 channels, got", len(channelSamples))
-			channelSamples = [][]float64{make([]float64, n), make([]float64, n)}
+		if len(channelSamples) < audio.NumChannels() {
+			fmt.Printf("WARNING: expected %d channels, got %d\n", audio.NumChannels(), len(channelSamples))
+			continue
 		}
 		if dur := time.Since(start); dur > timePerBuf {
 			fmt.Printf("WARNING: buffer took %s to fill, expected %s\n", dur, timePerBuf)
-		}
-
-		if false {
-			width, height, err := term.GetSize(int(os.Stdout.Fd()))
-			if err != nil {
-				panic(err)
-			}
-			plt := plot.LineChartString(channelSamples[0], width, height)
-			fmt.Print("\n" + plt)
 		}
 
 		// update gain to approach target gain.
@@ -248,31 +241,38 @@ func (s *Server) getSamples(cfg *audio.AudioConfig, n int) []int {
 			channelSamples[i] = *newSamples
 		}
 
+		// send samples to audio output
+		{
+			out := bufferpool.Get(2 * len(channelSamples[0]))
+			for i := range channelSamples[0] {
+				(*out)[i*2] = channelSamples[0][i]
+				(*out)[i*2+1] = channelSamples[1][i]
+			}
+			audio.QueueAudioFloat64(*out)
+			bufferpool.Put(out)
+		}
+
+		// send samples to viewer
 		{
 			avgSamples := bufferpool.Get(len(channelSamples[0]))
 			averageBuffers(*avgSamples, channelSamples)
 			s.vizSamplesBuffer = append(s.vizSamplesBuffer, (*avgSamples)...)
-			bufferpool.Put(avgSamples)
+			if len(s.vizSamplesBuffer) > vizBufferFlushSize {
+				vizEmitBuffer := bufferpool.Get(vizBufferFlushSize)
+				copy(*vizEmitBuffer, s.vizSamplesBuffer[:vizBufferFlushSize])
+				s.vizSamplesBuffer = s.vizSamplesBuffer[vizBufferFlushSize:]
+				go func() {
+					defer bufferpool.Put(vizEmitBuffer)
+					wrt.EventsEmit(s.ctx, "samples", *vizEmitBuffer)
+				}()
+			}
 		}
-
-		s.getSamplesBuffer = append(s.getSamplesBuffer, transformSampleBuffer(cfg, channelSamples)...)
 
 		for _, smps := range channelSamples {
 			smps := smps
 			bufferpool.Put(&smps)
 		}
 	}
-	go wrt.EventsEmit(s.ctx, "samples", s.vizSamplesBuffer)
-	if n == len(s.vizSamplesBuffer) {
-		s.vizSamplesBuffer = s.vizSamplesBuffer[:0]
-	} else {
-		copy(s.vizSamplesBuffer, s.vizSamplesBuffer[n:])
-		s.vizSamplesBuffer = s.vizSamplesBuffer[:len(s.vizSamplesBuffer)-n]
-	}
-
-	res := s.getSamplesBuffer[:2*n]
-	s.getSamplesBuffer = s.getSamplesBuffer[2*n:]
-	return res
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -314,36 +314,22 @@ func (gr *graphRunner) run() {
 
 	defer close(gr.graphOutputCh)
 
-	// the number of sample frames we can buffer before getting blocked.
-	const frameBufferSize = 1
-	frameBuffer := make(chan [][]float64, frameBufferSize)
-
-	go func() {
-		for {
-			start := time.Now()
-			output := make([][]float64, 0, 2)
-			for _, sinkChan := range gr.graph.SinkChans() {
-				select {
-				case samps := <-sinkChan:
-					output = append(output, samps)
-				case <-ctx.Done():
-					return
-				}
-			}
-			dur := time.Since(start)
-			if dur > 2*time.Millisecond {
-				fmt.Printf("took %s to get samples from graph\n", dur)
-			}
-			frameBuffer <- output
-		}
-	}()
-
 	for {
-		select {
-		case <-ctx.Done():
-			return
-		case gr.graphOutputCh <- <-frameBuffer:
+		start := time.Now()
+		output := make([][]float64, 0, 2)
+		for _, sinkChan := range gr.graph.SinkChans() {
+			select {
+			case samps := <-sinkChan:
+				output = append(output, samps)
+			case <-ctx.Done():
+				return
+			}
 		}
+		dur := time.Since(start)
+		if dur > 2*time.Millisecond {
+			fmt.Printf("took %s to get samples from graph\n", dur)
+		}
+		gr.graphOutputCh <- output
 	}
 }
 
@@ -382,46 +368,6 @@ func (gr *graphRunner) outputTo(output chan<- [][]float64) {
 		cancel()
 		<-stopChan
 	}
-}
-
-////////////////////////////////////////////////////////////////////////////////
-
-func transformSampleBuffer(cfg *audio.AudioConfig, buf [][]float64) []int {
-	var out []int
-	if cfg.Stereo {
-		out = make([]int, 2*len(buf[0]))
-	} else {
-		out = make([]int, len(buf[0]))
-	}
-
-	maxValue := float64(int(1) << cfg.BitDepth)
-	transformSample := func(sample float64) int {
-		s := (sample + 1) * (maxValue / 2)
-		if s > maxValue {
-			fmt.Printf("XXX clipping high (max=%v): %v (%v)\n", maxValue, s, sample)
-		}
-		if s < 0 {
-			fmt.Printf("XXX clipping low (min=%v): %v (%v)\n", 0, s, sample)
-		}
-		s = math.Max(0, math.Ceil(s))
-		return int(math.Min(s, maxValue-1))
-	}
-
-	zeroSample := transformSample(0)
-	for i := range buf[0] {
-		if cfg.Stereo {
-			out[2*i] = transformSample(buf[0][i])
-			if len(buf) > 1 {
-				out[2*i+1] = transformSample(buf[1][i])
-			} else {
-				out[2*i+1] = zeroSample
-			}
-		} else {
-			out[i] = transformSample(buf[0][i])
-		}
-	}
-
-	return out
 }
 
 ////////////////////////////////////////////////////////////////////////////////
