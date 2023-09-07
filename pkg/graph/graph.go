@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"runtime"
 	"runtime/debug"
 	"strconv"
 	"sync"
@@ -380,6 +381,13 @@ func (g *Graph) Run(ctx context.Context, cfg ugen.SampleConfig) {
 // exploratory
 
 type (
+	runNodeInfo struct {
+		epoch         atomic.Int64
+		evaling       atomic.Bool
+		value         []float64 // value of the node in the last epoch
+		incomingEdges []*Edge
+	}
+
 	// we evaluate the graph in epochs, where each epoch is a buffer
 	// sent to all sinks.
 	//
@@ -388,12 +396,7 @@ type (
 	// of the last time it was evaluated. if the epoch number is less than
 	// the current epoch, we evaluate the node and update the epoch number.
 	runState struct {
-		nodeEpochs  []atomic.Int64
-		nodeEvaling []atomic.Bool
-
-		nodeValues [][]float64 // values for each node in the last epoch
-
-		incomingEdges [][]*Edge
+		nodeInfo []runNodeInfo
 
 		// nodeOrder is a topological-ish ordering of the nodes in the
 		// graph, excluding nodes that are not ancestors of any
@@ -404,6 +407,14 @@ type (
 	}
 )
 
+func (rs *runState) NodeInfoByID(id NodeID) *runNodeInfo {
+	return &rs.nodeInfo[rs.nodeIndexMap[id]]
+}
+
+func (rs *runState) NodeInfoByIndex(idx int) *runNodeInfo {
+	return &rs.nodeInfo[idx]
+}
+
 func (g *Graph) RunWorkers(ctx context.Context, cfg ugen.SampleConfig) {
 	if g.BufferSize <= 0 {
 		g.BufferSize = 1024
@@ -411,15 +422,19 @@ func (g *Graph) RunWorkers(ctx context.Context, cfg ugen.SampleConfig) {
 
 	// using 1/2 the number of CPUs gives good performance when
 	// benchmarking. using all CPUs gives worse performance.
-	numWorkers := 1 //runtime.NumCPU() / 2
+	numWorkers := runtime.NumCPU() / 2
 	if numWorkers < 1 {
 		numWorkers = 1
 	}
 
+	rs := g.newRunState()
+	if numWorkers > len(rs.nodeOrder) {
+		numWorkers = len(rs.nodeOrder)
+	}
+	fmt.Printf("XXX running with %d workers (%d nodes)\n", numWorkers, len(rs.nodeOrder))
+
 	var wg sync.WaitGroup
 	wg.Add(numWorkers)
-
-	rs := g.newRunState()
 
 	g.bootstrapCyclesWorkers(ctx, rs)
 
@@ -488,19 +503,16 @@ func (g *Graph) newRunState() *runState {
 	}
 
 	rs := &runState{
-		nodeEpochs:    make([]atomic.Int64, len(order)),
-		nodeEvaling:   make([]atomic.Bool, len(order)),
-		nodeValues:    make([][]float64, len(order)),
-		incomingEdges: make([][]*Edge, len(order)),
-		nodeOrder:     order,
-		nodeIndexMap:  make([]int, len(g.Nodes)),
+		nodeInfo:     make([]runNodeInfo, len(order)),
+		nodeOrder:    order,
+		nodeIndexMap: make([]int, len(g.Nodes)),
 	}
 
 	fullSampleSize := g.BufferSize * len(order)
 	bufSlice := make([]float64, fullSampleSize, fullSampleSize)
 	for i, id := range order {
-		rs.incomingEdges[i] = g.IncomingEdges(id)
-		rs.nodeValues[i] = bufSlice[i*g.BufferSize : (i+1)*g.BufferSize]
+		rs.nodeInfo[i].incomingEdges = g.IncomingEdges(id)
+		rs.nodeInfo[i].value = bufSlice[i*g.BufferSize : (i+1)*g.BufferSize]
 		rs.nodeIndexMap[id] = i
 	}
 
@@ -544,9 +556,10 @@ func (g *Graph) runWorker(ctx context.Context, cfg ugen.SampleConfig, rs *runSta
 				sinkDoneMask = 0
 			}
 			node := g.Node(nodeID)
+			info := rs.NodeInfoByIndex(nodeIndex)
 
 			// if the node has already been evaluated for this epoch, skip it
-			if rs.nodeEpochs[nodeIndex].Load() > epoch {
+			if info.epoch.Load() > epoch {
 				if sink, ok := node.(*SinkNode); ok {
 					sinkDoneMask |= 1 << sink.sinkID
 				}
@@ -554,7 +567,7 @@ func (g *Graph) runWorker(ctx context.Context, cfg ugen.SampleConfig, rs *runSta
 			}
 
 			// try to lock the node for evaluation
-			if !rs.nodeEvaling[nodeIndex].CompareAndSwap(false, true) {
+			if !info.evaling.CompareAndSwap(false, true) {
 				continue
 			}
 
@@ -563,19 +576,19 @@ func (g *Graph) runWorker(ctx context.Context, cfg ugen.SampleConfig, rs *runSta
 
 			// check again if the node has already been evaluated for this
 			// epoch after we've acquired the lock.
-			if rs.nodeEpochs[nodeIndex].Load() > epoch {
+			if info.epoch.Load() > epoch {
 				if sink, ok := node.(*SinkNode); ok {
 					sinkDoneMask |= 1 << sink.sinkID
 				}
-				rs.nodeEvaling[nodeIndex].Store(false)
+				info.evaling.Store(false)
 				continue
 			}
 
 			// first, check that all nodes with incoming edges have been
 			// evaluated for this epoch
-			for _, e := range rs.incomingEdges[nodeIndex] {
-				if rs.nodeEpochs[rs.nodeIndexMap[e.From]].Load() <= epoch {
-					rs.nodeEvaling[nodeIndex].Store(false)
+			for _, e := range info.incomingEdges {
+				if rs.NodeInfoByID(e.From).epoch.Load() <= epoch {
+					info.evaling.Store(false)
 					continue NodeLoop
 				}
 			}
@@ -584,19 +597,19 @@ func (g *Graph) runWorker(ctx context.Context, cfg ugen.SampleConfig, rs *runSta
 			// evaluate node nodeID
 
 			// then, collect the inputs
-			for _, e := range rs.incomingEdges[nodeIndex] {
-				inputSampleMap[e.ToPort] = rs.nodeValues[rs.nodeIndexMap[e.From]]
+			for _, e := range info.incomingEdges {
+				inputSampleMap[e.ToPort] = rs.NodeInfoByID(e.From).value
 			}
 
 			// process the node
 			cfg.InputSamples = inputSampleMap
 			switch n := node.(type) {
 			case *GeneratorNode:
-				clear(rs.nodeValues[nodeIndex])
-				n.GenerateSamples(ctx, cfg, rs.nodeValues[nodeIndex])
+				clear(info.value)
+				n.GenerateSamples(ctx, cfg, info.value)
 			case *SinkNode:
-				for _, ev := range rs.incomingEdges[nodeIndex] { // TODO: disallow sinks with multiple inputs
-					smps := rs.nodeValues[rs.nodeIndexMap[ev.From]]
+				for _, ev := range info.incomingEdges { // TODO: disallow sinks with multiple inputs
+					smps := rs.NodeInfoByID(ev.From).value
 					out := bufferpool.Get(len(smps))
 					copy(*out, smps)
 					select {
@@ -610,10 +623,10 @@ func (g *Graph) runWorker(ctx context.Context, cfg ugen.SampleConfig, rs *runSta
 			}
 
 			// update the epoch
-			rs.nodeEpochs[nodeIndex].Store(epoch + 1)
+			info.epoch.Store(epoch + 1)
 
 			// release the node
-			rs.nodeEvaling[nodeIndex].Store(false)
+			info.evaling.Store(false)
 			// Node unlocked
 			//////////////////////////////////////////////////////////////////////
 
@@ -666,7 +679,7 @@ func (g *Graph) bootstrapCyclesWorkers(ctx context.Context, rs *runState) {
 
 			queue = append(queue, choice)
 			delete(blocked, choice)
-			rs.nodeEpochs[choice].Store(1)
+			rs.NodeInfoByID(choice).epoch.Store(1)
 		}
 
 		var nodeID NodeID

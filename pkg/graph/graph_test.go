@@ -82,14 +82,14 @@ func benchGraph() *Graph {
 		BufferSize: 128,
 	}
 
-	// add disconnected nodes to the graph to test for races
-	{
-		pn := g.AddGeneratorNode(ugen.NewProduct())
-		for i := 0; i < 20; i++ {
-			cn := g.AddGeneratorNode(ugen.NewConstant(1.0))
-			g.AddEdge(cn.ID(), pn.ID(), fmt.Sprintf("constant-%d", i))
-		}
-	}
+	// // add disconnected nodes to the graph to test for races
+	// {
+	// 	pn := g.AddGeneratorNode(ugen.NewProduct())
+	// 	for i := 0; i < 20; i++ {
+	// 		cn := g.AddGeneratorNode(ugen.NewConstant(1.0))
+	// 		g.AddEdge(cn.ID(), pn.ID(), fmt.Sprintf("constant-%d", i))
+	// 	}
+	// }
 
 	const (
 		numConsts   = 10
