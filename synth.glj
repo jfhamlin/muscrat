@@ -11,7 +11,7 @@
 (def detune
   (midi-in "detune" :cc :controller 74 :default 0.5))
 (def noise-volume
-  (midi-in "noise" :cc :controller 75 :default 0.0))
+  (midi-in "noise" :cc :controller 75 :default 0.1))
 
 (def melody-seq
   (sequencer trig
@@ -24,8 +24,10 @@
 
 (def drone
   (let [drone-root G4]
-    (-> (sqr drone-root :duty 0.2)
+    (-> (sum (repeatedly 32 #(sqr drone-root :duty 0.2)))
         (lores (* 2 drone-root) 0.5))))
+
+
         ;; (* (sin bps :mul 0.25 :add 0.75))
         ;; (lores (-> (sin 1)
         ;;            (* 2 drone-root)

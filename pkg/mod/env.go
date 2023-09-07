@@ -94,8 +94,9 @@ func NewEnvelope(opts ...EnvOption) ugen.UGen {
 		times := getSampleArrays(cfg.InputSamples, "time")
 		gate := cfg.InputSamples["trigger"]
 		if len(gate) == 0 {
-			gate = bufferpool.Get(n)
-			defer bufferpool.Put(gate)
+			buf := bufferpool.Get(n)
+			gate = *buf
+			defer bufferpool.Put(buf)
 		}
 		if len(levels) == 0 {
 			return

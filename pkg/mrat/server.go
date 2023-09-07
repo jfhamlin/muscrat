@@ -254,8 +254,10 @@ func (s *Server) getSamples(cfg *audio.AudioConfig, n int) []int {
 		}
 
 		s.getSamplesBuffer = append(s.getSamplesBuffer, transformSampleBuffer(cfg, channelSamples)...)
+
 		for _, smps := range channelSamples {
-			bufferpool.Put(smps)
+			smps := smps
+			bufferpool.Put(&smps)
 		}
 	}
 	go wrt.EventsEmit(s.ctx, "samples", s.vizSamplesBuffer)
