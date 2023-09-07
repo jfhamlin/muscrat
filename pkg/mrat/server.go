@@ -306,17 +306,37 @@ func (gr *graphRunner) run() {
 	}()
 
 	defer close(gr.graphOutputCh)
-	for {
-		output := make([][]float64, 0, 2)
-		for _, sinkChan := range gr.graph.SinkChans() {
-			select {
-			case samps := <-sinkChan:
-				output = append(output, samps)
-			case <-ctx.Done():
-				return
+
+	// the number of sample frames we can buffer before getting blocked.
+	const frameBufferSize = 1
+	frameBuffer := make(chan [][]float64, frameBufferSize)
+
+	go func() {
+		for {
+			start := time.Now()
+			output := make([][]float64, 0, 2)
+			for _, sinkChan := range gr.graph.SinkChans() {
+				select {
+				case samps := <-sinkChan:
+					output = append(output, samps)
+				case <-ctx.Done():
+					return
+				}
 			}
+			dur := time.Since(start)
+			if dur > 2*time.Millisecond {
+				fmt.Printf("took %s to get samples from graph\n", dur)
+			}
+			frameBuffer <- output
 		}
-		gr.graphOutputCh <- output
+	}()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case gr.graphOutputCh <- <-frameBuffer:
+		}
 	}
 }
 

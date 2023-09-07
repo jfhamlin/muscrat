@@ -431,7 +431,6 @@ func (g *Graph) RunWorkers(ctx context.Context, cfg ugen.SampleConfig) {
 	if numWorkers > len(rs.nodeOrder) {
 		numWorkers = len(rs.nodeOrder)
 	}
-	fmt.Printf("XXX running with %d workers (%d nodes)\n", numWorkers, len(rs.nodeOrder))
 
 	var wg sync.WaitGroup
 	wg.Add(numWorkers)
