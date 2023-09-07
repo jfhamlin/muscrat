@@ -36,8 +36,10 @@ func Get(sz int) *[]float64 {
 		ret := make([]float64, sz, sz)
 		return &ret
 	}
+	ret := v.(*[]float64)
+	clear(*ret)
 
-	return v.(*[]float64)
+	return ret
 }
 
 func Put(buf *[]float64) {

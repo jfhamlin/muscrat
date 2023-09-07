@@ -237,20 +237,22 @@ func (s *Server) getSamples(cfg *audio.AudioConfig, n int) []int {
 
 		// update gain to approach target gain.
 		for i, samples := range channelSamples {
-			newSamples := make([]float64, len(samples))
+			newSamples := bufferpool.Get(len(samples))
 			target := s.targetGain
 			gainStep := (target - s.gain) / float64(len(samples))
 			for i, smp := range samples {
-				newSamples[i] = smp * s.gain
+				(*newSamples)[i] = smp * s.gain
 				s.gain += gainStep
 			}
 			s.gain = target
-			channelSamples[i] = newSamples
+			channelSamples[i] = *newSamples
 		}
 
 		{
-			avgSamples := averageBuffers(channelSamples)
-			s.vizSamplesBuffer = append(s.vizSamplesBuffer, avgSamples...)
+			avgSamples := bufferpool.Get(len(channelSamples[0]))
+			averageBuffers(*avgSamples, channelSamples)
+			s.vizSamplesBuffer = append(s.vizSamplesBuffer, (*avgSamples)...)
+			bufferpool.Put(avgSamples)
 		}
 
 		s.getSamplesBuffer = append(s.getSamplesBuffer, transformSampleBuffer(cfg, channelSamples)...)
@@ -261,7 +263,12 @@ func (s *Server) getSamples(cfg *audio.AudioConfig, n int) []int {
 		}
 	}
 	go wrt.EventsEmit(s.ctx, "samples", s.vizSamplesBuffer)
-	s.vizSamplesBuffer = s.vizSamplesBuffer[n:]
+	if n == len(s.vizSamplesBuffer) {
+		s.vizSamplesBuffer = s.vizSamplesBuffer[:0]
+	} else {
+		copy(s.vizSamplesBuffer, s.vizSamplesBuffer[n:])
+		s.vizSamplesBuffer = s.vizSamplesBuffer[:len(s.vizSamplesBuffer)-n]
+	}
 
 	res := s.getSamplesBuffer[:2*n]
 	s.getSamplesBuffer = s.getSamplesBuffer[2*n:]
@@ -431,19 +438,18 @@ func zeroGraph() *graph.Graph {
 
 // averageBuffers returns the average of the N buffers. If the buffers
 // are not the same length, the result is undefined, and may panic.
-func averageBuffers(bufs [][]float64) []float64 {
+func averageBuffers(out []float64, bufs [][]float64) {
 	if len(bufs) == 1 {
-		return bufs[0]
+		copy(out, bufs[0])
+		return
 	}
 
-	avg := make([]float64, len(bufs[0]))
 	for i := 0; i < len(bufs); i++ {
 		for j := 0; j < len(bufs[0]); j++ {
-			avg[j] += bufs[i][j]
+			out[j] += bufs[i][j]
 		}
 	}
-	for i := 0; i < len(avg); i++ {
-		avg[i] /= float64(len(bufs))
+	for i := 0; i < len(out); i++ {
+		out[i] /= float64(len(bufs))
 	}
-	return avg
 }
