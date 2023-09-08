@@ -606,11 +606,17 @@ func (g *Graph) runWorker(ctx context.Context, cfg ugen.SampleConfig, rs *runSta
 			case *GeneratorNode:
 				clear(info.value)
 				n.GenerateSamples(ctx, cfg, info.value)
+				// update the epoch
+				info.epoch.Store(epoch + 1)
 			case *SinkNode:
-				for _, ev := range info.incomingEdges { // TODO: disallow sinks with multiple inputs
-					smps := rs.NodeInfoByID(ev.From).value
+				for _, smps := range inputSampleMap { // TODO: disallow sinks with multiple inputs
 					out := bufferpool.Get(len(smps))
 					copy(*out, smps)
+					// early epoch increment. we've copied the input samples, so
+					// we can increment the epoch now. this allows the next
+					// epoch to start while we wait on sending the samples to
+					// the sink.
+					info.epoch.Store(epoch + 1)
 					select {
 					case n.output <- *out:
 					case <-ctx.Done():
@@ -620,9 +626,6 @@ func (g *Graph) runWorker(ctx context.Context, cfg ugen.SampleConfig, rs *runSta
 				}
 				sinkDoneMask |= 1 << n.sinkID
 			}
-
-			// update the epoch
-			info.epoch.Store(epoch + 1)
 
 			// release the node
 			info.evaling.Store(false)
