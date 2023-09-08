@@ -43,7 +43,7 @@ func Open(opts ...Option) error {
 		Freq:     44100,
 		Format:   sdl.AUDIO_F32SYS,
 		Channels: 2,
-		Samples:  1024,
+		Samples:  512,
 	}
 	if err := sdl.OpenAudio(spec, nil); err != nil {
 		return err

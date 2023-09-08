@@ -315,7 +315,6 @@ func (gr *graphRunner) run() {
 	defer close(gr.graphOutputCh)
 
 	for {
-		start := time.Now()
 		output := make([][]float64, 0, 2)
 		for _, sinkChan := range gr.graph.SinkChans() {
 			select {
@@ -324,10 +323,6 @@ func (gr *graphRunner) run() {
 			case <-ctx.Done():
 				return
 			}
-		}
-		dur := time.Since(start)
-		if dur > 2*time.Millisecond {
-			fmt.Printf("took %s to get samples from graph\n", dur)
 		}
 		gr.graphOutputCh <- output
 	}
