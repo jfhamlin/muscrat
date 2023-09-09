@@ -24,6 +24,10 @@ type PinkNoise struct {
 	mul  float64
 }
 
+var (
+	_ ugen.UGen = (*PinkNoise)(nil)
+)
+
 // NewPinkNoise returns a new PinkNoise stochastic generator.
 func NewPinkNoise(opts ...ugen.Option) *PinkNoise {
 	o := ugen.DefaultOptions()
@@ -43,12 +47,10 @@ func NewPinkNoise(opts ...ugen.Option) *PinkNoise {
 	}
 }
 
-func (pn *PinkNoise) GenerateSamples(ctx context.Context, cfg ugen.SampleConfig, n int) []float64 {
-	samples := make([]float64, n)
-	for i := 0; i < n; i++ {
-		samples[i] = pn.mul*pn.generateSample() + pn.add
+func (pn *PinkNoise) Gen(ctx context.Context, cfg ugen.SampleConfig, out []float64) {
+	for i := range out {
+		out[i] = pn.mul*pn.generateSample() + pn.add
 	}
-	return samples
 }
 
 // generateSample generates a single sample of pink noise.

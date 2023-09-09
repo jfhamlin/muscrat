@@ -3,15 +3,14 @@ module github.com/jfhamlin/muscrat
 go 1.21
 
 require (
-	github.com/bspaans/bleep v0.0.0-20220414232837-486f92844ed7
 	github.com/fsnotify/fsnotify v1.5.4
 	github.com/glojurelang/glojure v0.0.0-20230903213614-fcddfd4847be
 	github.com/go-audio/audio v1.0.0
 	github.com/go-audio/wav v1.0.0
 	github.com/gordonklaus/portaudio v0.0.0-20221027163845-7c3b689db3cc
 	github.com/jfhamlin/freeverb-go v1.0.0
-	github.com/mjibson/go-dsp v0.0.0-20180508042940-11479a337f12
 	github.com/stretchr/testify v1.8.1
+	github.com/veandco/go-sdl2 v0.4.0
 	github.com/wailsapp/wails/v2 v2.5.1
 	gitlab.com/gomidi/midi/v2 v2.0.30
 	golang.org/x/term v0.8.0
@@ -42,7 +41,6 @@ require (
 	github.com/tkrajina/go-reflector v0.5.5 // indirect
 	github.com/valyala/bytebufferpool v1.0.0 // indirect
 	github.com/valyala/fasttemplate v1.2.1 // indirect
-	github.com/veandco/go-sdl2 v0.4.0 // indirect
 	github.com/wailsapp/mimetype v1.4.1 // indirect
 	go4.org/intern v0.0.0-20230205224052-192e9f60865c // indirect
 	go4.org/unsafe/assume-no-moving-gc v0.0.0-20230525183740-e7c30c78aeb2 // indirect

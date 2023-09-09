@@ -18,6 +18,10 @@ type WavOut struct {
 	fname string
 }
 
+var (
+	_ ugen.UGen = (*WavOut)(nil)
+)
+
 func NewWavOut(fname string) *WavOut {
 	return &WavOut{
 		fname: fname,
@@ -46,11 +50,11 @@ func (wo *WavOut) Stop(ctx context.Context) error {
 	return nil
 }
 
-func (wo *WavOut) GenerateSamples(ctx context.Context, cfg ugen.SampleConfig, n int) []float64 {
+func (wo *WavOut) Gen(ctx context.Context, cfg ugen.SampleConfig, _ []float64) {
 	ch0 := cfg.InputSamples["$0"]
 	ch1 := cfg.InputSamples["$1"]
 	if len(ch0) == 0 {
-		return make([]float64, n)
+		return
 	}
 
 	numChan := 2
@@ -62,6 +66,8 @@ func (wo *WavOut) GenerateSamples(ctx context.Context, cfg ugen.SampleConfig, n 
 		wo.enc = wav.NewEncoder(wo.f, cfg.SampleRateHz, 32, numChan, 1)
 	}
 
+	n := len(ch0)
+
 	buf := &audio.IntBuffer{
 		Format: &audio.Format{
 			SampleRate:  cfg.SampleRateHz,
@@ -69,6 +75,7 @@ func (wo *WavOut) GenerateSamples(ctx context.Context, cfg ugen.SampleConfig, n 
 		},
 		Data: make([]int, n*numChan),
 	}
+
 	for i := 0; i < n; i++ {
 		buf.Data[i*numChan] = float64ToInt32(ch0[i])
 		if numChan == 2 {
@@ -76,8 +83,6 @@ func (wo *WavOut) GenerateSamples(ctx context.Context, cfg ugen.SampleConfig, n 
 		}
 	}
 	wo.enc.Write(buf)
-
-	return make([]float64, n)
 }
 
 func float64ToInt32(f float64) int {
