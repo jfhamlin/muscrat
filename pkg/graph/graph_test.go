@@ -8,53 +8,20 @@ import (
 	"github.com/jfhamlin/muscrat/pkg/ugen"
 )
 
-////////////////////////////////////////////////////////////////////////////////
-// CONTROL BENCHMARK (goroutines and channels)
 // goos: darwin
 // goarch: arm64
 // pkg: github.com/jfhamlin/muscrat/pkg/graph
-// BenchmarkGraph-8   	   26818	     51012 ns/op
+// BenchmarkGraph-8   	  180675	      6712 ns/op
 // PASS
-// ok  	github.com/jfhamlin/muscrat/pkg/graph	1.927s
-
+// ok  	github.com/jfhamlin/muscrat/pkg/graph	2.360s
 func BenchmarkGraph(b *testing.B) {
-	//timings := make([]time.Duration, b.N)
-
-	g := benchGraph()
-	sinks := g.SinkChans()
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	go g.Run(ctx, ugen.SampleConfig{SampleRateHz: 44100})
-	for n := 0; n < b.N; n++ {
-		//start := time.Now()
-		for _, sink := range sinks {
-			<-sink
-		}
-		//timings[n] = time.Since(start)
-	}
-
-	// // print average time and p90 time
-	// sort.Slice(timings, func(i, j int) bool {
-	// 	return timings[i] < timings[j]
-	// })
-	// var total time.Duration
-	// for _, timing := range timings {
-	// 	total += timing
-	// }
-	// fmt.Println("---", b.N)
-	// fmt.Println("old p50", timings[int(float64(b.N)*0.5)])
-	// fmt.Println("old p90", timings[int(float64(b.N)*0.9)])
-	// fmt.Println("old avg", total/time.Duration(b.N))
-}
-
-func BenchmarkGraphWorkers(b *testing.B) {
 	//	timings := make([]time.Duration, b.N)
 
 	g := benchGraph()
 	sinks := g.SinkChans()
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	go g.RunWorkers(ctx, ugen.SampleConfig{SampleRateHz: 44100})
+	go g.Run(ctx, ugen.SampleConfig{SampleRateHz: 44100})
 	for n := 0; n < b.N; n++ {
 		//		start := time.Now()
 		for _, sink := range sinks {

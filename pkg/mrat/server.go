@@ -104,16 +104,6 @@ func (s *Server) Start(ctx context.Context) error {
 
 	go s.sendSamples()
 
-	// cfg := audio.NewAudioConfig()
-	// s.sampleRate = cfg.SampleRate
-
-	// // set up the audio output
-	// sink, err := sinks.NewSDLSink(cfg)
-	// if err != nil {
-	// 	panic(err)
-	// }
-	// sink.Start(s.getSamples)
-
 	s.playGraph(zeroGraph())
 	return nil
 }
@@ -309,7 +299,7 @@ func (gr *graphRunner) run() {
 
 	go func() {
 		defer close(gr.stopped)
-		gr.graph.RunWorkers(ctx, ugen.SampleConfig{SampleRateHz: gr.sampleRate})
+		gr.graph.Run(ctx, ugen.SampleConfig{SampleRateHz: gr.sampleRate})
 	}()
 
 	defer close(gr.graphOutputCh)

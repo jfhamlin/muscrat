@@ -3,14 +3,12 @@ module github.com/jfhamlin/muscrat
 go 1.21
 
 require (
-	github.com/bspaans/bleep v0.0.0-20220414232837-486f92844ed7
 	github.com/fsnotify/fsnotify v1.5.4
 	github.com/glojurelang/glojure v0.0.0-20230903213614-fcddfd4847be
 	github.com/go-audio/audio v1.0.0
 	github.com/go-audio/wav v1.0.0
 	github.com/gordonklaus/portaudio v0.0.0-20221027163845-7c3b689db3cc
 	github.com/jfhamlin/freeverb-go v1.0.0
-	github.com/mjibson/go-dsp v0.0.0-20180508042940-11479a337f12
 	github.com/stretchr/testify v1.8.1
 	github.com/veandco/go-sdl2 v0.4.0
 	github.com/wailsapp/wails/v2 v2.5.1
@@ -53,5 +51,3 @@ require (
 	golang.org/x/text v0.7.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
-
-replace github.com/glojurelang/glojure => ../glojure
