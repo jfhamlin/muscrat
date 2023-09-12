@@ -172,23 +172,26 @@
           notes (filter #(= (:type %) :note) elements)
           pitches (->> (map (partial note-pitch (keys key)) notes)
                        (map #(* % (semitones transpose))))
-          ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-          ;; note timing
+          ;; note lengths in units of whole notes
           note-lengths (map (partial note-len default-len) notes)
-          ;; all the times at which a note starts
+          ;; all the times at which a note starts in units of whole
+          ;; notes.
           partial-sums (reductions + note-lengths)
           ;; the greatest common divisor of all the note start times
-          ;; this is the smallest unit of time that the sequencer will
-          ;; be able to schedule notes at.
+          ;; in units of whole notes. this is the smallest unit of
+          ;; time that the sequencer will be able to schedule notes
+          ;; at.
           scheduling-unit (apply gcd partial-sums)
           scheduling-ticks-per-second (* tempo-units-per-minute (/ tempo-unit scheduling-unit) 1/60)
-          clock (impulse (double scheduling-ticks-per-second))
+          clock (impulse scheduling-ticks-per-second)
+          secs-per-whole-note (/ 60 tempo-units-per-minute)
           ;; 1 for clock ticks corresponding to note starts, 0 for all
           ;; other clock ticks
           note-schedule (flatten (map #(let [zero-count (/ (- % scheduling-unit) scheduling-unit)]
                                         (concat [1] (repeat (long zero-count) 0)))
                                       note-lengths))
           note-clock (* (sequencer clock note-schedule) clock)]
-      {:voices [{:sequencer (sequencer note-clock pitches)
+      {:voices [{:pitches (sequencer note-clock pitches)
+                 :durs (sequencer note-clock (map #(* % secs-per-whole-note) note-lengths))
                  :note-clock note-clock}]
        })))

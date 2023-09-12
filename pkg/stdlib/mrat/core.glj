@@ -249,7 +249,7 @@
     (if (empty? ugens)
       num-prod
       (let [prod-node (add-node! (NewProduct) "*")
-            nodes (conj ugens (add-node! (NewConstant num-prod) num-prod))]
+            nodes (conj ugens (add-node! (NewConstant (double num-prod)) num-prod))]
         (doseq [[n i] (map vector nodes (range (count nodes)))]
           (add-edge! n prod-node (str \$ i)))
         prod-node))))
