@@ -112,15 +112,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Evaluation
 
-(def ^:private clef
-  {:treble {\C 4
-            \D 4
-            \E 4
-            \F 4
-            \G 4
-            \A 4
-            \B 4}})
-
 (def ^:private keys
   "Map from key to a map from note to the semitone offset of that note
   in the key"
@@ -133,7 +124,7 @@
     0
     (let [midi-map (ns-map 'mrat.midi)
           upper-name (char (unicode.ToUpper name))
-          midi-octave (get-in clef [:treble upper-name])
+          midi-octave 4 ;; default midi octave
           is-lower (unicode.IsLower name)
           octave-scale (+ (if is-lower 1 0) octave)
           semitone-offset (if acc acc (key upper-name))]
@@ -165,12 +156,6 @@
       1/16
       1/8)))
 
-;; output
-;; one or more sequencers of all notes
-;; a clock running at the most granular level
-;; a pattern with a 1 for the start of each note at the most granular level
-;; a function that takes a note duration and returns an envelope
-
 (defn- gcd
   ([a] a)
   ([a b] (if (= b 0) a (recur b (mod a b))))
@@ -178,13 +163,15 @@
 
 (defn score
   "Converts a string of ABC notation into a score."
-  [{ :keys [tempo meter key default-len body] :as abc}]
+  [{ :keys [tempo meter key transpose default-len body] :as abc}]
   (let [key (or key 'C)
+        transpose (or transpose 0)
         default-len (or default-len (and meter (meter->default-len meter)) 1/8)]
     (let [[tempo-unit tempo-units-per-minute] (if tempo tempo [1/4 120])
           elements (map parse-el body)
           notes (filter #(= (:type %) :note) elements)
-          pitches (map (partial note-pitch (keys key)) notes)
+          pitches (->> (map (partial note-pitch (keys key)) notes)
+                       (map #(* % (semitones transpose))))
           ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
           ;; note timing
           note-lengths (map (partial note-len default-len) notes)
