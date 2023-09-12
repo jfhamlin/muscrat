@@ -1,0 +1,207 @@
+(ns mrat.abc
+  "Utilities for composing using ABC notation.
+
+  # PITCH
+  Pitch is indicated by the letters A through G, with case indicating
+  the lower or upper octave, periods and apostrophes lowering or
+  raising the octave further, respectively.
+
+  Note that in vanilla ABC notation, ',' lowers by an octave. Because
+  ',' is whitespace in Clojure, we use . instead.
+
+                                     d'
+                                  -c'--
+                                 b
+                              -a-------
+                             g
+---------------------------f----------------------------------------------------
+                         e
+-----------------------d--------------------------------------------------------
+                     c
+-------------------B------------------------------------------------------------
+                 A
+---------------G----------------------------------------------------------------
+             F
+-----------E--------------------------------------------------------------------
+         D
+      -C-
+     B,
+---A,-
+ G,
+
+  Accidentals are indicated by the symbols $, = and _ which raise the
+  pitch by a semitone (sharp), leave it unaltered (natural), or lower
+  it by a semitone (flat) respectively.
+
+  Note that in vanilla ABC notation, ^ indicates a sharp. Because ^ is
+  used for metadata in Clojure, we use $ instead.
+
+  # LENGTH
+
+  # DECORATIONS
+
+  # CHORDS AND UNISONS
+  "
+  (:require [mrat.core :refer :all]
+            [mrat.midi]
+            [glojure.string :as str]))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Parsing
+
+(def ^:private note-regex
+  #"([_=$]+)?([a-gA-Gzx])([.']+)?(([1-9][0-9]*)?/?[1-9][0-9]*)?")
+
+(defn- note-acc->semitones
+  [acc-str]
+  (reduce + (map #(case %
+                    \$ 1
+                    \_ -1
+                    \= 0
+                    (throw (fmt.Errorf "invalid accidental symbol: %v" %)))
+                 acc-str)))
+
+(defn- note-oct->octaves
+  [octave-str]
+  (reduce + (map #(case %
+                    \. -1
+                    \' 1
+                    (throw (fmt.Errorf "invalid octave symbol: %v" %)))
+                 octave-str)))
+
+(defn- parse-int
+  [int-str]
+  (let [[i err] (strconv.Atoi int-str)]
+    (when err (throw (fmt.Errorf "invalid integer: %q" int-str)))
+    i))
+
+(defn- note-len->ratio
+  [len-str]
+  (if (= "" len-str) 1
+      (let [slash-idx (str/index-of len-str \/)]
+        (if (nil? slash-idx)
+          (parse-int len-str)
+          (let [num (subs len-str 0 slash-idx)
+                num (if (= "" num) "1" num)
+                num (parse-int num)
+                den (subs len-str (inc slash-idx))
+                den (parse-int den)]
+            (/ num den))))))
+
+(defn- parse-note
+  "Parses a note string into a map of its components. Components include:
+  :acc - number of semitones to raise or lower the pitch, or nil if no accidentals
+  :name - the note name
+  :octave - the number of octaves to raise or lower the pitch
+  :len - the length of the note in beats, or nil if no length is specified"
+  [note-sym]
+  (let [[_ acc name octave len :as note] (re-matches note-regex (str note-sym))]
+    (when-not note (throw (fmt.Errorf "invalid note: %v" note-sym)))
+    {:type :note
+     :acc (if acc (note-acc->semitones acc))
+     :name (first name)
+     :octave (if octave (note-oct->octaves octave) 0)
+     :len (if len (note-len->ratio len))}))
+
+(defn- parse-el
+  [el]
+  (cond
+    (= '| el) {:type :measure-break}
+    :else (parse-note el)))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Evaluation
+
+(def ^:private clef
+  {:treble {\C 4
+            \D 4
+            \E 4
+            \F 4
+            \G 4
+            \A 4
+            \B 4}})
+
+(def ^:private keys
+  "Map from key to a map from note to the semitone offset of that note
+  in the key"
+  {'C (fn [_] 0)
+   'G#m (fn [n] (if (contains? #{\A \C \D \F \G} n) 1 0))})
+
+(defn- note-pitch
+  [key {:keys [acc name octave] :as note}]
+  (if (or (= name \z) (= name \x))
+    0
+    (let [midi-map (ns-map 'mrat.midi)
+          upper-name (char (unicode.ToUpper name))
+          midi-octave (get-in clef [:treble upper-name])
+          is-lower (unicode.IsLower name)
+          octave-scale (+ (if is-lower 1 0) octave)
+          semitone-offset (if acc acc (key upper-name))]
+      (-> (midi-map (symbol (str upper-name midi-octave)))
+          .get
+          (+ (* 12 octave-scale))
+          (+ semitone-offset)
+          midifreq))))
+
+(defn- note-len
+  [default-len {:keys [len] :as note}]
+  (if len
+    (* default-len len)
+    default-len))
+
+(defn- meter->default-len
+  "If there is no default-len field defined, a unit note length is set
+  by default, based on the meter field. This default is calculated by
+  computing the meter as a decimal: if it is less than 0.75 the
+  default unit note length is a sixteenth note; if it is 0.75 or
+  greater, it is an eighth note. For example, 2/4 = 0.5, so, the
+  default unit note length is a sixteenth note, while for 4/4 = 1.0,
+  or 6/8 = 0.75, or 3/4= 0.75, it is an eighth note. For M:C (4/4),
+  M:C| (2/2) and M:none (free meter), the default unit note length is
+  1/8."
+  [[num den]]
+  (let [meter (/ num den)]
+    (if (< meter 0.75)
+      1/16
+      1/8)))
+
+;; output
+;; one or more sequencers of all notes
+;; a clock running at the most granular level
+;; a pattern with a 1 for the start of each note at the most granular level
+;; a function that takes a note duration and returns an envelope
+
+(defn- gcd
+  ([a] a)
+  ([a b] (if (= b 0) a (recur b (mod a b))))
+  ([a b & more] (reduce gcd (gcd a b) more)))
+
+(defn score
+  "Converts a string of ABC notation into a score."
+  [{ :keys [tempo meter key default-len body] :as abc}]
+  (let [key (or key 'C)
+        default-len (or default-len (and meter (meter->default-len meter)) 1/8)]
+    (let [[tempo-unit tempo-units-per-minute] (if tempo tempo [1/4 120])
+          elements (map parse-el body)
+          notes (filter #(= (:type %) :note) elements)
+          pitches (map (partial note-pitch (keys key)) notes)
+          ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+          ;; note timing
+          note-lengths (map (partial note-len default-len) notes)
+          ;; all the times at which a note starts
+          partial-sums (reductions + note-lengths)
+          ;; the greatest common divisor of all the note start times
+          ;; this is the smallest unit of time that the sequencer will
+          ;; be able to schedule notes at.
+          scheduling-unit (apply gcd partial-sums)
+          scheduling-ticks-per-second (* tempo-units-per-minute (/ tempo-unit scheduling-unit) 1/60)
+          clock (impulse (double scheduling-ticks-per-second))
+          ;; 1 for clock ticks corresponding to note starts, 0 for all
+          ;; other clock ticks
+          note-schedule (flatten (map #(let [zero-count (/ (- % scheduling-unit) scheduling-unit)]
+                                        (concat [1] (repeat (long zero-count) 0)))
+                                      note-lengths))
+          note-clock (* (sequencer clock note-schedule) clock)]
+      {:voices [{:sequencer (sequencer note-clock pitches)
+                 :note-clock note-clock}]
+       })))
