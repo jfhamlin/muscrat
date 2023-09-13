@@ -1,5 +1,5 @@
 (ns mrat.core
-  (:import (github.com$glojurelang$glojure$pkg$lang *Ratio)
+  (:import (github.com$glojurelang$glojure$pkg$lang *Ratio *BigInt)
            (github.com$jfhamlin$muscrat$pkg$graph Node
                                                   WithLabel)
            (github.com$jfhamlin$muscrat$pkg$ugen NewConstant
@@ -85,6 +85,10 @@
 (extend-protocol AsNode
   go/int64
   (as-node [x] (add-node! (NewConstant x) x)))
+
+(extend-protocol AsNode
+  *BigInt
+  (as-node [x] (add-node! (NewConstant (double x)) x)))
 
 (extend-protocol AsNode
   *Ratio

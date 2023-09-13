@@ -161,6 +161,17 @@
   ([a b] (if (= b 0) a (recur b (mod a b))))
   ([a b & more] (reduce gcd (gcd a b) more)))
 
+(defn- measure-lens
+  [{ :keys [tempo meter key transpose default-len body] :as abc}]
+  (let [default-len (or default-len (and meter (meter->default-len meter)) 1/8)
+        elements (map parse-el body)
+        measures (reduce (fn [measures el]
+                           (if (= (:type el) :measure-break)
+                             (conj measures [])
+                             (update-in measures [(dec (count measures))] conj el)))
+                         [[]] elements)]
+    (map #(reduce + 0 (map (partial note-len default-len) %)) measures)))
+
 (defn score
   "Converts a string of ABC notation into a score."
   [{ :keys [tempo meter key transpose default-len body] :as abc}]
@@ -184,7 +195,8 @@
           scheduling-unit (apply gcd partial-sums)
           scheduling-ticks-per-second (* tempo-units-per-minute (/ tempo-unit scheduling-unit) 1/60)
           clock (impulse scheduling-ticks-per-second)
-          secs-per-whole-note (/ 60 tempo-units-per-minute)
+          secs-per-whole-note (/ 60 tempo-units-per-minute tempo-unit)
+          note-durs (map #(* % secs-per-whole-note) note-lengths)
           ;; 1 for clock ticks corresponding to note starts, 0 for all
           ;; other clock ticks
           note-schedule (flatten (map #(let [zero-count (/ (- % scheduling-unit) scheduling-unit)]
@@ -192,6 +204,6 @@
                                       note-lengths))
           note-clock (* (sequencer clock note-schedule) clock)]
       {:voices [{:pitches (sequencer note-clock pitches)
-                 :durs (sequencer note-clock (map #(* % secs-per-whole-note) note-lengths))
+                 :durs (sequencer note-clock note-durs)
                  :note-clock note-clock}]
        })))
