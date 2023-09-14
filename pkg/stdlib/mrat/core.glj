@@ -1,7 +1,8 @@
 (ns mrat.core
   (:import (github.com$glojurelang$glojure$pkg$lang *Ratio *BigInt)
            (github.com$jfhamlin$muscrat$pkg$graph Node
-                                                  WithLabel)
+                                                  WithLabel
+                                                  WithSink)
            (github.com$jfhamlin$muscrat$pkg$ugen NewConstant
                                                  NewSum
                                                  NewProduct
@@ -64,8 +65,10 @@
        ~@body)))
 
 (defn add-node!
-  [ug label]
-  (.AddGeneratorNode *graph* ug (WithLabel (str label))))
+  [ug label & {:keys [sink]}]
+  (if sink
+    (.AddGeneratorNode *graph* ug (WithLabel (str label)) (WithSink))
+    (.AddGeneratorNode *graph* ug (WithLabel (str label)))))
 
 (defn add-edge!
   [x y port] (.AddEdge *graph* (.ID x) (.ID y) port))
@@ -721,7 +724,7 @@
         _ (if (> (count chs) 2) (throw (str "wavout: too many channels supplied: " (count chs))))
         ch0 (as-node (first chs))
         ch1 (second chs)
-        n (add-node! (NewWavOut (:filename flags)) "wavout")]
+        n (add-node! (NewWavOut (:filename flags)) "wavout" :sink true)]
     (add-edge! ch0 n "$0")
     (when ch1
       (add-edge! ch1 n "$1"))

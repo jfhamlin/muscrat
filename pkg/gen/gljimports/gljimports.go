@@ -89,6 +89,7 @@ func RegisterImports(_register func(string, interface{})) {
 	_register("github.com/jfhamlin/muscrat/pkg/graph.*OutNode", reflect.TypeOf((*github_com_jfhamlin_muscrat_pkg_graph.OutNode)(nil)))
 	_register("github.com/jfhamlin/muscrat/pkg/graph.SinkChan", reflect.TypeOf((*github_com_jfhamlin_muscrat_pkg_graph.SinkChan)(nil)).Elem())
 	_register("github.com/jfhamlin/muscrat/pkg/graph.WithLabel", github_com_jfhamlin_muscrat_pkg_graph.WithLabel)
+	_register("github.com/jfhamlin/muscrat/pkg/graph.WithSink", github_com_jfhamlin_muscrat_pkg_graph.WithSink)
 
 	// package github.com/jfhamlin/muscrat/pkg/mod
 	////////////////////////////////////////

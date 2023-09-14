@@ -24,7 +24,8 @@ type (
 	SinkChan <-chan []float64
 
 	nodeOptions struct {
-		label string
+		label  string
+		isSink bool
 	}
 
 	// NodeOptions is a functional option for configuring a node.
@@ -33,7 +34,7 @@ type (
 	Node interface {
 		ID() NodeID
 
-		Sink() bool
+		IsSink() bool
 
 		String() string
 
@@ -46,15 +47,13 @@ type (
 		label     string
 		str       string
 
-		sinkID int
+		isSink bool
 	}
 
 	OutNode struct {
 		id     NodeID
 		output chan []float64
 		label  string
-
-		sinkID int
 	}
 
 	Edge struct {
@@ -84,8 +83,18 @@ func WithLabel(label string) NodeOption {
 	}
 }
 
+func WithSink() NodeOption {
+	return func(o *nodeOptions) {
+		o.isSink = true
+	}
+}
+
 func (n *GeneratorNode) ID() NodeID {
 	return n.id
+}
+
+func (n *GeneratorNode) IsSink() bool {
+	return n.isSink
 }
 
 func (n *GeneratorNode) GenerateSamples(ctx context.Context, cfg ugen.SampleConfig, out []float64) {
@@ -112,6 +121,10 @@ func (n *GeneratorNode) MarshalJSON() ([]byte, error) {
 
 func (n *OutNode) ID() NodeID {
 	return n.id
+}
+
+func (n *OutNode) IsSink() bool {
+	return true
 }
 
 func (n *OutNode) Chan() SinkChan {
@@ -163,6 +176,7 @@ func (g *Graph) AddGeneratorNode(gen ugen.UGen, opts ...NodeOption) Node {
 		id:        NodeID(len(g.Nodes)),
 		Generator: gen,
 		label:     options.label,
+		isSink:    options.isSink,
 	}
 	{
 		str := "[" + node.ID().String() + "]"
@@ -186,11 +200,20 @@ func (g *Graph) AddOutNode(opts ...NodeOption) *OutNode {
 		id:     NodeID(len(g.Nodes)),
 		output: make(chan []float64),
 		label:  options.label,
-		sinkID: len(g.outputs),
 	}
 	g.Nodes = append(g.Nodes, node)
 	g.outputs = append(g.outputs, node)
 	return node
+}
+
+func (g *Graph) Sinks() []Node {
+	var sinks []Node
+	for _, node := range g.Nodes {
+		if node.IsSink() {
+			sinks = append(sinks, node)
+		}
+	}
+	return sinks
 }
 
 func (g *Graph) Outputs() []*OutNode {
@@ -339,7 +362,7 @@ func (g *Graph) newRunState() *runState {
 	)
 
 	var q []NodeID
-	for _, sink := range g.Outputs() {
+	for _, sink := range g.Sinks() {
 		q = append(q, sink.ID())
 	}
 	for len(q) > 0 {
@@ -388,8 +411,12 @@ func (g *Graph) runWorker(ctx context.Context, cfg ugen.SampleConfig, rs *runSta
 	// 2. rs.nodeEvaling[i] is true if node i is currently being evaluated
 	// 3. rs.nodeValues[i] is the value of node i for the previous epoch of node i
 
-	numSinks := len(g.Outputs())
+	numSinks := len(g.Sinks())
 	sinksDoneBits := (int64(1) << numSinks) - 1
+	sinkBitIndex := make(map[NodeID]int)
+	for i, sink := range g.Sinks() {
+		sinkBitIndex[sink.ID()] = i
+	}
 
 	var epoch int64 = 0    // the epoch being evaluated by this worker
 	var sinkDoneMask int64 // assumes numSinks <= 64
@@ -423,8 +450,8 @@ func (g *Graph) runWorker(ctx context.Context, cfg ugen.SampleConfig, rs *runSta
 
 			// if the node has already been evaluated for this epoch, skip it
 			if info.epoch.Load() > epoch {
-				if sink, ok := node.(*OutNode); ok {
-					sinkDoneMask |= 1 << sink.sinkID
+				if node.IsSink() {
+					sinkDoneMask |= 1 << sinkBitIndex[nodeID]
 				}
 				continue
 			}
@@ -440,8 +467,8 @@ func (g *Graph) runWorker(ctx context.Context, cfg ugen.SampleConfig, rs *runSta
 			// check again if the node has already been evaluated for this
 			// epoch after we've acquired the lock.
 			if info.epoch.Load() > epoch {
-				if sink, ok := node.(*OutNode); ok {
-					sinkDoneMask |= 1 << sink.sinkID
+				if node.IsSink() {
+					sinkDoneMask |= 1 << sinkBitIndex[nodeID]
 				}
 				info.evaling.Store(false)
 				continue
@@ -472,6 +499,9 @@ func (g *Graph) runWorker(ctx context.Context, cfg ugen.SampleConfig, rs *runSta
 				n.GenerateSamples(ctx, cfg, info.value)
 				// update the epoch
 				info.epoch.Store(epoch + 1)
+				if node.IsSink() {
+					sinkDoneMask |= 1 << sinkBitIndex[nodeID]
+				}
 			case *OutNode:
 				for _, smps := range inputSampleMap { // TODO: disallow sinks with multiple inputs
 					out := bufferpool.Get(len(smps))
@@ -488,7 +518,7 @@ func (g *Graph) runWorker(ctx context.Context, cfg ugen.SampleConfig, rs *runSta
 					}
 					break
 				}
-				sinkDoneMask |= 1 << n.sinkID
+				sinkDoneMask |= 1 << sinkBitIndex[nodeID]
 			}
 
 			// release the node
