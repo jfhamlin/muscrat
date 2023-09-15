@@ -112,9 +112,9 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Evaluation
 
-(def ^:private keys
-  "Map from key to a map from note to the semitone offset of that note
-  in the key"
+(def ^:private key-note-accs
+  "Map from key to a map from note to the semitone offset (accidental)
+  of that note in the key"
   {'C (fn [_] 0)
    'G#m (fn [n] (if (contains? #{\A \C \D \F \G} n) 1 0))})
 
@@ -181,7 +181,7 @@
     (let [[tempo-unit tempo-units-per-minute] (if tempo tempo [1/4 120])
           elements (map parse-el body)
           notes (filter #(= (:type %) :note) elements)
-          pitches (->> (map (partial note-pitch (keys key)) notes)
+          pitches (->> (map (partial note-pitch (key-note-accs key)) notes)
                        (map #(* % (semitones transpose))))
           ;; note lengths in units of whole notes
           note-lengths (map (partial note-len default-len) notes)
