@@ -35,7 +35,7 @@
     :transpose -24
     :body '[z D G d b g'  | z D A f a f'    | z D B g g e'  | z D A $$f a d'  | z D c g e' c''  |
             z D d b d' b' | z D e c' c' =a' | z D d $b g' G | z E =A e c' c'' | z D =A f c' c'' |
-            z C F e =a =a' | z =C F e =a =a' | z B. E e g g' | z A. A E $$c' a' | z D A e a $$c' | z D A d a d' |
+            z C F e =a =a' | z =C F e =a =a' | z B. E e g g' | z A. A e $$c' a' | z D A e a $$c' | z D A d a d' |
             z E =A e c' c'' | z D =A f c' c'' | z C F e =a =a' | z =C F e =a =a' | z =C =F e =a =a' |
             z B. =F =d =a =a' | z =A. =D =c =f =f' | z G. =D =c =f =f' | z G. $D d d d' | z $$F. $$F d d d' | z $F. $F d d d' |
             z E. E A g $$c' | z D. G d b g' | z D. A f a f' | z D. B g g e' | z D. A $$f d'2 | z24
