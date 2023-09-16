@@ -15,14 +15,13 @@ func NewWaveFolder() *WaveFolder {
 	return &WaveFolder{}
 }
 
-func (w *WaveFolder) GenerateSamples(ctx context.Context, cfg ugen.SampleConfig, n int) []float64 {
+func (w *WaveFolder) Gen(ctx context.Context, cfg ugen.SampleConfig, out []float64) {
 	in := cfg.InputSamples["in"]
 	los := cfg.InputSamples["lo"]
 	his := cfg.InputSamples["hi"]
 
-	res := make([]float64, n)
-	for i := 0; i < n; i++ {
-		res[i] = in[i]
+	for i := range out {
+		out[i] = in[i]
 
 		x := in[i]
 		lo := -1.0
@@ -46,32 +45,31 @@ func (w *WaveFolder) GenerateSamples(ctx context.Context, cfg ugen.SampleConfig,
 			rem := x - floor
 			switch int64(floor) % 4 {
 			case 0:
-				res[i] = rem
+				out[i] = rem
 			case 1:
-				res[i] = 1 - rem
+				out[i] = 1 - rem
 			case 2:
-				res[i] = -rem
+				out[i] = -rem
 			case 3:
-				res[i] = rem - 1
+				out[i] = rem - 1
 			}
 		} else if x < -1 {
 			ciel := math.Ceil(x)
 			rem := ciel - x
 			switch int64(math.Abs(ciel)) % 4 {
 			case 0:
-				res[i] = -rem
+				out[i] = -rem
 			case 1:
-				res[i] = rem - 1
+				out[i] = rem - 1
 			case 2:
-				res[i] = rem
+				out[i] = rem
 			case 3:
-				res[i] = 1 - rem
+				out[i] = 1 - rem
 			}
 		} else {
-			res[i] = x
+			out[i] = x
 		}
-		// transform res[i] back to -1 = lo, 0 = (lo + hi) / 2, 1 = hi
-		res[i] = res[i]*(hi-mid) + mid
+		// transform out[i] back to -1 = lo, 0 = (lo + hi) / 2, 1 = hi
+		out[i] = out[i]*(hi-mid) + mid
 	}
-	return res
 }

@@ -1,7 +1,8 @@
 (ns mrat.core
-  (:import (github.com$glojurelang$glojure$pkg$lang *Ratio)
+  (:import (github.com$glojurelang$glojure$pkg$lang *Ratio *BigInt)
            (github.com$jfhamlin$muscrat$pkg$graph Node
-                                                  WithLabel)
+                                                  WithLabel
+                                                  WithSink)
            (github.com$jfhamlin$muscrat$pkg$ugen NewConstant
                                                  NewSum
                                                  NewProduct
@@ -64,8 +65,10 @@
        ~@body)))
 
 (defn add-node!
-  [ug label]
-  (.AddGeneratorNode *graph* ug (WithLabel (str label))))
+  [ug label & {:keys [sink]}]
+  (if sink
+    (.AddGeneratorNode *graph* ug (WithLabel (str label)) (WithSink))
+    (.AddGeneratorNode *graph* ug (WithLabel (str label)))))
 
 (defn add-edge!
   [x y port] (.AddEdge *graph* (.ID x) (.ID y) port))
@@ -87,6 +90,10 @@
   (as-node [x] (add-node! (NewConstant x) x)))
 
 (extend-protocol AsNode
+  *BigInt
+  (as-node [x] (add-node! (NewConstant (double x)) x)))
+
+(extend-protocol AsNode
   *Ratio
   (as-node [x] (add-node! (NewConstant (double x)) x)))
 
@@ -95,12 +102,12 @@
   (let [channels (if-not (coll? channels) [channels channels] channels)
         channels (if (= (count channels) 0) [0 0] channels)
         channels (if (= (count channels) 1) [(first channels) (first channels)] channels)
-        num-sinks (count (. *graph* sinks))
+        num-sinks (count (. *graph* outputs))
         ch-inds (map vector channels (range (count channels)))]
     (doseq [[ch i] ch-inds]
       (let [gen (as-node ch)
             chan-id (+ num-sinks i)
-            sink (.AddSinkNode *graph* (WithLabel (fmt.Sprintf "out%d" chan-id)))]
+            sink (.AddOutNode *graph* (WithLabel (fmt.Sprintf "out%d" chan-id)))]
         (add-edge! gen sink "w"))))) ;; TODO: "w" seems wrong
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -249,7 +256,7 @@
     (if (empty? ugens)
       num-prod
       (let [prod-node (add-node! (NewProduct) "*")
-            nodes (conj ugens (add-node! (NewConstant num-prod) num-prod))]
+            nodes (conj ugens (add-node! (NewConstant (double num-prod)) num-prod))]
         (doseq [[n i] (map vector nodes (range (count nodes)))]
           (add-edge! n prod-node (str \$ i)))
         prod-node))))
@@ -338,7 +345,7 @@
                             (~'WithMultiply (get args# :mul 1.0))
                             (~'WithAdd (get args# :add 0.0))]
                   args# (dissoc args# :default-duty :mul :add)
-                  gen# (apply ~'Generator (~wavtab 1024) wt-opts#)
+                  gen# (apply ~'Generator (~wavtab 2048) wt-opts#)
                   label# (~'WithLabel ~(str name))
                   osc-node# (add-node! gen# label#)
                   freq-node# (as-node freq#)]
@@ -717,7 +724,7 @@
         _ (if (> (count chs) 2) (throw (str "wavout: too many channels supplied: " (count chs))))
         ch0 (as-node (first chs))
         ch1 (second chs)
-        n (add-node! (NewWavOut (:filename flags)) "wavout")]
+        n (add-node! (NewWavOut (:filename flags)) "wavout" :sink true)]
     (add-edge! ch0 n "$0")
     (when ch1
       (add-edge! ch1 n "$1"))

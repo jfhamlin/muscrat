@@ -4,7 +4,7 @@ go 1.21
 
 require (
 	github.com/fsnotify/fsnotify v1.5.4
-	github.com/glojurelang/glojure v0.0.0-20230903213614-fcddfd4847be
+	github.com/glojurelang/glojure v0.0.0-20230911015258-7b5b420a8fe7
 	github.com/go-audio/audio v1.0.0
 	github.com/go-audio/wav v1.0.0
 	github.com/gordonklaus/portaudio v0.0.0-20221027163845-7c3b689db3cc

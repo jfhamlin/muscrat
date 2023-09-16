@@ -306,9 +306,9 @@ func (gr *graphRunner) run() {
 
 	for {
 		output := make([][]float64, 0, 2)
-		for _, sinkChan := range gr.graph.SinkChans() {
+		for _, outChan := range gr.graph.OutputChans() {
 			select {
-			case samps := <-sinkChan:
+			case samps := <-outChan:
 				output = append(output, samps)
 			case <-ctx.Done():
 				return
@@ -359,8 +359,8 @@ func (gr *graphRunner) outputTo(output chan<- [][]float64) {
 
 func zeroGraph() *graph.Graph {
 	g := &graph.Graph{BufferSize: bufferSize}
-	s0 := g.AddSinkNode()
-	s1 := g.AddSinkNode()
+	s0 := g.AddOutNode()
+	s1 := g.AddOutNode()
 	zero := g.AddGeneratorNode(ugen.NewConstant(0))
 	g.AddEdge(zero.ID(), s0.ID(), "in")
 	g.AddEdge(zero.ID(), s1.ID(), "in")

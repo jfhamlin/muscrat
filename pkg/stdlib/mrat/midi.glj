@@ -1,15 +1,23 @@
-(ns mrat.midi
-  (:import (github.com$jfhamlin$muscrat$pkg$midi Notes)))
+(ns mrat.midi)
 
-;; TODO: reimplement the whole go package here.
+(def ^:private note-names
+  [["C" "B#"]
+   ["C#" "Db"]
+   ["D"]
+   ["D#" "Eb"]
+   ["E" "Fb"]
+   ["F" "E#"]
+   ["F#" "Gb"]
+   ["G"]
+   ["G#" "Ab"]
+   ["A"]
+   ["A#" "Bb"]
+   ["B" "Cb"]])
 
-(dorun (map
-        (fn [note]
-          (eval
-           `(def ~(symbol (.Name note)) ~(.Frequency note))))
-        Notes))
-
-(def midi-map
-  (reduce (fn [acc [m f]] (assoc acc m f))
-          {}
-          (map #(vector (.MIDI %) (.Frequency %)) Notes)))
+(doseq [[note names] (map vector
+                          (range 128)
+                          (cycle note-names))]
+  (let [octave-num (- (quot note 12) 1)]
+    (doseq [name names]
+      (eval
+       `(def ~(symbol (str name octave-num)) ~note)))))

@@ -24,7 +24,8 @@ type (
 	SinkChan <-chan []float64
 
 	nodeOptions struct {
-		label string
+		label  string
+		isSink bool
 	}
 
 	// NodeOptions is a functional option for configuring a node.
@@ -32,6 +33,8 @@ type (
 
 	Node interface {
 		ID() NodeID
+
+		IsSink() bool
 
 		String() string
 
@@ -43,14 +46,14 @@ type (
 		Generator ugen.UGen
 		label     string
 		str       string
+
+		isSink bool
 	}
 
-	SinkNode struct {
+	OutNode struct {
 		id     NodeID
 		output chan []float64
 		label  string
-
-		sinkID int
 	}
 
 	Edge struct {
@@ -66,7 +69,7 @@ type (
 
 		BufferSize int `json:"bufferSize"`
 
-		sinks []*SinkNode
+		outputs []*OutNode
 	}
 )
 
@@ -80,8 +83,18 @@ func WithLabel(label string) NodeOption {
 	}
 }
 
+func WithSink() NodeOption {
+	return func(o *nodeOptions) {
+		o.isSink = true
+	}
+}
+
 func (n *GeneratorNode) ID() NodeID {
 	return n.id
+}
+
+func (n *GeneratorNode) IsSink() bool {
+	return n.isSink
 }
 
 func (n *GeneratorNode) GenerateSamples(ctx context.Context, cfg ugen.SampleConfig, out []float64) {
@@ -106,22 +119,26 @@ func (n *GeneratorNode) MarshalJSON() ([]byte, error) {
 	return []byte(fmt.Sprintf(`{"id":%d,"type":"generator","label":"%s"}`, n.id, n.String())), nil
 }
 
-func (n *SinkNode) ID() NodeID {
+func (n *OutNode) ID() NodeID {
 	return n.id
 }
 
-func (n *SinkNode) Chan() SinkChan {
+func (n *OutNode) IsSink() bool {
+	return true
+}
+
+func (n *OutNode) Chan() SinkChan {
 	return n.output
 }
 
-func (n *SinkNode) String() string {
+func (n *OutNode) String() string {
 	if n.label != "" {
 		return n.label
 	}
 	return n.ID().String()
 }
 
-func (n *SinkNode) MarshalJSON() ([]byte, error) {
+func (n *OutNode) MarshalJSON() ([]byte, error) {
 	return []byte(fmt.Sprintf(`{"id":%d,"type":"sink","label":"%s"}`, n.id, n.String())), nil
 }
 
@@ -138,7 +155,7 @@ func (g *Graph) AddEdge(from, to NodeID, port string) {
 	if int(to) >= len(g.Nodes) {
 		panic(fmt.Sprintf("edge destination %d is not in the graph", to))
 	}
-	if _, ok := g.Nodes[from].(*SinkNode); ok {
+	if _, ok := g.Nodes[from].(*OutNode); ok {
 		panic(fmt.Sprintf("cannot add edge whose source %d is a sink node", from))
 	}
 
@@ -159,6 +176,7 @@ func (g *Graph) AddGeneratorNode(gen ugen.UGen, opts ...NodeOption) Node {
 		id:        NodeID(len(g.Nodes)),
 		Generator: gen,
 		label:     options.label,
+		isSink:    options.isSink,
 	}
 	{
 		str := "[" + node.ID().String() + "]"
@@ -172,39 +190,40 @@ func (g *Graph) AddGeneratorNode(gen ugen.UGen, opts ...NodeOption) Node {
 	return node
 }
 
-func (g *Graph) AddSinkNode(opts ...NodeOption) *SinkNode {
+func (g *Graph) AddOutNode(opts ...NodeOption) *OutNode {
 	var options nodeOptions
 	for _, opt := range opts {
 		opt(&options)
 	}
 
-	node := &SinkNode{
+	node := &OutNode{
 		id:     NodeID(len(g.Nodes)),
 		output: make(chan []float64),
 		label:  options.label,
-		sinkID: len(g.sinks),
 	}
 	g.Nodes = append(g.Nodes, node)
-	g.sinks = append(g.sinks, node)
+	g.outputs = append(g.outputs, node)
 	return node
 }
 
-func (g *Graph) Sinks() []*SinkNode {
-	var sinks []*SinkNode
+func (g *Graph) Sinks() []Node {
+	var sinks []Node
 	for _, node := range g.Nodes {
-		if sink, ok := node.(*SinkNode); ok {
-			sinks = append(sinks, sink)
+		if node.IsSink() {
+			sinks = append(sinks, node)
 		}
 	}
 	return sinks
 }
 
-func (g *Graph) SinkChans() []SinkChan {
+func (g *Graph) Outputs() []*OutNode {
+	return g.outputs
+}
+
+func (g *Graph) OutputChans() []SinkChan {
 	var chs []SinkChan
-	for _, node := range g.Nodes {
-		if sink, ok := node.(*SinkNode); ok {
-			chs = append(chs, sink.output)
-		}
+	for _, out := range g.outputs {
+		chs = append(chs, out.output)
 	}
 	return chs
 }
@@ -267,7 +286,11 @@ type (
 )
 
 func (rs *runState) NodeInfoByID(id NodeID) *runNodeInfo {
-	return &rs.nodeInfo[rs.nodeIndexMap[id]]
+	index := rs.nodeIndexMap[id]
+	if index < 0 {
+		return nil
+	}
+	return &rs.nodeInfo[index]
 }
 
 func (rs *runState) NodeInfoByIndex(idx int) *runNodeInfo {
@@ -365,6 +388,11 @@ func (g *Graph) newRunState() *runState {
 		nodeOrder:    order,
 		nodeIndexMap: make([]int, len(g.Nodes)),
 	}
+	for i := range rs.nodeIndexMap {
+		// initialize to -1 so that we can detect nodes that are not
+		// ancestors of any sink.
+		rs.nodeIndexMap[i] = -1
+	}
 
 	fullSampleSize := g.BufferSize * len(order)
 	bufSlice := make([]float64, fullSampleSize, fullSampleSize)
@@ -385,6 +413,10 @@ func (g *Graph) runWorker(ctx context.Context, cfg ugen.SampleConfig, rs *runSta
 
 	numSinks := len(g.Sinks())
 	sinksDoneBits := (int64(1) << numSinks) - 1
+	sinkBitIndex := make(map[NodeID]int)
+	for i, sink := range g.Sinks() {
+		sinkBitIndex[sink.ID()] = i
+	}
 
 	var epoch int64 = 0    // the epoch being evaluated by this worker
 	var sinkDoneMask int64 // assumes numSinks <= 64
@@ -418,8 +450,8 @@ func (g *Graph) runWorker(ctx context.Context, cfg ugen.SampleConfig, rs *runSta
 
 			// if the node has already been evaluated for this epoch, skip it
 			if info.epoch.Load() > epoch {
-				if sink, ok := node.(*SinkNode); ok {
-					sinkDoneMask |= 1 << sink.sinkID
+				if node.IsSink() {
+					sinkDoneMask |= 1 << sinkBitIndex[nodeID]
 				}
 				continue
 			}
@@ -435,8 +467,8 @@ func (g *Graph) runWorker(ctx context.Context, cfg ugen.SampleConfig, rs *runSta
 			// check again if the node has already been evaluated for this
 			// epoch after we've acquired the lock.
 			if info.epoch.Load() > epoch {
-				if sink, ok := node.(*SinkNode); ok {
-					sinkDoneMask |= 1 << sink.sinkID
+				if node.IsSink() {
+					sinkDoneMask |= 1 << sinkBitIndex[nodeID]
 				}
 				info.evaling.Store(false)
 				continue
@@ -467,7 +499,10 @@ func (g *Graph) runWorker(ctx context.Context, cfg ugen.SampleConfig, rs *runSta
 				n.GenerateSamples(ctx, cfg, info.value)
 				// update the epoch
 				info.epoch.Store(epoch + 1)
-			case *SinkNode:
+				if node.IsSink() {
+					sinkDoneMask |= 1 << sinkBitIndex[nodeID]
+				}
+			case *OutNode:
 				for _, smps := range inputSampleMap { // TODO: disallow sinks with multiple inputs
 					out := bufferpool.Get(len(smps))
 					copy(*out, smps)
@@ -483,7 +518,7 @@ func (g *Graph) runWorker(ctx context.Context, cfg ugen.SampleConfig, rs *runSta
 					}
 					break
 				}
-				sinkDoneMask |= 1 << n.sinkID
+				sinkDoneMask |= 1 << sinkBitIndex[nodeID]
 			}
 
 			// release the node
@@ -503,7 +538,7 @@ func (g *Graph) bootstrapCyclesWorkers(ctx context.Context, rs *runState) {
 	queue := make([]NodeID, 0, len(g.Nodes))
 	blocked := map[NodeID]struct{}{}
 	for _, node := range g.Nodes {
-		if _, ok := node.(*SinkNode); ok {
+		if _, ok := node.(*OutNode); ok {
 			continue
 		}
 		if len(g.IncomingEdges(node.ID())) == 0 {
@@ -540,7 +575,9 @@ func (g *Graph) bootstrapCyclesWorkers(ctx context.Context, rs *runState) {
 
 			queue = append(queue, choice)
 			delete(blocked, choice)
-			rs.NodeInfoByID(choice).epoch.Store(1)
+			if ni := rs.NodeInfoByID(choice); ni != nil {
+				rs.NodeInfoByID(choice).epoch.Store(1)
+			}
 		}
 
 		var nodeID NodeID

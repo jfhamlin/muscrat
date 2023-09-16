@@ -2,9 +2,9 @@ package aio
 
 import (
 	"context"
+	"math"
 	"time"
 
-	"github.com/jfhamlin/muscrat/pkg/midi"
 	"github.com/jfhamlin/muscrat/pkg/ugen"
 )
 
@@ -78,27 +78,31 @@ func (q *qwertyTrig) Gen(ctx context.Context, cfg ugen.SampleConfig, out []float
 	}
 }
 
+func midiFreq(n float64) float64 {
+	return 440 * math.Pow(2, (n-69)/12)
+}
+
 var (
 	midiCharMap = map[byte]float64{
-		'a':  midi.C3.Frequency,
-		'w':  midi.Cs3.Frequency,
-		's':  midi.D3.Frequency,
-		'e':  midi.Ds3.Frequency,
-		'd':  midi.E3.Frequency,
-		'f':  midi.F3.Frequency,
-		't':  midi.Fs3.Frequency,
-		'g':  midi.G3.Frequency,
-		'y':  midi.Gs3.Frequency,
-		'h':  midi.A3.Frequency,
-		'u':  midi.As3.Frequency,
-		'j':  midi.B3.Frequency,
-		'k':  midi.C4.Frequency,
-		'o':  midi.Cs4.Frequency,
-		'l':  midi.D4.Frequency,
-		'p':  midi.Ds4.Frequency,
-		';':  midi.E4.Frequency,
-		'\'': midi.F4.Frequency,
-		']':  midi.Fs4.Frequency,
+		'a':  midiFreq(48),
+		'w':  midiFreq(49),
+		's':  midiFreq(50),
+		'e':  midiFreq(51),
+		'd':  midiFreq(52),
+		'f':  midiFreq(53),
+		't':  midiFreq(54),
+		'g':  midiFreq(55),
+		'y':  midiFreq(56),
+		'h':  midiFreq(57),
+		'u':  midiFreq(58),
+		'j':  midiFreq(59),
+		'k':  midiFreq(60),
+		'o':  midiFreq(61),
+		'l':  midiFreq(62),
+		'p':  midiFreq(63),
+		';':  midiFreq(64),
+		'\'': midiFreq(65),
+		']':  midiFreq(66),
 	}
 )
 

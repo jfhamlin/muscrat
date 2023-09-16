@@ -18,7 +18,7 @@ func BenchmarkGraph(b *testing.B) {
 	//	timings := make([]time.Duration, b.N)
 
 	g := benchGraph()
-	sinks := g.SinkChans()
+	sinks := g.OutputChans()
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	go g.Run(ctx, ugen.SampleConfig{SampleRateHz: 44100})
@@ -84,7 +84,7 @@ func benchGraph() *Graph {
 		g.AddEdge(product.ID(), sum.ID(), fmt.Sprintf("product-%d", i))
 	}
 
-	sn := g.AddSinkNode()
+	sn := g.AddOutNode()
 	g.AddEdge(sum.ID(), sn.ID(), "in")
 
 	return g

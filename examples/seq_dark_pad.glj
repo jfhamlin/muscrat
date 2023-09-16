@@ -10,20 +10,21 @@
    (let [size 32
          freqs (map #(* freq (semitones %)) (repeatedly size #(* 0.1 (noise 8))))
          snds (map #(saw %) freqs)
-         snds (map #(delayl % (* 0.01 (math$rand.Float64))) snds)
+         snds (map #(delayl % 1 (* 0.01 (math$rand.Float64))) snds)
          snd (sum snds)
          asr (env-asr gate [1 1 8])]
      (* amp asr snd))))
+
 
 (def ivals (map semitones [3 7 12 14 15 24]))
 
 (def trig (sqr 0.25))
 
-(def s (sequencer trig [E2 G2 Fs2 A2 C2 B2]))
+(def s (sequencer trig (map midifreq [E2 G2 F#2 A2 C2 B2])))
 
 (play (sum
        (map #(-> (pad trig (* s %) (decibels -35))
-                 (delayl (* 0.01 (math$rand.Float64)))
+                 (delayl 1 (* 0.01 (math$rand.Float64)))
                  (lores (* 4 s) 0.8)
                  (freeverb :room-size 0.6))
             ivals)))
