@@ -345,7 +345,7 @@
                             (~'WithMultiply (get args# :mul 1.0))
                             (~'WithAdd (get args# :add 0.0))]
                   args# (dissoc args# :default-duty :mul :add)
-                  gen# (apply ~'Generator (~wavtab 1024) wt-opts#)
+                  gen# (apply ~'Generator (~wavtab 2048) wt-opts#)
                   label# (~'WithLabel ~(str name))
                   osc-node# (add-node! gen# label#)
                   freq-node# (as-node freq#)]
