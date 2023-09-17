@@ -45,6 +45,7 @@ func Generator(wavtab *Table, opts ...GeneratorOption) ugen.UGen {
 		opt(&options)
 	}
 
+	lastPhase := 0.0
 	phase := 0.0
 	lastSync := 0.0
 
@@ -68,34 +69,36 @@ func Generator(wavtab *Table, opts ...GeneratorOption) ugen.UGen {
 			}
 		}
 
-		// TODO: band-limited interpolation based on the frequency
-
 		for i := range out {
-			if i < len(phases) {
-				phase = phases[i]
-			}
 			dc := options.defaultDutyCycle
 			if i < len(dcs) {
 				dc = dcs[i]
 			}
+			w := 440.0 // default frequency
+			if i < len(ws) {
+				w = ws[i]
+			}
+			if i < len(phases) {
+				phase = phases[i]
+				// estimate frequency from phase and sample rate
+				w = (phase - lastPhase) * float64(cfg.SampleRateHz)
+				lastPhase = phase
+			}
+
 			switch dc {
 			case 0:
 				out[i] = wavtab.tbl[0]
 			case 1:
-				out[i] = wavtab.HermiteBL(ws[i], phase)
+				out[i] = wavtab.HermiteBL(w, phase)
 			default:
 				t := (phase - math.Floor(phase)) / dc
 				if t > 1 {
 					out[i] = wavtab.tbl[len(wavtab.tbl)-1]
 				} else {
-					out[i] = wavtab.HermiteBL(ws[i], t)
+					out[i] = wavtab.HermiteBL(w, t)
 				}
 			}
 
-			w := 440.0 // default frequency
-			if i < len(ws) {
-				w = ws[i]
-			}
 			phase += w / float64(cfg.SampleRateHz)
 			// keep phase in [0, 1)
 			phase -= math.Floor(phase)
