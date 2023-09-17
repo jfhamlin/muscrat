@@ -1,6 +1,7 @@
 package wavtabs
 
 // Pulse returns a pulse wave table.
+// TODO: pulse is not well-implemented by a wavetable. Drop it?
 func Pulse(resolution int) *Table {
 	return memoize("pulse", resolution, func() *Table {
 		if resolution < 2 {
