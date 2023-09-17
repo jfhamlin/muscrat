@@ -36,7 +36,7 @@ func WithAdd(a float64) GeneratorOption {
 }
 
 // Generator is a generator that generates a wavetable.
-func Generator(wavtabIn Table, opts ...GeneratorOption) ugen.UGen {
+func Generator(wavtab *Table, opts ...GeneratorOption) ugen.UGen {
 	options := genOpts{
 		defaultDutyCycle: 1,
 		multiply:         1,
@@ -45,11 +45,7 @@ func Generator(wavtabIn Table, opts ...GeneratorOption) ugen.UGen {
 		opt(&options)
 	}
 
-	wavtab := make(Table, len(wavtabIn))
-	for i, v := range wavtabIn {
-		wavtab[i] = v*options.multiply + options.add
-	}
-
+	lastPhase := 0.0
 	phase := 0.0
 	lastSync := 0.0
 
@@ -73,34 +69,36 @@ func Generator(wavtabIn Table, opts ...GeneratorOption) ugen.UGen {
 			}
 		}
 
-		// TODO: band-limited interpolation
-
 		for i := range out {
-			if i < len(phases) {
-				phase = phases[i]
-			}
 			dc := options.defaultDutyCycle
 			if i < len(dcs) {
 				dc = dcs[i]
 			}
-			switch dc {
-			case 0:
-				out[i] = wavtab[0]
-			case 1:
-				out[i] = wavtab.Lerp(phase)
-			default:
-				t := (phase - math.Floor(phase)) / dc
-				if t > 1 {
-					out[i] = wavtab[len(wavtab)-1]
-				} else {
-					out[i] = wavtab.Lerp(t)
-				}
-			}
-
 			w := 440.0 // default frequency
 			if i < len(ws) {
 				w = ws[i]
 			}
+			if i < len(phases) {
+				phase = phases[i]
+				// estimate frequency from phase and sample rate
+				w = (phase - lastPhase) * float64(cfg.SampleRateHz)
+				lastPhase = phase
+			}
+
+			switch dc {
+			case 0:
+				out[i] = wavtab.tbl[0]
+			case 1:
+				out[i] = wavtab.HermiteBL(w, phase)
+			default:
+				t := (phase - math.Floor(phase)) / dc
+				if t > 1 {
+					out[i] = wavtab.tbl[len(wavtab.tbl)-1]
+				} else {
+					out[i] = wavtab.HermiteBL(w, t)
+				}
+			}
+
 			phase += w / float64(cfg.SampleRateHz)
 			// keep phase in [0, 1)
 			phase -= math.Floor(phase)
@@ -111,6 +109,12 @@ func Generator(wavtabIn Table, opts ...GeneratorOption) ugen.UGen {
 					phase = 0.0
 				}
 				lastSync = syncs[i]
+			}
+		}
+
+		if options.multiply != 1 || options.add != 0 {
+			for i := range out {
+				out[i] = out[i]*options.multiply + options.add
 			}
 		}
 	})
