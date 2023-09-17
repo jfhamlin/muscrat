@@ -13,7 +13,7 @@ import (
 func TestBandLimit(t *testing.T) {
 	tbl := Saw(DefaultResolution)
 
-	for f := 20.0; f < maxBandLimitedFreq; f *= math.Sqrt2 {
+	for f := 20.01; f < maxBandLimitedFreq; f *= math.Sqrt2 {
 		idx, off := tbl.blTableIndexOffset(f)
 		if false {
 			t.Errorf("%v: %v, %v", f, idx, off)

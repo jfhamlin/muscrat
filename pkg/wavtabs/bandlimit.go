@@ -32,7 +32,13 @@ func (t *Table) HermiteBL(freq, x float64) float64 {
 }
 
 func (t *Table) blTableIndexOffset(freq float64) (int, float64) {
-	index := int(math.Floor(12 * math.Log2(freq/minBandLimitedFreq) / bandLimitedSemitoneRange))
+	index := 0
+	for i, f := range t.bandLimitedFreqs {
+		if f > freq {
+			break
+		}
+		index = i
+	}
 	offset := (freq - t.bandLimitedFreqs[index]) / (t.bandLimitedFreqs[index+1] - t.bandLimitedFreqs[index])
 	return index, offset
 }
