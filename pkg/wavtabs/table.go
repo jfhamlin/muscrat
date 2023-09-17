@@ -18,6 +18,9 @@ type (
 		res int
 
 		bins []complex128
+
+		// band-limited variants of the table at various octaves
+		blTables [][]float64
 	}
 )
 
