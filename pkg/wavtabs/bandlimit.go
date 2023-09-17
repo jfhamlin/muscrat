@@ -1,8 +1,65 @@
 package wavtabs
 
 import (
+	"math"
+
 	"gonum.org/v1/gonum/dsp/fourier"
 )
+
+const (
+	minBandLimitedFreq       = 20
+	maxBandLimitedFreq       = 20480
+	bandLimitedSemitoneRange = 12
+
+	sampleRate = 44100 // TODO: make this configurable
+	nyquist    = sampleRate / 2
+)
+
+func (t *Table) HermiteBL(freq, x float64) float64 {
+	// find the band-limited table for the greatest frequency less than
+	// or equal to freq. linearly interpolate between this table and the
+	// next table. if freq is greater than the greatest frequency, use
+	// the greatest frequency table. if freq is less than the least
+	// frequency, use the least frequency table.
+	if freq <= minBandLimitedFreq {
+		return t.bandLimitedTbls[0].Hermite(x)
+	}
+	if freq >= maxBandLimitedFreq {
+		return t.bandLimitedTbls[len(t.bandLimitedTbls)-1].Hermite(x)
+	}
+	index, offset := t.blTableIndexOffset(freq)
+	return t.bandLimitedTbls[index].Hermite(x)*(1-offset) + t.bandLimitedTbls[index+1].Hermite(x)*offset
+}
+
+func (t *Table) blTableIndexOffset(freq float64) (int, float64) {
+	index := int(math.Floor(12 * math.Log2(freq/minBandLimitedFreq) / bandLimitedSemitoneRange))
+	offset := (freq - t.bandLimitedFreqs[index]) / (t.bandLimitedFreqs[index+1] - t.bandLimitedFreqs[index])
+	return index, offset
+}
+
+func (t *Table) genBandLimited() {
+	if t.bandLimitedTbls != nil {
+		return
+	}
+
+	// minBandLimitedFreq * 2^((x - 1)*bandLimitedSemitoneRange/12) = maxBandLimitedFreq
+	// x = 1 + 12 * log2(maxBandLimitedFreq/minBandLimitedFreq) / bandLimitedSemitoneRange
+	numTables := int(1 + 12*math.Log2(maxBandLimitedFreq/minBandLimitedFreq)/bandLimitedSemitoneRange)
+	t.bandLimitedTbls = make([]atomicTable, numTables)
+	t.bandLimitedFreqs = make([]float64, numTables)
+	for i := 0; i < numTables; i++ {
+		freq := minBandLimitedFreq * math.Pow(2, float64(i)*bandLimitedSemitoneRange/12)
+		if i == 0 && freq != minBandLimitedFreq {
+			panic("wavtabs: internal error: first band-limited table has incorrect frequency")
+		}
+		if i == numTables-1 && freq != maxBandLimitedFreq {
+			panic("wavtabs: internal error: last band-limited table has incorrect frequency")
+		}
+		tbl := t.bandLimited(freq, nyquist)
+		t.bandLimitedTbls[i] = append(tbl, tbl[0])
+		t.bandLimitedFreqs[i] = freq
+	}
+}
 
 // fft computes the FFT of the wave table.
 func (t *Table) fft() {

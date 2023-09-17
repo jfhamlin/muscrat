@@ -14,14 +14,16 @@ type (
 	// Table is a wavetable.
 	Table struct {
 		// len(tbl) == res + 1, so that tbl[res] == tbl[0]
-		tbl []float64
-		res int
+		tbl atomicTable
 
 		bins []complex128
 
-		// band-limited variants of the table at various octaves
-		blTables [][]float64
+		bandLimitedTbls  []atomicTable
+		bandLimitedFreqs []float64
 	}
+
+	// atomicTable is a wavetable without band-limited interpolation.
+	atomicTable []float64
 )
 
 // New returns a new wavetable with the given control points.
@@ -33,14 +35,16 @@ func NewWithWrap(points []float64, wrapVal float64) *Table {
 	tbl := make([]float64, len(points)+1)
 	copy(tbl, points)
 	tbl[len(points)] = wrapVal
-	return &Table{
+	t := &Table{
 		tbl: tbl,
-		res: len(points),
 	}
+	t.genBandLimited()
+
+	return t
 }
 
 func (t *Table) Resolution() int {
-	return t.res
+	return len(t.tbl) - 1
 }
 
 // Nearest returns the nearest discrete value in a wavetable. The
@@ -49,10 +53,7 @@ func (t *Table) Resolution() int {
 // Values of x outside this range are valid, and will be wrapped to the
 // appropriate position in the table.
 func (t *Table) Nearest(x float64) float64 {
-	x -= math.Floor(x)
-	x = x * float64(t.Resolution())
-	i := int(x + 0.5)
-	return t.tbl[i]
+	return t.tbl.Nearest(x)
 }
 
 // Lerp linearly interpolates between two discrete values in a
@@ -61,31 +62,55 @@ func (t *Table) Nearest(x float64) float64 {
 // waveform covering [0, 1). Values of x outside this range are valid,
 // and will be wrapped to the appropriate position in the table.
 func (t *Table) Lerp(x float64) float64 {
-	x -= math.Floor(x)
-	x = x * float64(t.Resolution())
-	i := int(x)
-	f := x - float64(i)
-	return t.tbl[i] + f*(t.tbl[i+1]-t.tbl[i])
+	return t.tbl.Lerp(x)
 }
 
 func (t *Table) Hermite(x float64) float64 {
+	return t.tbl.Hermite(x)
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// atomicTable
+
+func (at atomicTable) Resolution() int {
+	return len(at) - 1
+}
+
+func (at atomicTable) Nearest(x float64) float64 {
 	x -= math.Floor(x)
-	x = x * float64(t.Resolution())
+	x = x * float64(at.Resolution())
+	i := int(x + 0.5)
+	return at[i]
+}
+
+func (at atomicTable) Lerp(x float64) float64 {
+	x -= math.Floor(x)
+	x = x * float64(at.Resolution())
+	i := int(x)
+	f := x - float64(i)
+	return at[i] + f*(at[i+1]-at[i])
+}
+
+func (at atomicTable) Hermite(x float64) float64 {
+	res := at.Resolution()
+
+	x -= math.Floor(x)
+	x = x * float64(res)
 	i := int(x)
 	off := x - float64(i)
 
 	var val0, val1, val2, val3 float64
 	if i == 0 {
-		val0 = t.tbl[t.Resolution()-1]
+		val0 = at[res-1]
 	} else {
-		val0 = t.tbl[i-1]
+		val0 = at[i-1]
 	}
-	val1 = t.tbl[i]
-	val2 = t.tbl[i+1]
-	if i == t.Resolution()-1 {
-		val3 = t.tbl[0]
+	val1 = at[i]
+	val2 = at[i+1]
+	if i == res-1 {
+		val3 = at[0]
 	} else {
-		val3 = t.tbl[i+2]
+		val3 = at[i+2]
 	}
 
 	return hermite(off, val0, val1, val2, val3)

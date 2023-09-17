@@ -2,6 +2,7 @@ package wavtabs
 
 import (
 	"fmt"
+	"math"
 	"testing"
 
 	"gonum.org/v1/gonum/dsp/fourier"
@@ -10,9 +11,18 @@ import (
 )
 
 func TestBandLimit(t *testing.T) {
-	for f := 10.0; f < 10000; f += 100 {
-		plotBL(t, f)
+	tbl := Saw(DefaultResolution)
+
+	for f := 20.0; f < maxBandLimitedFreq; f *= math.Sqrt2 {
+		idx, off := tbl.blTableIndexOffset(f)
+		if false {
+			t.Errorf("%v: %v, %v", f, idx, off)
+		}
 	}
+
+	// for f := 10.0; f < 10000; f += 100 {
+	// 	plotBL(t, f)
+	// }
 }
 
 func plotBL(t *testing.T, cyclesPerSecond float64) {
@@ -40,7 +50,5 @@ func plotBL(t *testing.T, cyclesPerSecond float64) {
 		blFFT = append(blFFT, blFFT[i])
 	}
 
-	//fmt.Println(plot.DFTHistogramString(blFFT, sampleRate, 200, 40))
-	fmt.Println(plot.DFTHistogramString(blFFT, sampleRate, 180, 40, plot.WithLogRange()))
-	t.Errorf("fail")
+	fmt.Println(plot.DFTHistogramString(blFFT, sampleRate, 180, 40))
 }
