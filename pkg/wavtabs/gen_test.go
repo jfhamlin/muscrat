@@ -9,12 +9,6 @@ import (
 	"github.com/jfhamlin/muscrat/pkg/ugen"
 )
 
-// BenchmarkGenerator-8   	  208602	      5770 ns/op // Before bandlimiting
-
-// BenchmarkGenerator-8   	   33162	     37659 ns/op // before bl table search optimization
-
-// BenchmarkGenerator-8   	   42739	     25936 ns/op // before even more bl table search optimization
-
 // BenchmarkGenerator-8   	   89032	     13406 ns/op
 func BenchmarkGenerator(b *testing.B) {
 	g := Generator(Sin(2048))
