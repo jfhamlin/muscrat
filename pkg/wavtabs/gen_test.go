@@ -7,8 +7,9 @@ import (
 	"github.com/jfhamlin/muscrat/pkg/ugen"
 )
 
+// BenchmarkGenerator-8   	  208602	      5770 ns/op
 func BenchmarkGenerator(b *testing.B) {
-	g := Generator(Sin(1024))
+	g := Generator(Sin(2048))
 
 	const numSamples = 1024
 	w := make([]float64, numSamples)

@@ -36,18 +36,13 @@ func WithAdd(a float64) GeneratorOption {
 }
 
 // Generator is a generator that generates a wavetable.
-func Generator(wavtabIn Table, opts ...GeneratorOption) ugen.UGen {
+func Generator(wavtab *Table, opts ...GeneratorOption) ugen.UGen {
 	options := genOpts{
 		defaultDutyCycle: 1,
 		multiply:         1,
 	}
 	for _, opt := range opts {
 		opt(&options)
-	}
-
-	wavtab := make(Table, len(wavtabIn))
-	for i, v := range wavtabIn {
-		wavtab[i] = v*options.multiply + options.add
 	}
 
 	phase := 0.0
@@ -73,7 +68,7 @@ func Generator(wavtabIn Table, opts ...GeneratorOption) ugen.UGen {
 			}
 		}
 
-		// TODO: band-limited interpolation
+		// TODO: band-limited interpolation based on the frequency
 
 		for i := range out {
 			if i < len(phases) {
@@ -85,15 +80,15 @@ func Generator(wavtabIn Table, opts ...GeneratorOption) ugen.UGen {
 			}
 			switch dc {
 			case 0:
-				out[i] = wavtab[0]
+				out[i] = wavtab.tbl[0]
 			case 1:
-				out[i] = wavtab.Lerp(phase)
+				out[i] = wavtab.Hermite(phase)
 			default:
 				t := (phase - math.Floor(phase)) / dc
 				if t > 1 {
-					out[i] = wavtab[len(wavtab)-1]
+					out[i] = wavtab.tbl[len(wavtab.tbl)-1]
 				} else {
-					out[i] = wavtab.Lerp(t)
+					out[i] = wavtab.Hermite(t)
 				}
 			}
 
@@ -111,6 +106,12 @@ func Generator(wavtabIn Table, opts ...GeneratorOption) ugen.UGen {
 					phase = 0.0
 				}
 				lastSync = syncs[i]
+			}
+		}
+
+		if options.multiply != 1 || options.add != 0 {
+			for i := range out {
+				out[i] = out[i]*options.multiply + options.add
 			}
 		}
 	})

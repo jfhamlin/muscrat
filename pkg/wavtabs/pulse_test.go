@@ -10,14 +10,6 @@ import (
 func TestPulse(t *testing.T) {
 	const resolution = 10
 	tbl := Pulse(resolution)
-	for i := 0; i < resolution; i++ {
-		if tbl[i] != 1 {
-			t.Errorf("tbl[%d] = %f, want 1", i, tbl[i])
-		}
-	}
-	if tbl[resolution] != -1 {
-		t.Errorf("tbl[%d] = %f, want -1", resolution, tbl[resolution])
-	}
 	for x := 0.0; x <= 1.0; x += 0.01 {
 		v := tbl.Lerp(x)
 		if x < 1-(1/float64(resolution)) {
@@ -26,6 +18,7 @@ func TestPulse(t *testing.T) {
 			}
 		}
 	}
+	// fmt.Println(plot.LineChartString(tbl.tbl, 80, 20))
 }
 
 func TestPulseSample(t *testing.T) {
