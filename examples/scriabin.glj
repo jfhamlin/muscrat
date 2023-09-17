@@ -69,7 +69,6 @@
                 (lores (* root 5) 0.1)
                 (* envelope))
         sig-bass (-> (saw (* root-bass (semitones (sin 6 :mul 0.1))))
-                     (+ (noise 0 :mul 0.5))
                      (lores (* root-bass 3) 0.9)
                      (* envelope-bass))]
     (-> (+ sig (* (decibels -5) sig-bass))
