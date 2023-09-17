@@ -28,7 +28,9 @@ func (t *Table) HermiteBL(freq, x float64) float64 {
 		return t.bandLimitedTbls[len(t.bandLimitedTbls)-1].Hermite(x)
 	}
 	index, offset := t.blTableIndexOffset(freq)
-	return t.bandLimitedTbls[index].Hermite(x)*(1-offset) + t.bandLimitedTbls[index+1].Hermite(x)*offset
+	v0 := t.bandLimitedTbls[index].Hermite(x)
+	v1 := t.bandLimitedTbls[index+1].Hermite(x)
+	return v0*(1-offset) + v1*offset
 }
 
 func (t *Table) blTableIndexOffset(freq float64) (int, float64) {
