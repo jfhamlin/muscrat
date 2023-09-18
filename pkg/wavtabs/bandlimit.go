@@ -9,7 +9,7 @@ import (
 const (
 	minBandLimitedFreq       = 20
 	maxBandLimitedFreq       = 20480
-	bandLimitedSemitoneRange = 12
+	bandLimitedSemitoneRange = 4
 
 	sampleRate = 44100 // TODO: make this configurable
 	nyquist    = sampleRate / 2
