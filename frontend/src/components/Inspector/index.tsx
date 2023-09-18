@@ -264,6 +264,7 @@ function LineChart(props: {samples: number[]}) {
 
 function Histogram(props: {labels: number[] | undefined, bins: number[]}) {
   const options = {
+    animation: false,
     responsive: true,
     plugins: {
       legend: {
