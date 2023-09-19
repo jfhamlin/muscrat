@@ -15,14 +15,21 @@ require (
 	gitlab.com/gomidi/midi/v2 v2.0.30
 	golang.org/x/term v0.8.0
 	gonum.org/v1/gonum v0.14.0
+	gonum.org/v1/plot v0.10.1
 )
 
 require (
 	bitbucket.org/pcastools/hash v1.0.5 // indirect
+	git.sr.ht/~sbinet/gg v0.3.1 // indirect
+	github.com/ajstarks/svgo v0.0.0-20211024235047-1546f124cd8b // indirect
 	github.com/bep/debounce v1.2.1 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/go-audio/riff v1.0.0 // indirect
+	github.com/go-fonts/liberation v0.3.0 // indirect
+	github.com/go-latex/latex v0.0.0-20230307184459-12ec69307ad9 // indirect
 	github.com/go-ole/go-ole v1.2.6 // indirect
+	github.com/go-pdf/fpdf v0.6.0 // indirect
+	github.com/golang/freetype v0.0.0-20170609003504-e2365dfdc4a0 // indirect
 	github.com/google/uuid v1.1.2 // indirect
 	github.com/jchv/go-winloader v0.0.0-20210711035445-715c2860da7e // indirect
 	github.com/labstack/echo/v4 v4.9.0 // indirect
@@ -47,6 +54,7 @@ require (
 	go4.org/unsafe/assume-no-moving-gc v0.0.0-20230525183740-e7c30c78aeb2 // indirect
 	golang.org/x/crypto v0.1.0 // indirect
 	golang.org/x/exp v0.0.0-20230321023759-10a507213a29 // indirect
+	golang.org/x/image v0.6.0 // indirect
 	golang.org/x/net v0.7.0 // indirect
 	golang.org/x/sys v0.8.0 // indirect
 	golang.org/x/text v0.8.0 // indirect

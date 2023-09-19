@@ -93,7 +93,7 @@ func Generator(wavtab *Table, opts ...GeneratorOption) ugen.UGen {
 			default:
 				t := (phase - math.Floor(phase)) / dc
 				if t > 1 {
-					out[i] = wavtab.tbl[len(wavtab.tbl)-1]
+					out[i] = wavtab.HermiteBL(w, 0)
 				} else {
 					out[i] = wavtab.HermiteBL(w, t)
 				}

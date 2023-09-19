@@ -3,6 +3,8 @@ package wavtabs
 
 import (
 	"math"
+
+	"github.com/jfhamlin/muscrat/pkg/interp"
 )
 
 const (
@@ -113,17 +115,5 @@ func (at atomicTable) Hermite(x float64) float64 {
 		val3 = at[i+2]
 	}
 
-	return hermite(off, val0, val1, val2, val3)
-}
-
-func hermite(off, val0, val1, val2, val3 float64) float64 {
-	slope0 := (val2 - val0) * 0.5
-	slope1 := (val3 - val1) * 0.5
-	v := val1 - val2
-	w := slope0 + v
-	a := w + v + slope1
-	bNeg := w + a
-	stage1 := a*off - bNeg
-	stage2 := stage1*off + slope0
-	return stage2*off + val1
+	return interp.Hermite(off, val0, val1, val2, val3)
 }
