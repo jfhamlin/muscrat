@@ -28,7 +28,9 @@
                                                 NewSaw
                                                 NewTri
                                                 NewPulse
-                                                NewPhasor)
+                                                NewPhasor
+                                                NewLFSaw
+                                                NewLFPulse)
            (github.com$jfhamlin$muscrat$pkg$stochastic NewNoise
                                                        NewNoiseQuad
                                                        NewPinkNoise)
@@ -359,6 +361,9 @@
 (defosc phasor NewPhasor)
 (defosc pulse NewPulse :default-duty 0.5)
 (defosc sqr NewPulse :default-duty 0.5)
+(defosc lfsaw NewLFSaw)
+(defosc lfpulse NewLFPulse :default-duty 0.5)
+(defosc lfsqr NewLFPulse :default-duty 0.5)
 
 (defn impulse
   [freq & flags]

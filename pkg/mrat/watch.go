@@ -41,3 +41,7 @@ func watchFile(ctx context.Context, path string, srv *Server) error {
 		}
 	}
 }
+
+func WatchScriptFile(ctx context.Context, path string, srv *Server) error {
+	return watchFile(ctx, path, srv)
+}

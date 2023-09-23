@@ -18,48 +18,54 @@ func polyBlep(phase, dPhase float64) float64 {
 	return 0.0
 }
 
-type (
-	saw struct{}
-
-	square struct{}
-
-	tri struct{}
-)
-
 func NewSaw(opts ...ugen.Option) ugen.UGen {
-	return New(saw{}, opts...)
+	return New(SamplerFunc(sampleSaw), opts...)
 }
 
-func (s saw) Sample(phase, dPhase float64) float64 {
+func sampleSaw(phase, dPhase, dutyCycle float64) float64 {
+	phase = dcPhase(phase, dutyCycle)
+
 	result := 2.0*phase - 1.0
 	result -= polyBlep(phase, dPhase)
 	return result
 }
 
-func NewSquare(opts ...ugen.Option) ugen.UGen {
-	return New(square{}, opts...)
+func NewPulse(opts ...ugen.Option) ugen.UGen {
+	return New(SamplerFunc(samplePulse), opts...)
 }
 
-func (s square) Sample(phase, dPhase float64) float64 {
+func samplePulse(phase, dPhase, dutyCycle float64) float64 {
+	if dutyCycle >= 1.0 {
+		return 1.0
+	} else if dutyCycle <= 0.0 {
+		return -1.0
+	}
+
 	result := -1.0
-	if phase >= 0.5 {
+	if phase >= dutyCycle {
 		result = 1.0
 	}
 
-	result += polyBlep(math.Mod(phase+0.5, 1), dPhase)
+	result += polyBlep(math.Mod(phase+dutyCycle, 1), dPhase)
 	result -= polyBlep(phase, dPhase)
 
 	return result
 }
 
 func NewTri(opts ...ugen.Option) ugen.UGen {
-	return New(tri{}, opts...)
+	return New(SamplerFunc(sampleTri), opts...)
 }
 
-func (t tri) Sample(phase, dPhase float64) float64 {
+func sampleTri(phase, dPhase, dutyCycle float64) float64 {
+	phase = dcPhase(phase, dutyCycle)
+
 	// TODO: integrate square
 	if phase < 0.5 {
 		return 4.0*phase - 1.0
 	}
 	return 3.0 - 4.0*phase
+}
+
+func dcPhase(phase, dc float64) float64 {
+	return math.Max(0, math.Min(1, phase/dc))
 }

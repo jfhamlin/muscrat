@@ -22,9 +22,10 @@ const (
 
 func DefaultOptions() Options {
 	return Options{
-		Rand: rand.New(rand.NewSource(rand.Int63())),
-		Add:  0.0,
-		Mul:  1.0,
+		Rand:             rand.New(rand.NewSource(rand.Int63())),
+		Add:              0.0,
+		Mul:              1.0,
+		DefaultDutyCycle: 1.0,
 	}
 }
 

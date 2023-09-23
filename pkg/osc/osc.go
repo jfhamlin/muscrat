@@ -11,10 +11,10 @@ type (
 	Sampler interface {
 		// Sample returns the sample value for the given phase and phase
 		// delta per sample.
-		Sample(phase, dPhase float64) float64
+		Sample(phase, dPhase, dutyCycle float64) float64
 	}
 
-	SamplerFunc func(phase, dPhase float64) float64
+	SamplerFunc func(phase, dPhase, dutyCycle float64) float64
 
 	Osc struct {
 		options ugen.Options
@@ -76,7 +76,7 @@ func (o *Osc) Gen(ctx context.Context, cfg ugen.SampleConfig, out []float64) {
 	lastSync := o.lastSync
 
 	for i := range out {
-		dc := 1.0
+		dc := o.options.DefaultDutyCycle
 		if len(dcs) > 0 {
 			dc = dcs[i]
 		}
@@ -92,19 +92,7 @@ func (o *Osc) Gen(ctx context.Context, cfg ugen.SampleConfig, out []float64) {
 			phase = phases[i]
 		}
 
-		switch dc {
-		case 0:
-			out[i] = 0
-		case 1:
-			out[i] = sampler.Sample(phase, dPhase)
-		default:
-			t := (phase - math.Floor(phase)) / dc
-			if t > 1 {
-				out[i] = sampler.Sample(0, dPhase)
-			} else {
-				out[i] = sampler.Sample(t, dPhase)
-			}
-		}
+		out[i] = sampler.Sample(phase, dPhase, dc)
 
 		if len(phases) == 0 {
 			phase += w / float64(cfg.SampleRateHz)
@@ -131,6 +119,6 @@ func (o *Osc) Gen(ctx context.Context, cfg ugen.SampleConfig, out []float64) {
 	o.lastSync = lastSync
 }
 
-func (f SamplerFunc) Sample(phase, dPhase float64) float64 {
-	return f(phase, dPhase)
+func (f SamplerFunc) Sample(phase, dPhase, dutyCycle float64) float64 {
+	return f(phase, dPhase, dutyCycle)
 }

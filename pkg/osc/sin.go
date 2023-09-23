@@ -7,8 +7,6 @@ import (
 	"github.com/jfhamlin/muscrat/pkg/ugen"
 )
 
-type sine struct{}
-
 const (
 	sineTableSize = 2048
 )
@@ -30,10 +28,13 @@ func init() {
 }
 
 func NewSine(opts ...ugen.Option) ugen.UGen {
-	return New(sine{}, opts...)
+	return New(SamplerFunc(sampleSine), opts...)
 }
 
-func (s sine) Sample(phase, dPhase float64) float64 {
+func sampleSine(phase, dPhase, dutyCycle float64) float64 {
+	phase /= dutyCycle
+	phase = math.Max(0, math.Min(1, phase))
+
 	x := phase - math.Floor(phase)
 	x = x * float64(sineTableSize)
 	i := int(x)

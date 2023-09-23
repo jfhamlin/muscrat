@@ -1,15 +1,15 @@
 package osc
 
-import "github.com/jfhamlin/muscrat/pkg/ugen"
+import (
+	"math"
 
-type (
-	phasor struct{}
+	"github.com/jfhamlin/muscrat/pkg/ugen"
 )
 
 func NewPhasor(opts ...ugen.Option) ugen.UGen {
-	return New(phasor{}, opts...)
+	return New(SamplerFunc(samplePhasor), opts...)
 }
 
-func (p phasor) Sample(phase, dPhase float64) float64 {
-	return phase
+func samplePhasor(phase, dPhase, dutyCycle float64) float64 {
+	return math.Max(0, math.Min(1, phase/dutyCycle))
 }

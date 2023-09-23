@@ -8,8 +8,8 @@ import (
 	"sync"
 	"sync/atomic"
 
+	"github.com/jfhamlin/muscrat/pkg/pubsub"
 	"github.com/jfhamlin/muscrat/pkg/ugen"
-	"github.com/wailsapp/wails/v2/pkg/runtime"
 
 	"gitlab.com/gomidi/midi/v2"
 	"gitlab.com/gomidi/midi/v2/drivers"
@@ -140,7 +140,7 @@ func findAndListenToMIDIPort(ctx context.Context, id int, namePattern *regexp.Re
 			lastMidiPortControllerValues[portID][int(controller)] = int32(value)
 			lastMidiPortControllerValuesMtx.Unlock()
 		}
-		runtime.EventsEmit(ctx, "midi", &MIDIEnvelope{
+		pubsub.Publish("midi", &MIDIEnvelope{
 			DeviceID:   found.Number(),
 			DeviceName: found.String(),
 			Message:    msg,
@@ -238,8 +238,8 @@ func (s *Keyboard) Start(ctx context.Context) error {
 	defer s.mtx.Unlock()
 
 	if s.cancel == nil {
-		s.cancel = runtime.EventsOn(ctx, "midi", func(e ...interface{}) {
-			evt := e[0].(*MIDIEnvelope)
+		s.cancel = pubsub.Subscribe("midi", func(eventName string, e any) {
+			evt := e.(*MIDIEnvelope)
 			msg := evt.Message
 			if evt.DeviceID != id {
 				return

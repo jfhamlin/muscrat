@@ -102,10 +102,12 @@ func RegisterImports(_register func(string, interface{})) {
 	// package github.com/jfhamlin/muscrat/pkg/osc
 	////////////////////////////////////////
 	_register("github.com/jfhamlin/muscrat/pkg/osc.New", github_com_jfhamlin_muscrat_pkg_osc.New)
+	_register("github.com/jfhamlin/muscrat/pkg/osc.NewLFPulse", github_com_jfhamlin_muscrat_pkg_osc.NewLFPulse)
+	_register("github.com/jfhamlin/muscrat/pkg/osc.NewLFSaw", github_com_jfhamlin_muscrat_pkg_osc.NewLFSaw)
 	_register("github.com/jfhamlin/muscrat/pkg/osc.NewPhasor", github_com_jfhamlin_muscrat_pkg_osc.NewPhasor)
+	_register("github.com/jfhamlin/muscrat/pkg/osc.NewPulse", github_com_jfhamlin_muscrat_pkg_osc.NewPulse)
 	_register("github.com/jfhamlin/muscrat/pkg/osc.NewSaw", github_com_jfhamlin_muscrat_pkg_osc.NewSaw)
 	_register("github.com/jfhamlin/muscrat/pkg/osc.NewSine", github_com_jfhamlin_muscrat_pkg_osc.NewSine)
-	_register("github.com/jfhamlin/muscrat/pkg/osc.NewSquare", github_com_jfhamlin_muscrat_pkg_osc.NewSquare)
 	_register("github.com/jfhamlin/muscrat/pkg/osc.NewTri", github_com_jfhamlin_muscrat_pkg_osc.NewTri)
 	_register("github.com/jfhamlin/muscrat/pkg/osc.Osc", reflect.TypeOf((*github_com_jfhamlin_muscrat_pkg_osc.Osc)(nil)).Elem())
 	_register("github.com/jfhamlin/muscrat/pkg/osc.*Osc", reflect.TypeOf((*github_com_jfhamlin_muscrat_pkg_osc.Osc)(nil)))

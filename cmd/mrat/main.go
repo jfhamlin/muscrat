@@ -56,8 +56,18 @@ func main() {
 		return
 	}
 
+	ctx, cancel := context.WithCancel(context.Background())
+
 	// wait for kill signal
 	done := make(chan os.Signal, 1)
 	go signal.Notify(done, os.Interrupt)
-	<-done
+	go func() {
+		<-done
+		cancel()
+	}()
+
+	if err := mrat.WatchScriptFile(ctx, scriptFile, srv); err != nil {
+		fmt.Printf("error watching script file: %v\n", err)
+		return
+	}
 }
