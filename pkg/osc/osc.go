@@ -48,9 +48,8 @@ func New(s Sampler, opts ...ugen.Option) *Osc {
 //
 // combinations:
 //
-// [ws, syncs, dcs, iphases] => 2^4 = 16 variants
-//
-// [phases, syncs, dcs] => 2^3 = 8 variants
+// ws: [syncs, dcs, iphases] => 8 variants
+// phases: [dcs] => 2 variants
 //
 // 16 + 8 = 24 variants
 

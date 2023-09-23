@@ -15,20 +15,20 @@
                                                  NewMIDIFreq
                                                  NewImpulse
                                                  SimpleUGenFunc
+                                                 WithAdd
+                                                 WithMul
                                                  WithInterp
+                                                 WithDefaultDutyCycle
                                                  InterpNone
                                                  InterpLinear
                                                  InterpCubic)
            (github.com$jfhamlin$muscrat$pkg$wavtabs Generator
-                                                    Table
-                                                    WithDefaultDutyCycle
-                                                    WithMultiply
-                                                    WithAdd
-                                                    Sin
-                                                    Saw
-                                                    Tri
-                                                    Pulse
-                                                    Phasor)
+                                                    Table)
+           (github.com$jfhamlin$muscrat$pkg$osc NewSine
+                                                NewSaw
+                                                NewTri
+                                                NewPulse
+                                                NewPhasor)
            (github.com$jfhamlin$muscrat$pkg$stochastic NewNoise
                                                        NewNoiseQuad
                                                        NewPinkNoise)
@@ -327,7 +327,7 @@
       (when (nil? param) (throw (fmt.Errorf "handle-extra-gen-args: unknown parameter: %s" k)))
       (add-edge! gen node param))))
 
-(defmacro defwtosc
+(defmacro defosc
   [name wavtab & default-args]
   (let [fn-name (symbol (str name))
         default-args (vec default-args)]
@@ -342,10 +342,10 @@
             (let [args# (if (empty? ~default-args) args# (concat ~default-args args#))
                   args# (reduce #(apply assoc %1 %2) {} (partition 2 args#))
                   wt-opts# [(~'WithDefaultDutyCycle (get args# :default-duty 1))
-                            (~'WithMultiply (get args# :mul 1.0))
+                            (~'WithMul (get args# :mul 1.0))
                             (~'WithAdd (get args# :add 0.0))]
                   args# (dissoc args# :default-duty :mul :add)
-                  gen# (apply ~'Generator (~wavtab 2048) wt-opts#)
+                  gen# (apply ~wavtab  wt-opts#)
                   label# (~'WithLabel ~(str name))
                   osc-node# (add-node! gen# label#)
                   freq-node# (as-node freq#)]
@@ -353,12 +353,12 @@
               (handle-extra-gen-args osc-node# args#)
               osc-node#)))))))
 
-(defwtosc sin Sin)
-(defwtosc saw Saw)
-(defwtosc tri Tri)
-(defwtosc phasor Phasor)
-(defwtosc pulse Pulse :default-duty 0.5)
-(defwtosc sqr Pulse :default-duty 0.5)
+(defosc sin NewSine)
+(defosc saw NewSaw)
+(defosc tri NewTri)
+(defosc phasor NewPhasor)
+(defosc pulse NewPulse :default-duty 0.5)
+(defosc sqr NewPulse :default-duty 0.5)
 
 (defn impulse
   [freq & flags]

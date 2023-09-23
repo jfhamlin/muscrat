@@ -253,7 +253,9 @@ func (s *Server) sendSamples() {
 				s.vizSamplesBuffer = s.vizSamplesBuffer[vizBufferFlushSize:]
 				go func() {
 					defer bufferpool.Put(vizEmitBuffer)
-					wrt.EventsEmit(s.ctx, "samples", *vizEmitBuffer)
+					if s.ctx != nil && s.ctx.Value("events") != nil {
+						wrt.EventsEmit(s.ctx, "samples", *vizEmitBuffer)
+					}
 				}()
 			}
 		}

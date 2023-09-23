@@ -27,6 +27,10 @@ func BenchmarkTri(b *testing.B) {
 	benchmark(b, NewTri())
 }
 
+func BenchmarkPhasor(b *testing.B) {
+	benchmark(b, NewPhasor())
+}
+
 func benchmark(b *testing.B, osc ugen.UGen) {
 	cfg := ugen.SampleConfig{
 		SampleRateHz: 44100,

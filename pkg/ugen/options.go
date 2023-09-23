@@ -6,10 +6,11 @@ type (
 	Interp int
 
 	Options struct {
-		Rand   *rand.Rand
-		Add    float64
-		Mul    float64
-		Interp Interp
+		Rand             *rand.Rand
+		Add              float64
+		Mul              float64
+		Interp           Interp
+		DefaultDutyCycle float64
 	}
 )
 
@@ -59,5 +60,11 @@ func WithMul(mul float64) Option {
 func WithInterp(interp Interp) Option {
 	return func(o *Options) {
 		o.Interp = interp
+	}
+}
+
+func WithDefaultDutyCycle(dc float64) Option {
+	return func(o *Options) {
+		o.DefaultDutyCycle = dc
 	}
 }

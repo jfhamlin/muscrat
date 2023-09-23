@@ -8,6 +8,7 @@ import (
 	github_com_jfhamlin_muscrat_pkg_effects "github.com/jfhamlin/muscrat/pkg/effects"
 	github_com_jfhamlin_muscrat_pkg_graph "github.com/jfhamlin/muscrat/pkg/graph"
 	github_com_jfhamlin_muscrat_pkg_mod "github.com/jfhamlin/muscrat/pkg/mod"
+	github_com_jfhamlin_muscrat_pkg_osc "github.com/jfhamlin/muscrat/pkg/osc"
 	github_com_jfhamlin_muscrat_pkg_pattern "github.com/jfhamlin/muscrat/pkg/pattern"
 	github_com_jfhamlin_muscrat_pkg_sampler "github.com/jfhamlin/muscrat/pkg/sampler"
 	github_com_jfhamlin_muscrat_pkg_slice "github.com/jfhamlin/muscrat/pkg/slice"
@@ -98,6 +99,19 @@ func RegisterImports(_register func(string, interface{})) {
 	_register("github.com/jfhamlin/muscrat/pkg/mod.WithInterpolation", github_com_jfhamlin_muscrat_pkg_mod.WithInterpolation)
 	_register("github.com/jfhamlin/muscrat/pkg/mod.WithReleaseNode", github_com_jfhamlin_muscrat_pkg_mod.WithReleaseNode)
 
+	// package github.com/jfhamlin/muscrat/pkg/osc
+	////////////////////////////////////////
+	_register("github.com/jfhamlin/muscrat/pkg/osc.New", github_com_jfhamlin_muscrat_pkg_osc.New)
+	_register("github.com/jfhamlin/muscrat/pkg/osc.NewPhasor", github_com_jfhamlin_muscrat_pkg_osc.NewPhasor)
+	_register("github.com/jfhamlin/muscrat/pkg/osc.NewSaw", github_com_jfhamlin_muscrat_pkg_osc.NewSaw)
+	_register("github.com/jfhamlin/muscrat/pkg/osc.NewSine", github_com_jfhamlin_muscrat_pkg_osc.NewSine)
+	_register("github.com/jfhamlin/muscrat/pkg/osc.NewSquare", github_com_jfhamlin_muscrat_pkg_osc.NewSquare)
+	_register("github.com/jfhamlin/muscrat/pkg/osc.NewTri", github_com_jfhamlin_muscrat_pkg_osc.NewTri)
+	_register("github.com/jfhamlin/muscrat/pkg/osc.Osc", reflect.TypeOf((*github_com_jfhamlin_muscrat_pkg_osc.Osc)(nil)).Elem())
+	_register("github.com/jfhamlin/muscrat/pkg/osc.*Osc", reflect.TypeOf((*github_com_jfhamlin_muscrat_pkg_osc.Osc)(nil)))
+	_register("github.com/jfhamlin/muscrat/pkg/osc.Sampler", reflect.TypeOf((*github_com_jfhamlin_muscrat_pkg_osc.Sampler)(nil)).Elem())
+	_register("github.com/jfhamlin/muscrat/pkg/osc.SamplerFunc", reflect.TypeOf((*github_com_jfhamlin_muscrat_pkg_osc.SamplerFunc)(nil)).Elem())
+
 	// package github.com/jfhamlin/muscrat/pkg/pattern
 	////////////////////////////////////////
 	_register("github.com/jfhamlin/muscrat/pkg/pattern.NewChoose", github_com_jfhamlin_muscrat_pkg_pattern.NewChoose)
@@ -153,6 +167,7 @@ func RegisterImports(_register func(string, interface{})) {
 	_register("github.com/jfhamlin/muscrat/pkg/ugen.UGen", reflect.TypeOf((*github_com_jfhamlin_muscrat_pkg_ugen.UGen)(nil)).Elem())
 	_register("github.com/jfhamlin/muscrat/pkg/ugen.UGenFunc", reflect.TypeOf((*github_com_jfhamlin_muscrat_pkg_ugen.UGenFunc)(nil)).Elem())
 	_register("github.com/jfhamlin/muscrat/pkg/ugen.WithAdd", github_com_jfhamlin_muscrat_pkg_ugen.WithAdd)
+	_register("github.com/jfhamlin/muscrat/pkg/ugen.WithDefaultDutyCycle", github_com_jfhamlin_muscrat_pkg_ugen.WithDefaultDutyCycle)
 	_register("github.com/jfhamlin/muscrat/pkg/ugen.WithInterp", github_com_jfhamlin_muscrat_pkg_ugen.WithInterp)
 	_register("github.com/jfhamlin/muscrat/pkg/ugen.WithMul", github_com_jfhamlin_muscrat_pkg_ugen.WithMul)
 	_register("github.com/jfhamlin/muscrat/pkg/ugen.WithRand", github_com_jfhamlin_muscrat_pkg_ugen.WithRand)
@@ -163,11 +178,14 @@ func RegisterImports(_register func(string, interface{})) {
 	_register("github.com/jfhamlin/muscrat/pkg/wavtabs.DefaultResolution", github_com_jfhamlin_muscrat_pkg_wavtabs.DefaultResolution)
 	_register("github.com/jfhamlin/muscrat/pkg/wavtabs.Generator", github_com_jfhamlin_muscrat_pkg_wavtabs.Generator)
 	_register("github.com/jfhamlin/muscrat/pkg/wavtabs.GeneratorOption", reflect.TypeOf((*github_com_jfhamlin_muscrat_pkg_wavtabs.GeneratorOption)(nil)).Elem())
+	_register("github.com/jfhamlin/muscrat/pkg/wavtabs.New", github_com_jfhamlin_muscrat_pkg_wavtabs.New)
+	_register("github.com/jfhamlin/muscrat/pkg/wavtabs.NewWithWrap", github_com_jfhamlin_muscrat_pkg_wavtabs.NewWithWrap)
 	_register("github.com/jfhamlin/muscrat/pkg/wavtabs.Phasor", github_com_jfhamlin_muscrat_pkg_wavtabs.Phasor)
 	_register("github.com/jfhamlin/muscrat/pkg/wavtabs.Pulse", github_com_jfhamlin_muscrat_pkg_wavtabs.Pulse)
 	_register("github.com/jfhamlin/muscrat/pkg/wavtabs.Saw", github_com_jfhamlin_muscrat_pkg_wavtabs.Saw)
 	_register("github.com/jfhamlin/muscrat/pkg/wavtabs.Sin", github_com_jfhamlin_muscrat_pkg_wavtabs.Sin)
 	_register("github.com/jfhamlin/muscrat/pkg/wavtabs.Table", reflect.TypeOf((*github_com_jfhamlin_muscrat_pkg_wavtabs.Table)(nil)).Elem())
+	_register("github.com/jfhamlin/muscrat/pkg/wavtabs.*Table", reflect.TypeOf((*github_com_jfhamlin_muscrat_pkg_wavtabs.Table)(nil)))
 	_register("github.com/jfhamlin/muscrat/pkg/wavtabs.Tri", github_com_jfhamlin_muscrat_pkg_wavtabs.Tri)
 	_register("github.com/jfhamlin/muscrat/pkg/wavtabs.WithAdd", github_com_jfhamlin_muscrat_pkg_wavtabs.WithAdd)
 	_register("github.com/jfhamlin/muscrat/pkg/wavtabs.WithDefaultDutyCycle", github_com_jfhamlin_muscrat_pkg_wavtabs.WithDefaultDutyCycle)
