@@ -41,13 +41,13 @@ func samplePulse(phase, dPhase, dutyCycle float64) float64 {
 		return -1.0
 	}
 
-	result := -1.0
+	result := 1.0
 	if phase >= dutyCycle {
-		result = 1.0
+		result = -1.0
 	}
 
-	result += polyBlep(math.Mod(phase+dutyCycle, 1), dPhase)
-	result -= polyBlep(phase, dPhase)
+	result -= polyBlep(math.Mod(phase+1-dutyCycle, 1), dPhase)
+	result += polyBlep(phase, dPhase)
 
 	return result
 }
