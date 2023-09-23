@@ -11,7 +11,10 @@ const (
 	maxBandLimitedFreq       = 20480
 	bandLimitedSemitoneRange = 4
 
-	sampleRate = 44100 // TODO: make this configurable
+	// TODO: make this configurable, though this isn't horrible; we'll
+	// still be removing inaudible frequencies even if they wouldn't
+	// alias at the higher sample rate.
+	sampleRate = 44100
 	nyquist    = sampleRate / 2
 )
 
