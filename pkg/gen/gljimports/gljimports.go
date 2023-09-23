@@ -178,18 +178,8 @@ func RegisterImports(_register func(string, interface{})) {
 	// package github.com/jfhamlin/muscrat/pkg/wavtabs
 	////////////////////////////////////////
 	_register("github.com/jfhamlin/muscrat/pkg/wavtabs.DefaultResolution", github_com_jfhamlin_muscrat_pkg_wavtabs.DefaultResolution)
-	_register("github.com/jfhamlin/muscrat/pkg/wavtabs.Generator", github_com_jfhamlin_muscrat_pkg_wavtabs.Generator)
-	_register("github.com/jfhamlin/muscrat/pkg/wavtabs.GeneratorOption", reflect.TypeOf((*github_com_jfhamlin_muscrat_pkg_wavtabs.GeneratorOption)(nil)).Elem())
 	_register("github.com/jfhamlin/muscrat/pkg/wavtabs.New", github_com_jfhamlin_muscrat_pkg_wavtabs.New)
 	_register("github.com/jfhamlin/muscrat/pkg/wavtabs.NewWithWrap", github_com_jfhamlin_muscrat_pkg_wavtabs.NewWithWrap)
-	_register("github.com/jfhamlin/muscrat/pkg/wavtabs.Phasor", github_com_jfhamlin_muscrat_pkg_wavtabs.Phasor)
-	_register("github.com/jfhamlin/muscrat/pkg/wavtabs.Pulse", github_com_jfhamlin_muscrat_pkg_wavtabs.Pulse)
-	_register("github.com/jfhamlin/muscrat/pkg/wavtabs.Saw", github_com_jfhamlin_muscrat_pkg_wavtabs.Saw)
-	_register("github.com/jfhamlin/muscrat/pkg/wavtabs.Sin", github_com_jfhamlin_muscrat_pkg_wavtabs.Sin)
 	_register("github.com/jfhamlin/muscrat/pkg/wavtabs.Table", reflect.TypeOf((*github_com_jfhamlin_muscrat_pkg_wavtabs.Table)(nil)).Elem())
 	_register("github.com/jfhamlin/muscrat/pkg/wavtabs.*Table", reflect.TypeOf((*github_com_jfhamlin_muscrat_pkg_wavtabs.Table)(nil)))
-	_register("github.com/jfhamlin/muscrat/pkg/wavtabs.Tri", github_com_jfhamlin_muscrat_pkg_wavtabs.Tri)
-	_register("github.com/jfhamlin/muscrat/pkg/wavtabs.WithAdd", github_com_jfhamlin_muscrat_pkg_wavtabs.WithAdd)
-	_register("github.com/jfhamlin/muscrat/pkg/wavtabs.WithDefaultDutyCycle", github_com_jfhamlin_muscrat_pkg_wavtabs.WithDefaultDutyCycle)
-	_register("github.com/jfhamlin/muscrat/pkg/wavtabs.WithMultiply", github_com_jfhamlin_muscrat_pkg_wavtabs.WithMultiply)
 }

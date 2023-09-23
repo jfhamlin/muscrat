@@ -11,7 +11,7 @@ import (
 )
 
 func TestBandLimit(t *testing.T) {
-	tbl := Saw(DefaultResolution)
+	tbl := New([]float64{1, 0, 0, 0, 0, 0, 0, 0, 0, 0})
 
 	for f := 20.01; f < maxBandLimitedFreq; f *= math.Sqrt2 {
 		idx, off := tbl.blTableIndexOffset(f)
@@ -31,7 +31,7 @@ func plotBL(t *testing.T, cyclesPerSecond float64) {
 		nyquist    = sampleRate / 2
 	)
 
-	tbl := Saw(DefaultResolution)
+	tbl := New([]float64{1, 0, 0, 0, 0, 0, 0, 0, 0, 0})
 	bl := tbl.bandLimited(cyclesPerSecond, nyquist)
 
 	sampleTable := New(bl)
