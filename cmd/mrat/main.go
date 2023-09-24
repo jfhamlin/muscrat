@@ -7,6 +7,10 @@ import (
 	"os"
 	"os/signal"
 
+	"fyne.io/fyne/v2/app"
+	"fyne.io/fyne/v2/container"
+	"fyne.io/fyne/v2/widget"
+
 	"github.com/jfhamlin/muscrat/pkg/mrat"
 
 	"golang.org/x/term"
@@ -66,8 +70,24 @@ func main() {
 		cancel()
 	}()
 
-	if err := mrat.WatchScriptFile(ctx, scriptFile, srv); err != nil {
-		fmt.Printf("error watching script file: %v\n", err)
-		return
+	go func() {
+		if err := mrat.WatchScriptFile(ctx, scriptFile, srv); err != nil {
+			fmt.Printf("error watching script file: %v\n", err)
+			return
+		}
+		os.Exit(0)
+	}()
+
+	{
+		a := app.New()
+		w := a.NewWindow("Hello")
+		hello := widget.NewLabel("Hello Fyne!")
+		w.SetContent(container.NewVBox(
+			hello,
+			widget.NewButton("Hi!", func() {
+				hello.SetText("Welcome :)")
+			}),
+		))
+		w.ShowAndRun()
 	}
 }

@@ -18,5 +18,8 @@ pkgs.mkShell {
     frameworks.WebKit
     frameworks.UniformTypeIdentifiers
     frameworks.ForceFeedback
+
+    # for fyne
+    frameworks.UserNotifications
   ];
 }
