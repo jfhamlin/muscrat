@@ -1,48 +1,52 @@
 package gui
 
 import (
-	"math"
-	"time"
-
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/container"
 
 	"github.com/jfhamlin/muscrat/pkg/gui/chart"
+	"github.com/jfhamlin/muscrat/pkg/pubsub"
 )
 
-func NewMainWindow(a fyne.App) fyne.Window {
+type (
+	// MainWindow is the main window of the application.
+	MainWindow struct {
+		fyne.Window
+
+		oscilloscope *chart.LineChart
+		spectrogram  *chart.LineChart
+
+		unsub func()
+	}
+)
+
+func NewMainWindow(a fyne.App) *MainWindow {
 	w := a.NewWindow("Muscrat")
 
 	logo := LogoImage()
 	logo.SetMinSize(fyne.NewSize(100, 100))
 
-	// Generate some sample data
-	var data []float64
-	for i := 0; i < 360; i += 10 {
-		data = append(data, math.Sin(float64(i)*math.Pi/180))
-	}
-	wave := chart.NewLineChart(data)
-	wave.SetMinSize(fyne.NewSize(320, 240))
-	go func() {
-		ticker := time.NewTicker(time.Second / 30)
-		angle := 0.0
-		last := time.Now()
-		for range ticker.C {
-			now := time.Now()
-			diff := now.Sub(last)
-			angle += diff.Seconds() * 180
-			for i := range data {
-				angleOffset := float64(i) * 10
-				data[i] = math.Sin((angle + angleOffset) * math.Pi / 180)
-			}
-			last = now
-			wave.Update(data)
-		}
-	}()
+	osc := chart.NewLineChart(&chart.LineChartConfig{})
+	spect := chart.NewLineChart(&chart.LineChartConfig{})
 
 	w.SetContent(container.NewVBox(
 		logo,
-		wave.CanvasObject(),
+		osc,
+		spect,
 	))
-	return w
+
+	unsub := pubsub.Subscribe("samples", func(evt string, data any) {
+		samples := data.([]float64)
+		cpy := make([]float64, len(samples))
+		copy(cpy, samples)
+		osc.Update(cpy)
+		spect.Update(cpy)
+	})
+
+	return &MainWindow{
+		Window:       w,
+		oscilloscope: osc,
+		spectrogram:  spect,
+		unsub:        unsub,
+	}
 }

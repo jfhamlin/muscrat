@@ -10,11 +10,10 @@ import (
 	"sync"
 	"time"
 
-	wrt "github.com/wailsapp/wails/v2/pkg/runtime"
-
 	"github.com/jfhamlin/muscrat/pkg/bufferpool"
 	"github.com/jfhamlin/muscrat/pkg/gen/gljimports"
 	"github.com/jfhamlin/muscrat/pkg/graph"
+	"github.com/jfhamlin/muscrat/pkg/pubsub"
 	"github.com/jfhamlin/muscrat/pkg/stdlib"
 	"github.com/jfhamlin/muscrat/pkg/ugen"
 
@@ -47,7 +46,6 @@ const (
 
 type (
 	Server struct {
-		// wails context
 		ctx context.Context
 
 		sampleRate int
@@ -80,8 +78,8 @@ type (
 
 func NewServer(msgChan chan<- *ServerMessage) *Server {
 	return &Server{
-		gain:          0.25,
-		targetGain:    0.25,
+		gain:          1,
+		targetGain:    1,
 		outputChannel: make(chan [][]float64, 1),
 		msgChan:       msgChan,
 	}
@@ -253,9 +251,7 @@ func (s *Server) sendSamples() {
 				s.vizSamplesBuffer = s.vizSamplesBuffer[vizBufferFlushSize:]
 				go func() {
 					defer bufferpool.Put(vizEmitBuffer)
-					if s.ctx != nil && s.ctx.Value("events") != nil {
-						wrt.EventsEmit(s.ctx, "samples", *vizEmitBuffer)
-					}
+					pubsub.Publish("samples", *vizEmitBuffer)
 				}()
 			}
 		}

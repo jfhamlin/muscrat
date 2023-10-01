@@ -22,8 +22,7 @@
                                                  InterpNone
                                                  InterpLinear
                                                  InterpCubic)
-           (github.com$jfhamlin$muscrat$pkg$wavtabs Generator
-                                                    Table)
+           (github.com$jfhamlin$muscrat$pkg$wavtabs Table)
            (github.com$jfhamlin$muscrat$pkg$osc NewSine
                                                 NewSaw
                                                 NewTri

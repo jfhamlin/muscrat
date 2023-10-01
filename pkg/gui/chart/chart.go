@@ -1,13 +1,15 @@
 package chart
 
 import (
-	"image/png"
-	"os"
+	"math"
+	"sync"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/canvas"
+	"fyne.io/fyne/v2/widget"
 
 	"gonum.org/v1/plot"
+	"gonum.org/v1/plot/font"
 	"gonum.org/v1/plot/plotter"
 	"gonum.org/v1/plot/vg/draw"
 	"gonum.org/v1/plot/vg/vgimg"
@@ -16,32 +18,51 @@ import (
 type (
 	// LineChart is a chart that displays a line graph.
 	LineChart struct {
-		*canvas.Image
+		widget.BaseWidget
 
-		xLabel    string
-		yLabel    string
-		data      []float64
+		xLabel string
+		yLabel string
+		data   []float64
+
+		minSize fyne.Size
+	}
+
+	// LineChartConfig is a configuration struct for a LineChart.
+	LineChartConfig struct {
+		xLabel string
+		yLabel string
+		data   []float64
+	}
+
+	lineChartRenderer struct {
+		lineChart *LineChart
+
+		drawMtx   sync.Mutex
 		pltCanvas *vgimg.Canvas
+		image     *canvas.Image
+
+		objects []fyne.CanvasObject
 	}
 )
 
 var (
-	_ fyne.CanvasObject = (*LineChart)(nil)
+	_ fyne.WidgetRenderer = (*lineChartRenderer)(nil)
 )
 
-func NewLineChart(data []float64) *LineChart {
+func NewLineChart(cfg *LineChartConfig) *LineChart {
 	lc := &LineChart{
-		data:      data,
-		pltCanvas: vgimg.New(320, 240),
+		data:    cfg.data,
+		xLabel:  cfg.xLabel,
+		yLabel:  cfg.yLabel,
+		minSize: fyne.Size{Width: 10, Height: 240},
 	}
-	lc.draw()
-	lc.Image = canvas.NewImageFromImage(lc.pltCanvas.Image())
-	lc.FillMode = canvas.ImageFillContain
+
+	lc.ExtendBaseWidget(lc)
 	return lc
 }
 
-func (lc *LineChart) CanvasObject() fyne.CanvasObject {
-	return lc.Image
+func (lc *LineChart) SetMinSize(size fyne.Size) {
+	lc.minSize = size
 }
 
 func (lc *LineChart) Update(data []float64) {
@@ -49,15 +70,62 @@ func (lc *LineChart) Update(data []float64) {
 	lc.Refresh()
 }
 
-func (lc *LineChart) draw() {
-	p := plot.New()
-	p.X.Label.Text = lc.xLabel
-	p.Y.Label.Text = lc.yLabel
+func (lc *LineChart) CreateRenderer() fyne.WidgetRenderer {
+	lc.ExtendBaseWidget(lc)
 
-	pts := make(plotter.XYs, len(lc.data))
-	for i, v := range lc.data {
+	r := &lineChartRenderer{
+		lineChart: lc,
+	}
+	r.Layout(lc.minSize)
+	r.objects = []fyne.CanvasObject{r.image}
+
+	return r
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// Renderer
+
+func (r *lineChartRenderer) Layout(size fyne.Size) {
+	r.drawMtx.Lock()
+	defer r.drawMtx.Unlock()
+
+	if r.pltCanvas != nil {
+		w, h := r.pltCanvas.Size()
+		if float32(w) == size.Width && float32(h) == size.Height {
+			return
+		}
+	}
+
+	r.pltCanvas = vgimg.New(font.Length(size.Width), font.Length(size.Height))
+	r.image = canvas.NewImageFromImage(r.pltCanvas.Image())
+	r.image.FillMode = canvas.ImageFillContain
+	r.image.SetMinSize(size)
+	r.image.Resize(size)
+	r.objects = []fyne.CanvasObject{r.image}
+}
+
+func (r *lineChartRenderer) MinSize() fyne.Size {
+	return r.lineChart.minSize
+}
+
+func (r *lineChartRenderer) Refresh() {
+	r.Layout(r.lineChart.Size())
+
+	r.drawMtx.Lock()
+	defer r.drawMtx.Unlock()
+
+	p := plot.New()
+	p.X.Label.Text = r.lineChart.xLabel
+	p.Y.Label.Text = r.lineChart.yLabel
+	p.Y.Min = -1
+	p.Y.Max = 1
+
+	pts := make(plotter.XYs, len(r.lineChart.data))
+	for i, v := range r.lineChart.data {
 		pts[i].X = float64(i)
 		pts[i].Y = v
+		p.Y.Min = math.Min(p.Y.Min, v)
+		p.Y.Max = math.Max(p.Y.Max, v)
 	}
 
 	line, err := plotter.NewLine(pts)
@@ -66,19 +134,14 @@ func (lc *LineChart) draw() {
 	}
 	p.Add(line)
 
-	p.Draw(draw.New(lc.pltCanvas))
+	p.Draw(draw.New(r.pltCanvas))
 
-	// save lc.img to file "out.png"
-	f, err := os.Create("out.png")
-	if err != nil {
-		panic(err)
-	}
-	defer f.Close()
-	png.Encode(f, lc.pltCanvas.Image())
+	r.image.Refresh()
 }
 
-func (lc *LineChart) Refresh() {
-	lc.draw()
-	// set lc.img as the canvas
-	lc.Image.Refresh()
+func (r *lineChartRenderer) Objects() []fyne.CanvasObject {
+	return r.objects
+}
+
+func (r *lineChartRenderer) Destroy() {
 }
