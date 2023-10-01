@@ -6,6 +6,7 @@ import (
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/canvas"
+	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
 
 	"gonum.org/v1/plot"
@@ -54,7 +55,7 @@ func NewLineChart(cfg *LineChartConfig) *LineChart {
 		data:    cfg.data,
 		xLabel:  cfg.xLabel,
 		yLabel:  cfg.yLabel,
-		minSize: fyne.Size{Width: 10, Height: 240},
+		minSize: fyne.Size{Width: 300, Height: 264},
 	}
 
 	lc.ExtendBaseWidget(lc)
@@ -85,6 +86,42 @@ func (lc *LineChart) CreateRenderer() fyne.WidgetRenderer {
 ////////////////////////////////////////////////////////////////////////////////
 // Renderer
 
+func (r *lineChartRenderer) draw() {
+	p := plot.New()
+	p.BackgroundColor = theme.BackgroundColor()
+
+	p.X.Label.Text = r.lineChart.xLabel
+	p.X.Label.TextStyle.Color = theme.ForegroundColor()
+	p.X.Tick.Label.Color = theme.ForegroundColor()
+	p.X.Tick.Color = theme.ForegroundColor()
+	p.X.LineStyle.Color = theme.ForegroundColor()
+
+	p.Y.Label.Text = r.lineChart.yLabel
+	p.Y.Label.TextStyle.Color = theme.ForegroundColor()
+	p.Y.LineStyle.Color = theme.ForegroundColor()
+	p.Y.Tick.Label.Color = theme.ForegroundColor()
+	p.Y.Tick.Color = theme.ForegroundColor()
+	p.Y.Min = -1
+	p.Y.Max = 1
+
+	pts := make(plotter.XYs, len(r.lineChart.data))
+	for i, v := range r.lineChart.data {
+		pts[i].X = float64(i)
+		pts[i].Y = v
+		p.Y.Min = math.Min(p.Y.Min, v)
+		p.Y.Max = math.Max(p.Y.Max, v)
+	}
+
+	line, err := plotter.NewLine(pts)
+	if err != nil {
+		panic(err)
+	}
+	line.Color = theme.ForegroundColor()
+	p.Add(line)
+
+	p.Draw(draw.New(r.pltCanvas))
+}
+
 func (r *lineChartRenderer) Layout(size fyne.Size) {
 	r.drawMtx.Lock()
 	defer r.drawMtx.Unlock()
@@ -102,6 +139,7 @@ func (r *lineChartRenderer) Layout(size fyne.Size) {
 	r.image.SetMinSize(size)
 	r.image.Resize(size)
 	r.objects = []fyne.CanvasObject{r.image}
+	r.draw()
 }
 
 func (r *lineChartRenderer) MinSize() fyne.Size {
@@ -114,27 +152,7 @@ func (r *lineChartRenderer) Refresh() {
 	r.drawMtx.Lock()
 	defer r.drawMtx.Unlock()
 
-	p := plot.New()
-	p.X.Label.Text = r.lineChart.xLabel
-	p.Y.Label.Text = r.lineChart.yLabel
-	p.Y.Min = -1
-	p.Y.Max = 1
-
-	pts := make(plotter.XYs, len(r.lineChart.data))
-	for i, v := range r.lineChart.data {
-		pts[i].X = float64(i)
-		pts[i].Y = v
-		p.Y.Min = math.Min(p.Y.Min, v)
-		p.Y.Max = math.Max(p.Y.Max, v)
-	}
-
-	line, err := plotter.NewLine(pts)
-	if err != nil {
-		panic(err)
-	}
-	p.Add(line)
-
-	p.Draw(draw.New(r.pltCanvas))
+	r.draw()
 
 	r.image.Refresh()
 }

@@ -1,4 +1,4 @@
 (ns examples.simple
   (:require [mrat.core :refer :all]))
 
-(play (saw 1000))
+(play (sin 440))
