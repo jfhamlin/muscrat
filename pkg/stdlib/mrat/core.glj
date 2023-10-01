@@ -565,14 +565,17 @@
     comb))
 
 (defn combn
+  "Comb filter with no interpolation."
   [in max-delay-time delay-time decay-time & flags]
   (apply -comb in max-delay-time delay-time decay-time delayn flags))
 
 (defn combl
+  "Comb filter with linear interpolation."
   [in max-delay-time delay-time decay-time & flags]
   (apply -comb in max-delay-time delay-time decay-time delayl flags))
 
 (defn combc
+  "Comb filter with cubic interpolation."
   [in max-delay-time delay-time decay-time & flags]
   (apply -comb in max-delay-time delay-time decay-time delayc flags))
 
