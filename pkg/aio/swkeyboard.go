@@ -5,8 +5,8 @@ import (
 	"math"
 	"sync"
 
+	"github.com/jfhamlin/muscrat/pkg/pubsub"
 	"github.com/jfhamlin/muscrat/pkg/ugen"
-	"github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
 type (
@@ -60,8 +60,8 @@ func (s *SoftwareKeyboard) Start(ctx context.Context) error {
 	defer s.mtx.Unlock()
 
 	if s.cancel == nil {
-		s.cancel = runtime.EventsOn(ctx, "midi-event", func(e ...interface{}) {
-			event := e[0].(map[string]interface{})
+		s.cancel = pubsub.Subscribe("midi-event", func(evt string, data any) {
+			event := data.(map[string]interface{})
 			typ := event["type"].(string)
 			note := event["midiNumber"].(float64)
 			freq := math.Pow(2, (note-69)/12) * 440

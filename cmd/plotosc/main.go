@@ -30,7 +30,7 @@ var (
 	oscs = map[string]ugen.UGen{
 		"sine": osc.NewSine(),
 		"saw":  osc.NewSaw(),
-		"sqr":  osc.NewSquare(),
+		"sqr":  osc.NewPulse(ugen.WithDefaultDutyCycle(0.5)),
 		"tri":  osc.NewTri(),
 	}
 )
@@ -164,7 +164,7 @@ func plotFreqDomain(name string, freq, sampleRate float64, samples []float64) *p
 	// returned by the FFT.
 
 	// apply the Hann window to the samples
-	window := make([]float64, genSamples)
+	window := make([]float64, len(samples))
 	for i := range window {
 		window[i] = 0.5 * (1 - math.Cos(2*math.Pi*float64(i)/float64(len(window)-1)))
 		samples[i] *= window[i]
@@ -172,7 +172,7 @@ func plotFreqDomain(name string, freq, sampleRate float64, samples []float64) *p
 
 	// calculate the FFT of the samples. note that only the first half
 	// of the FFT is returned (genSamples/2 + 1).
-	fft := fourier.NewFFT(genSamples)
+	fft := fourier.NewFFT(len(samples))
 	bins := fft.Coefficients(nil, samples)
 
 	// convert the FFT to a power spectrum

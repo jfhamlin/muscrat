@@ -7,6 +7,9 @@ import (
 	"os"
 	"os/signal"
 
+	"fyne.io/fyne/v2/app"
+
+	"github.com/jfhamlin/muscrat/pkg/gui"
 	"github.com/jfhamlin/muscrat/pkg/mrat"
 
 	"golang.org/x/term"
@@ -66,8 +69,17 @@ func main() {
 		cancel()
 	}()
 
-	if err := mrat.WatchScriptFile(ctx, scriptFile, srv); err != nil {
-		fmt.Printf("error watching script file: %v\n", err)
-		return
+	go func() {
+		if err := mrat.WatchScriptFile(ctx, scriptFile, srv); err != nil {
+			fmt.Printf("error watching script file: %v\n", err)
+			return
+		}
+		os.Exit(0)
+	}()
+
+	{
+		a := app.New()
+		w := gui.NewMainWindow(a)
+		w.ShowAndRun()
 	}
 }
