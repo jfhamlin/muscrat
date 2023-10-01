@@ -16,7 +16,7 @@ import (
 )
 
 const (
-	sampleBufferSize = 4096
+	sampleBufferSize = 4096 * 2
 	sampleRate       = 44100
 )
 
