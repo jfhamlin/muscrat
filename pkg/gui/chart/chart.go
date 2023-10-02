@@ -256,20 +256,17 @@ func (t log2Ticks) Ticks(min, max float64) []plot.Tick {
 	max = math.Pow(2, float64(int(math.Ceil(math.Log2(max)))))
 	var ticks []plot.Tick
 	for val < max {
-		for i := 1; i < 10; i++ {
-			if i == 1 {
-				ticks = append(ticks, plot.Tick{Value: val, Label: formatFloatTick(val, t.Prec)})
+		for i := 0; i < 12; i++ {
+			tickVal := val * math.Pow(2, float64(i)/float64(12))
+			tick := plot.Tick{Value: tickVal}
+			if i == 0 || i == 6 {
+				tick.Label = formatFloatTick(tickVal, t.Prec)
 			}
-			tickVal := val * float64(i)
-			if i == 2 || i == 5 {
-				ticks = append(ticks, plot.Tick{Value: tickVal, Label: formatFloatTick(tickVal, t.Prec)})
-			} else {
-				ticks = append(ticks, plot.Tick{Value: val * float64(i)})
-			}
+			ticks = append(ticks, tick)
 		}
-		val *= 10
+		val *= 2
 	}
-	ticks = append(ticks, plot.Tick{Value: val, Label: formatFloatTick(val, t.Prec)})
+	ticks = append(ticks, plot.Tick{Value: max, Label: formatFloatTick(max, t.Prec)})
 
 	return ticks
 }
