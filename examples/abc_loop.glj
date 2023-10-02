@@ -19,8 +19,13 @@
    {:tempo [1/4 tempo]
     :meter [4 4]
     :transpose (* (- note-in 0.5) 12)
-    :body '[z/2 E/2 D E/2 D/2 F/2 D/2 | G/2 D/2 a/2 d/2 z/2 b3/2 |
-            z/2 c/2 D E/2 d/2 C/2 b/2 | G/2 D/2 a/2 d/2 z/2 b3/2]}))
+    :body '[z/2 E/2 D E/2 D/2 F/2 D/2 | G/2 D/2 A/2 d/2 z/2 B3/2 |
+            z/2 c/2 D E/2 d/2 C/2 B/2 | G/2 D/2 A/2 d/2 z/2 e3/2 |
+            z/2 E/2 D E/2 D/2 F/2 D/2 | G/2 D/2 A/2 d/2 z/2 B3/2 |
+            z/2 c/2 D E/2 d/2 C/2 B/2 | G/2 D/2 A/2 d/2 z/2 f3/2 |
+            z/2 E/2 D E/2 D/2 F/2 D/2 | G/2 D/2 A/2 d/2 z/2 B3/2 |
+            z/2 c/2 D E/2 d/2 C/2 B/2 | G/2 D/2 A/2 d/2 z/2 _f3/2 |
+            ]}))
 
 (def freq (:pitches (first (:voices score))))
 
