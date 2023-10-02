@@ -12,6 +12,7 @@ import (
 	"gonum.org/v1/gonum/dsp/fourier"
 
 	"github.com/jfhamlin/muscrat/pkg/gui/chart"
+	"github.com/jfhamlin/muscrat/pkg/gui/meter"
 	"github.com/jfhamlin/muscrat/pkg/pubsub"
 )
 
@@ -44,12 +45,18 @@ type (
 
 // NewMainWindow creates a new main window.
 func NewMainWindow(a fyne.App) *MainWindow {
-	w := a.NewWindow("Muscrat")
+	w := a.NewWindow("muscrat")
 
 	logo := LogoImage()
 	logo.SetMinSize(fyne.NewSize(100, 100))
 
-	osc := chart.NewLineChart(chart.LineChartConfig{})
+	osc := chart.NewLineChart(chart.LineChartConfig{
+		Y: chart.AxisConfig{
+			Label: "Amplitude",
+			Min:   -1,
+			Max:   1,
+		},
+	})
 	spect := chart.NewLineChart(chart.LineChartConfig{
 		X: chart.AxisConfig{
 			Label: "Frequency (Hz)",
@@ -69,11 +76,21 @@ func NewMainWindow(a fyne.App) *MainWindow {
 	rateSlider := newSlider(1, 30, 15)
 	rateSlider.slider.Step = 1
 
-	contents := container.NewVBox(
-		logo,
+	volumeMeter := meter.NewVolume(-60, 0)
+	volumeMeter.SetMinSize(fyne.NewSize(10, 400))
+
+	scopes := container.NewVBox(
 		osc,
 		spect,
 		rateSlider.slider,
+	)
+	logoMeter := container.NewVBox(
+		logo,
+		volumeMeter,
+	)
+	contents := container.NewHBox(
+		logoMeter,
+		scopes,
 	)
 	w.SetContent(contents)
 
@@ -84,13 +101,16 @@ func NewMainWindow(a fyne.App) *MainWindow {
 
 	lastUpdateTime := time.Now()
 	unsub := pubsub.Subscribe("samples", func(evt string, data any) {
-		buffer.Append(data.([]float64))
+		samples := data.([]float64)
+		buffer.Append(samples)
+
+		buffer.Get(readBuffer)
+		volumeMeter.SetValues(rmsDBPeak(readBuffer))
+
 		if time.Since(lastUpdateTime) < time.Second/time.Duration(rateSlider.Value()) {
 			return
 		}
 		lastUpdateTime = time.Now()
-
-		buffer.Get(readBuffer)
 		osc.SetData(nil, readBuffer[:len(readBuffer)/4])
 		spect.SetData(fft(readBuffer))
 	})
@@ -168,4 +188,20 @@ func fft(samples []float64) (freqs, powerDB []float64) {
 	freqs[0] += 0.0001 // avoid log(0)
 
 	return freqs, db
+}
+
+func rmsPeak(samples []float64) (rms, peak float64) {
+	sum := 0.0
+	for _, s := range samples {
+		sum += s * s
+		if math.Abs(s) > peak {
+			peak = math.Abs(s)
+		}
+	}
+	return math.Sqrt(sum / float64(len(samples))), peak
+}
+
+func rmsDBPeak(samples []float64) (db, peak float64) {
+	rms, peak := rmsPeak(samples)
+	return 20 * math.Log10(rms), peak
 }
