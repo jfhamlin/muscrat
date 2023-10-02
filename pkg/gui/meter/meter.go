@@ -211,7 +211,7 @@ func (r *volumeRenderer) applyTheme() {
 	r.peakBar.FillColor = theme.PrimaryColor()
 
 	r.volumeLabel.TextSize = theme.TextSize()
-	r.volumeLabel.Color = theme.TextColor()
+	r.volumeLabel.Color = theme.PrimaryColor()
 
 	textColor := theme.TextColor()
 	textSize := 2 * theme.TextSize() / 3

@@ -17,6 +17,10 @@ import (
 	"gonum.org/v1/plot/vg/vgimg"
 )
 
+const (
+	minPixelsPerLabel = 50
+)
+
 type (
 	// LineChart is a chart that displays a line graph.
 	LineChart struct {
@@ -56,7 +60,8 @@ type (
 	log2Scale struct{}
 
 	log2Ticks struct {
-		Prec int
+		Prec  int
+		Width float64
 	}
 )
 
@@ -136,7 +141,10 @@ func (r *lineChartRenderer) draw() {
 	p.X.Max = xConfig.Max
 	if xConfig.Log && len(r.lineChart.ys) > 0 { // avoid log w/ empty data
 		p.X.Scale = log2Scale{}
-		p.X.Tick.Marker = log2Ticks{Prec: 1}
+		p.X.Tick.Marker = log2Ticks{
+			Prec:  1,
+			Width: float64(r.lineChart.Size().Width),
+		}
 	}
 
 	p.Y.Label.Text = yConfig.Label
@@ -252,6 +260,8 @@ func (t log2Ticks) Ticks(min, max float64) []plot.Tick {
 		panic("Values must be greater than 0 for a log scale.")
 	}
 
+	numLabels := 0
+
 	val := math.Pow(2, float64(int(math.Log2(min))))
 	max = math.Pow(2, float64(int(math.Ceil(math.Log2(max)))))
 	var ticks []plot.Tick
@@ -261,12 +271,29 @@ func (t log2Ticks) Ticks(min, max float64) []plot.Tick {
 			tick := plot.Tick{Value: tickVal}
 			if i == 0 || i == 6 {
 				tick.Label = formatFloatTick(tickVal, t.Prec)
+				numLabels++
 			}
 			ticks = append(ticks, tick)
 		}
 		val *= 2
 	}
 	ticks = append(ticks, plot.Tick{Value: max, Label: formatFloatTick(max, t.Prec)})
+
+	pixelsPerLabel := float64(t.Width) / float64(numLabels)
+	if pixelsPerLabel < minPixelsPerLabel {
+		targetNumLabels := int(float64(t.Width) / minPixelsPerLabel)
+		keep := int(math.Ceil(float64(numLabels) / float64(targetNumLabels)))
+		labelIndex := 0
+		for i := range ticks {
+			if ticks[i].Label == "" {
+				continue
+			}
+			if labelIndex%keep != 0 {
+				ticks[i].Label = ""
+			}
+			labelIndex++
+		}
+	}
 
 	return ticks
 }

@@ -3,12 +3,11 @@ package gui
 import (
 	"math"
 	"math/cmplx"
-	"sync/atomic"
 	"time"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/container"
-	"fyne.io/fyne/v2/widget"
+	"fyne.io/fyne/v2/layout"
 	"gonum.org/v1/gonum/dsp/fourier"
 
 	"github.com/jfhamlin/muscrat/pkg/gui/chart"
@@ -19,6 +18,7 @@ import (
 const (
 	sampleBufferSize = 4096 * 2
 	sampleRate       = 44100
+	scopeUpdateRate  = 15
 )
 
 type (
@@ -35,11 +35,6 @@ type (
 	circularBuffer struct {
 		buffer []float64
 		index  int
-	}
-
-	slider struct {
-		slider *widget.Slider
-		value  *atomic.Value
 	}
 )
 
@@ -73,25 +68,13 @@ func NewMainWindow(a fyne.App) *MainWindow {
 		},
 	})
 
-	rateSlider := newSlider(1, 30, 15)
-	rateSlider.slider.Step = 1
-
 	volumeMeter := meter.NewVolume(-60, 0)
 	volumeMeter.SetMinSize(fyne.NewSize(10, 400))
 
-	scopes := container.NewVBox(
-		osc,
-		spect,
-		rateSlider.slider,
-	)
-	logoMeter := container.NewVBox(
-		logo,
-		volumeMeter,
-	)
-	contents := container.NewHBox(
-		logoMeter,
-		scopes,
-	)
+	scopes := container.NewVSplit(osc, spect)
+	logoMeter := container.New(layout.NewBorderLayout(logo, nil, nil, nil), logo, volumeMeter)
+	contents := container.New(layout.NewBorderLayout(nil, nil, logoMeter, nil), logoMeter, scopes)
+
 	w.SetContent(contents)
 
 	buffer := &circularBuffer{buffer: make([]float64, sampleBufferSize)}
@@ -107,7 +90,7 @@ func NewMainWindow(a fyne.App) *MainWindow {
 		buffer.Get(readBuffer)
 		volumeMeter.SetValues(rmsDBPeak(readBuffer))
 
-		if time.Since(lastUpdateTime) < time.Second/time.Duration(rateSlider.Value()) {
+		if time.Since(lastUpdateTime) < time.Second/time.Duration(scopeUpdateRate) {
 			return
 		}
 		lastUpdateTime = time.Now()
@@ -133,23 +116,6 @@ func (b *circularBuffer) Append(v []float64) {
 func (b *circularBuffer) Get(out []float64) {
 	copy(out, b.buffer[b.index:])
 	copy(out[len(b.buffer)-b.index:], b.buffer[:b.index])
-}
-
-func newSlider(min, max, def float64) *slider {
-	s := &slider{
-		slider: widget.NewSlider(min, max),
-		value:  &atomic.Value{},
-	}
-	s.value.Store(def)
-	s.slider.SetValue(def)
-	s.slider.OnChanged = func(v float64) {
-		s.value.Store(v)
-	}
-	return s
-}
-
-func (s *slider) Value() float64 {
-	return s.value.Load().(float64)
 }
 
 func fft(samples []float64) (freqs, powerDB []float64) {
