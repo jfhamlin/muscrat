@@ -613,12 +613,12 @@
      (add-edge! hi wf "hi")
      wf)))
 
-(defn bitcrusher
-  ([in bits] (bitcrusher in bits 44100.0))
+(defn bitcrush
+  ([in bits] (bitcrush in bits 44100.0))
   ([in bits rate]
    (let [rate (as-node rate)
          bits (as-node bits)
-         out (add-node! (github.com$jfhamlin$muscrat$pkg$effects.NewBitcrusher) "bitcrusher")]
+         out (add-node! (github.com$jfhamlin$muscrat$pkg$effects.NewBitcrusher) "bitcrush")]
      (add-edge! in out "in")
      (add-edge! rate out "rate")
      (add-edge! bits out "bits")

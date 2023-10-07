@@ -30,7 +30,7 @@
 
 (def duty-env (env 1 [0.8 0.8 0.2 0.2] [30 2 100]))
 
-(def root E3)
+(def root (midifreq E3))
 (def notes (map #(* root (semitones %))
                 aeolian))
 

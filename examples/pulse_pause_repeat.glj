@@ -1,8 +1,0 @@
-(ns examples.synth
-  (:require [mrat.core :refer :all] :reload
-            [mrat.midi :refer :all] :reload
-            [mrat.welsh] :reload))
-
-(play (sin (env 1
-                [E2 G2 Fs2 A2 C2 B2 0]
-                [2 2 3 2 3 2] :interp :hold)))

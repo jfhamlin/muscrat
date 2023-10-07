@@ -1,0 +1,107 @@
+(ns examples.patterns
+  (:require [mrat.core :refer :all] :reload
+            [mrat.midi :refer :all] :reload
+            [mrat.scales :refer :all] :reload
+            [mrat.welsh] :reload))
+
+(def root (midifreq A2)) ;; Root note A2 for a darker vibe
+(def notes (map #(* root (semitones %))
+                aeolian)) ;; Using Aeolian scale for a dark mood
+
+;; Bassline
+(defn bassline
+  [gate freq]
+  (-> (saw freq :duty 0.5 :iphase (math$rand.Float64))
+      (* (env-adsr gate [0.1 0.2 0.7 0.1]))
+      (lores (* 2 freq) 0.7)))
+
+;; Pad
+(defn pad
+  [gate freq]
+  (-> (saw (* freq (semitones (* 0.05 (noise-quad 8)))) :duty 0.8 :iphase (math$rand.Float64))
+      (* (env-adsr gate [0.5 0.5 0.8 2]))
+      (freeverb :room-size 0.8)
+      (delayl 1 (* 0.2 (math$rand.Float64)))))
+
+;; Rhythm
+(defn rhythm
+  [gate freq]
+  (-> (sqr (* freq (semitones (* 0.1 (noise-quad 4)))) :duty 0.5 :iphase (math$rand.Float64))
+      (* (env-adsr gate [0.01 0.1 0.5 0.1]))
+      (lores (* 2 freq) 0.9)))
+
+;; Secondary Rhythm
+(defn sec-rhythm
+  [gate freq]
+  (-> (tri freq :duty 0.25 :iphase (math$rand.Float64))
+      (* (env-adsr gate [0.05 0.1 0.5 0.1]))
+      (delayl 1 (* 0.15 (math$rand.Float64)))))
+
+;; Lead
+(defn lead
+  [gate freq]
+  (let [detune (semitones (* 0.2 (noise 4)))]  ;; Adding slight detune
+    (-> (sqr (+ freq detune) :duty 0.5 :iphase (math$rand.Float64))  ;; Using square wave
+        (* (env-adsr gate [0.05 0.2 0.7 0.1]))
+        (lores (* 2 freq) 0.7)))
+        (fn [signal] (* signal signal))  ;; Squaring the signal for a simple distortion
+        (decibels 3))  ;; Boosting volume
+
+;; Sub Bass
+(defn sub-bass
+  [gate freq]
+  (-> (sin freq :duty 0.5 :iphase (math$rand.Float64))
+      (* (env-adsr gate [0.1 0.2 0.8 0.1]))))
+
+(def bass
+  (let [gate (sqr 0.25 :duty 0.5)
+        freq (choose-gate gate notes)
+        amp (decibels -5)]
+    (-> (bassline gate freq)
+        (* amp))))
+
+(def atmospheric
+  (let [gate (sqr 0.125 :duty 0.5)
+        freq (choose-gate gate (map #(* % (octaves 1)) notes))
+        amp (decibels -10)]
+    (-> (pad gate freq)
+        (* amp))))
+
+(def rhythmic-element
+  (let [gate (sqr 2 :duty 0.7)
+        freq (choose-gate gate notes)
+        amp (decibels -15)]
+    (-> (rhythm gate freq)
+        (* amp))))
+
+(def secondary-rhythmic
+  (let [gate (sqr 4 :duty 0.7)
+        freq (choose-gate gate notes)
+        amp (decibels -15)]
+    (-> (sec-rhythm gate freq)
+        (* amp))))
+
+(def lead-synth
+  (let [gate (sqr 1 :duty 0.5)
+        freq (choose-gate gate (map #(* % (octaves 1)) notes))  ;; Moving an octave down
+        amp (decibels -7)]  ;; Slightly louder
+    (-> (lead gate freq)
+        (* amp))))
+
+(def sub-bass-layer
+  (let [gate (sqr 0.25 :duty 0.5)
+        freq (choose-gate gate (map #(* % (octaves -1)) notes))
+        amp (decibels -5)]
+    (-> (sub-bass gate freq)
+        (* amp))))
+
+
+
+(def lead-synth
+  (let [gate (sqr 1 :duty 0.5)
+        freq (choose-gate gate (map #(* % (octaves 1)) notes))  ;; Moving an octave down
+        amp (decibels -7)]  ;; Slightly louder
+    (-> (lead gate freq)
+        (* amp))))
+
+(play (* (decibels -5) (+ bass atmospheric rhythmic-element secondary-rhythmic lead-synth sub-bass-layer)))
