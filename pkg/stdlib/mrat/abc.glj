@@ -202,8 +202,12 @@
           note-schedule (flatten (map #(let [zero-count (/ (- % scheduling-unit) scheduling-unit)]
                                         (concat [1] (repeat (long zero-count) 0)))
                                       note-lengths))
-          note-clock (* (sequencer clock note-schedule) clock)]
-      {:voices [{:pitches (sequencer note-clock pitches)
+          note-clock (* (sequencer clock note-schedule) clock)
+          pitches (sequencer note-clock pitches)]
+      {:voices [{:pitches pitches
                  :durs (sequencer note-clock note-durs)
-                 :note-clock note-clock}]
+                 ;; rests are represented as a pitch of 0, so we can
+                 ;; gate the clock with the pitches to avoid
+                 ;; triggering an envelope on rests.
+                 :note-clock (* pitches note-clock)}]
        })))

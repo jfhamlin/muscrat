@@ -19,8 +19,8 @@ func BenchmarkSaw(b *testing.B) {
 	benchmark(b, NewSaw())
 }
 
-func BenchmarkSquare(b *testing.B) {
-	benchmark(b, NewSquare())
+func BenchmarkPulse(b *testing.B) {
+	benchmark(b, NewPulse())
 }
 
 func BenchmarkTri(b *testing.B) {

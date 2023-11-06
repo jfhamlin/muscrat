@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"math"
 	"runtime"
 	"runtime/debug"
 	"strconv"
@@ -260,10 +261,15 @@ func (g *Graph) OutgoingEdges(id NodeID) []*Edge {
 
 type (
 	runNodeInfo struct {
-		epoch         atomic.Int64
+		epoch         atomic.Int64 // the _next_ epoch in which this node will be evaluated
 		evaling       atomic.Bool
 		value         []float64 // value of the node in the last epoch
 		incomingEdges []*Edge
+
+		// offset to apply to the epoch of each incoming edge when
+		// checking if the dependency has been satisfied. this is
+		// necessary to handle cycles in the graph.
+		incomingEdgesEpochOffsets []int64
 	}
 
 	// we evaluate the graph in epochs, where each epoch is a buffer
@@ -345,6 +351,7 @@ func (g *Graph) Run(ctx context.Context, cfg ugen.SampleConfig) {
 			g.runWorker(ctx, cfg, rs, id)
 		}()
 	}
+
 	wg.Wait()
 }
 
@@ -398,6 +405,7 @@ func (g *Graph) newRunState() *runState {
 	bufSlice := make([]float64, fullSampleSize, fullSampleSize)
 	for i, id := range order {
 		rs.nodeInfo[i].incomingEdges = g.IncomingEdges(id)
+		rs.nodeInfo[i].incomingEdgesEpochOffsets = make([]int64, len(rs.nodeInfo[i].incomingEdges))
 		rs.nodeInfo[i].value = bufSlice[i*g.BufferSize : (i+1)*g.BufferSize]
 		rs.nodeIndexMap[id] = i
 	}
@@ -406,25 +414,14 @@ func (g *Graph) newRunState() *runState {
 }
 
 func (g *Graph) runWorker(ctx context.Context, cfg ugen.SampleConfig, rs *runState, workerID int) {
-	// invariants:
-	// 1. rs.nodeEpochs[i] is the next unevaluated epoch of node i
-	// 2. rs.nodeEvaling[i] is true if node i is currently being evaluated
-	// 3. rs.nodeValues[i] is the value of node i for the previous epoch of node i
+	var epoch int64 = 0 // the epoch being evaluated by this worker
 
-	numSinks := len(g.Sinks())
-	sinksDoneBits := (int64(1) << numSinks) - 1
-	sinkBitIndex := make(map[NodeID]int)
-	for i, sink := range g.Sinks() {
-		sinkBitIndex[sink.ID()] = i
-	}
-
-	var epoch int64 = 0    // the epoch being evaluated by this worker
-	var sinkDoneMask int64 // assumes numSinks <= 64
-	if numSinks > 64 {
-		panic("too many sinks")
-	}
+	// the minimum epoch across all nodes
+	// we can continue once this is > epoch
+	var minEpoch int64 = 0
 
 	inputSampleMap := make(map[string][]float64) // cleared after every node evaluation
+Outer:
 	for {
 		select {
 		case <-ctx.Done():
@@ -439,21 +436,26 @@ func (g *Graph) runWorker(ctx context.Context, cfg ugen.SampleConfig, rs *runSta
 		// 	fmt.Printf("  - [%d] node %d epoch: %d\n", workerID, i, rs.nodeEpochs[i].Load())
 		// }
 
+		nextMinEpoch := int64(math.MaxInt64)
+
 	NodeLoop:
 		for nodeIndex, nodeID := range rs.nodeOrder {
-			if sinkDoneMask == sinksDoneBits {
+			if minEpoch > epoch {
 				epoch++
-				sinkDoneMask = 0
+				continue Outer
 			}
 			node := g.Node(nodeID)
 			info := rs.NodeInfoByIndex(nodeIndex)
 
 			// if the node has already been evaluated for this epoch, skip it
-			if info.epoch.Load() > epoch {
-				if node.IsSink() {
-					sinkDoneMask |= 1 << sinkBitIndex[nodeID]
+			{
+				nodeEpoch := info.epoch.Load()
+				if nodeEpoch < nextMinEpoch {
+					nextMinEpoch = nodeEpoch
 				}
-				continue
+				if nodeEpoch > epoch {
+					continue
+				}
 			}
 
 			// try to lock the node for evaluation
@@ -467,17 +469,14 @@ func (g *Graph) runWorker(ctx context.Context, cfg ugen.SampleConfig, rs *runSta
 			// check again if the node has already been evaluated for this
 			// epoch after we've acquired the lock.
 			if info.epoch.Load() > epoch {
-				if node.IsSink() {
-					sinkDoneMask |= 1 << sinkBitIndex[nodeID]
-				}
 				info.evaling.Store(false)
 				continue
 			}
 
 			// first, check that all nodes with incoming edges have been
 			// evaluated for this epoch
-			for _, e := range info.incomingEdges {
-				if rs.NodeInfoByID(e.From).epoch.Load() <= epoch {
+			for i, e := range info.incomingEdges {
+				if rs.NodeInfoByID(e.From).epoch.Load() <= epoch+info.incomingEdgesEpochOffsets[i] {
 					info.evaling.Store(false)
 					continue NodeLoop
 				}
@@ -499,9 +498,6 @@ func (g *Graph) runWorker(ctx context.Context, cfg ugen.SampleConfig, rs *runSta
 				n.GenerateSamples(ctx, cfg, info.value)
 				// update the epoch
 				info.epoch.Store(epoch + 1)
-				if node.IsSink() {
-					sinkDoneMask |= 1 << sinkBitIndex[nodeID]
-				}
 			case *OutNode:
 				for _, smps := range inputSampleMap { // TODO: disallow sinks with multiple inputs
 					out := bufferpool.Get(len(smps))
@@ -518,7 +514,6 @@ func (g *Graph) runWorker(ctx context.Context, cfg ugen.SampleConfig, rs *runSta
 					}
 					break
 				}
-				sinkDoneMask |= 1 << sinkBitIndex[nodeID]
 			}
 
 			// release the node
@@ -528,6 +523,8 @@ func (g *Graph) runWorker(ctx context.Context, cfg ugen.SampleConfig, rs *runSta
 
 			clear(inputSampleMap)
 		}
+
+		minEpoch = nextMinEpoch
 	}
 }
 
@@ -553,31 +550,37 @@ func (g *Graph) bootstrapCyclesWorkers(ctx context.Context, rs *runState) {
 		if len(queue) == 0 {
 			// all nodes are blocked. pick an unsatisfied dependency of the
 			// node with the most satisfied dependencies, and treat it as
-			// "satisfied," generating a buffer of zero samples for it.
+			// "satisfied," setting an offset of -1 for the chosen
+			// dependency in the blocked node's offset slice.
 			maxSatisfied := -1
 			var choice NodeID = -1
+			var choiceEdgeIndex = -1
+			var blockedID NodeID
 
 			for id := range blocked {
 				satisfiedDeps := 0
 				var unsatisfiedDep NodeID
-				for _, e := range g.IncomingEdges(id) {
+				var unsatisfiedDepIndex int
+				for i, e := range g.IncomingEdges(id) {
 					if _, ok := satisfiedNodes[e.From]; ok {
 						satisfiedDeps++
 					} else {
 						unsatisfiedDep = e.From
+						unsatisfiedDepIndex = i
 					}
 				}
 				if satisfiedDeps > maxSatisfied {
 					maxSatisfied = satisfiedDeps
 					choice = unsatisfiedDep
+					choiceEdgeIndex = unsatisfiedDepIndex
+					blockedID = id
 				}
 			}
 
 			queue = append(queue, choice)
 			delete(blocked, choice)
-			if ni := rs.NodeInfoByID(choice); ni != nil {
-				rs.NodeInfoByID(choice).epoch.Store(1)
-			}
+			ni := rs.NodeInfoByID(blockedID)
+			ni.incomingEdgesEpochOffsets[choiceEdgeIndex] = -1
 		}
 
 		var nodeID NodeID

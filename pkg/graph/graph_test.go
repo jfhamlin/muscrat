@@ -89,3 +89,39 @@ func benchGraph() *Graph {
 
 	return g
 }
+
+func TestCycle(t *testing.T) {
+	g := &Graph{
+		BufferSize: 128,
+	}
+
+	n1 := g.AddGeneratorNode(ugen.NewConstant(1.0))
+	n2 := g.AddGeneratorNode(ugen.NewSum())
+	n3 := g.AddGeneratorNode(ugen.NewSum())
+
+	g.AddEdge(n1.ID(), n2.ID(), "n1->n2")
+	g.AddEdge(n2.ID(), n3.ID(), "n2->n3")
+	g.AddEdge(n3.ID(), n2.ID(), "n3->n2")
+
+	out := g.AddOutNode()
+	g.AddEdge(n3.ID(), out.ID(), "n3->out")
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	go g.Run(ctx, ugen.SampleConfig{SampleRateHz: 44100})
+
+	var result []float64
+	for i := 0; i < 10; i++ {
+		res, ok := <-out.Chan()
+		if !ok {
+			t.Fail()
+		}
+		result = append(result, res[0])
+	}
+	// it should = [1, 2, ..., 10]
+	for i := 0; i < 10; i++ {
+		if result[i] != float64(i+1) {
+			t.Errorf("expected %d, got %f", i+1, result[i])
+		}
+	}
+}

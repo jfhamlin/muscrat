@@ -4,7 +4,7 @@
             [mrat.scales :refer :all] :reload
             [mrat.welsh] :reload))
 
-(def root (* E3 (semitones 0))) ;; 3
+(def root (* (midifreq E3) (semitones 0))) ;; 3
 (def notes (map #(* root (semitones %))
                 aeolian))
 
@@ -12,7 +12,7 @@
   [gate freq]
   (-> (saw (* freq (semitones (* 0.05 (noise-quad 8)))) :duty 1 :iphase (math$rand.Float64))
       (* (env-adsr gate [0.3 0.5 0.8 1]))
-      (delayc (* 0.2 (math$rand.Float64)))))
+      (delayc 1 (* 0.2 (math$rand.Float64)))))
 
 (def mid
   (let [gate (sqr 8 :duty 0.7)
@@ -45,7 +45,7 @@
 (def highs
   (let [gate (sqr 16)
         freq (choose-gate gate (map #(* % (octaves 1)) notes))
-        amp (decibels -10)
+        amp (decibels -15)
         mask (sqr (/ 1.0 8.0) :mul 0.5 :add 0.5)]
     (-> (sqr freq :duty 0.8)
         (lores freq 0.9)
@@ -54,4 +54,3 @@
         (* amp))))
 
 (play (* (decibels -5) (+ mid bass kick highs)))
-

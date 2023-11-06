@@ -115,6 +115,8 @@
 ;; Utilities
 
 (defn pow
+  "Returns b^e. If b or e are nodes, creates a new node that computes b^e. Else,
+  returns the result of b^e directly."
   [b e]
   (if (some (partial instance? Node) [b e])
     (let [n (add-node! (NewPow) "pow")]
@@ -124,6 +126,9 @@
     (math.Pow b e)))
 
 (defn abs
+  "Returns the absolute value of x. If x is a node, creates a new node
+  that computes the absolute value of x. Else, returns the absolute
+  value of x directly."
   [x]
   (if (instance? Node x)
     (let [n (add-node! (NewAbs) "abs")]
@@ -132,6 +137,8 @@
     (math.Abs x)))
 
 (defn exp
+  "Returns e^x. If x is a node, creates a new node that computes e^x.
+  Else, returns e^x directly."
   [x]
   (if (instance? Node x)
     (let [n (add-node! (NewExp) "exp")]
@@ -140,6 +147,9 @@
     (math.Exp x)))
 
 (defn copy-sign
+  "Returns x with the sign of s. If x or s are nodes, creates a new node
+  that computes x with the sign of s. Else, returns x with the sign of
+  s directly."
   [x s]
   (if (or (instance? Node x) (instance? Node s))
     (let [n (add-node! (NewCopySign) "copy-sign")]
@@ -155,12 +165,15 @@
     n))
 
 (defn decibels
+  "Return the amplitude ratio corresponding to the given decibel value."
   [db]
   (if (instance? Node db)
     (freq-ratio db "decibels")
     (pow 10 (/ db 20.0))))
 
 (defn cents
+  "Return the frequency ratio corresponding to the given number of
+  cents."
   [x]
   (if (instance? Node x)
     (let [cnt (add-node! (NewFreqRatio "cents") "cents")]
@@ -169,6 +182,8 @@
     (pow 2 (/ x 1200.0))))
 
 (defn semitones
+  "Return the frequency ratio corresponding to the given number of
+  semitones."
   [x]
   (if (instance? Node x)
     (let [stn (add-node! (NewFreqRatio "semitones") "semitones")]
@@ -177,6 +192,8 @@
     (pow 2 (/ x 12.0))))
 
 (defn octaves
+  "Return the frequency ratio corresponding to the given number of
+  octaves."
   [x]
   (if (instance? Node x)
     (let [oct (add-node! (NewFreqRatio "octaves") "octaves")]
@@ -185,6 +202,7 @@
     (pow 2 x)))
 
 (defn midifreq
+  "Return the frequency corresponding to the given MIDI note number."
   [note]
   (if (instance? Node note)
     (let [mf (add-node! (NewMIDIFreq) "midifreq")]
@@ -196,6 +214,9 @@
 ;; Helper for custom sample generators
 
 (defn ugen-fn
+  "Returns a UGenFunc that wraps the given function. The function should
+  take a map of configuration parameters and an output buffer, and
+  write samples to the output buffer."
   [f]
   (let [wrapped (fn [cfg out]
                   (f {:sample-rate-hz (.SampleRateHz cfg)
@@ -382,8 +403,8 @@
 
 (defn noise
   "Generates random values between -1 and 1 at the given frequency.
-  If frequency is zero or not provided, generates white noise. Currently,
-  frequency must be a number, not a node."
+  If frequency is zero or not provided, generates white
+  noise. Currently, frequency must be a number, not a node."
   ([] (noise 0))
   ([freq & flags]
    (let [flags (validate-flags flags {:mul 1.0 :add 0.0})
@@ -399,9 +420,9 @@
   (add-node! (NewPinkNoise) "pink-noise"))
 
 (defn noise-quad
-  "Generates quadratically-interpolated random values between
-  -1 and 1 at the given frequency. If frequency is zero or not
-  provided, generates at 500 hz."
+  "Generates quadratically-interpolated random values between -1 and 1
+  at the given frequency. If frequency is zero or not provided,
+  generates at 500 hz."
   ([] (noise-quad 500.0))
   ([freq & flags]
    (let [flags (validate-flags flags {:mul 1.0 :add 0.0})
@@ -446,10 +467,31 @@
   [gate [a d]]
   (env gate [0 1 0] [a d]))
 
+(defn line
+  "Generates a line from the start value to the end value over the given
+  duration."
+  [start end dur & {:keys [mul add]}]
+  (let [sig (env 1 [start end] [dur] :interp :lin)
+        sig (if mul (* mul sig) sig)
+        sig (if add (+ sig add) sig)]
+    sig))
+
+(defn xline
+  "Generates an exponential curve from the start value to the end
+  value. Both the start and end values must be non-zero and have the
+  same sign."
+  [start end dur & {:keys [mul add]}]
+  (let [sig (env 1 [start end] [dur] :interp :exp)
+        sig (if mul (* mul sig) sig)
+        sig (if add (+ sig add) sig)]
+    sig))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Effects
 
 (defn pipe
+  "Create a pipe, which copies the input to the output. The input may be
+  set with pipeset!. This is useful for creating feedback loops."
   []
   (let [f (fn [cfg out]
             (when-let [in (get (:input-samples cfg) "in")]
@@ -457,6 +499,7 @@
     (add-node! (ugen-fn f) "pipe")))
 
 (defn pipeset!
+  "Set the input of a pipe."
   [p in]
   (add-edge! (as-node in) p "in"))
 
@@ -472,6 +515,11 @@
        (.SetWidth width)))))
 
 (defn freeverb
+  "A reverb effect. Options are:
+  :dry - the amount of dry signal to mix in (0-1)
+  :wet - the amount of wet signal to mix in (0-1)
+  :room-size - the size of the room (0-1)
+  :damp - the damping factor (0-1)"
   [node & opts]
   (let [opts (apply hash-map opts)
         supported #{:dry :wet :room-size :damp :width}
@@ -499,6 +547,7 @@
     lpf))
 
 (defn bpf
+  "A simple bandpass filter with center frequency and bandwidth."
   [n freq bw]
   (let [n (as-node n)
         freq (as-node freq)
@@ -520,20 +569,23 @@
     delay))
 
 (defn delayn
+  "Delay line with no interpolation."
   [in max-delay-time delay-time & flags]
   (apply -delay in max-delay-time delay-time (WithInterp InterpNone) flags))
 
 (defn delayl
+  "Delay line with linear interpolation."
   [in max-delay-time delay-time & flags]
   (apply -delay in max-delay-time delay-time (WithInterp InterpLinear) flags))
 
 (defn delayc
+  "Delay line with cubic interpolation."
   [in max-delay-time delay-time & flags]
   (apply -delay in max-delay-time delay-time (WithInterp InterpCubic) flags))
 
 (defn tape-delayl
-  "Tape delay line with linear interpolation. This generator simulates a
-  tape read head such that changes to the delay value are not
+  "Tape delay line with linear interpolation. This generator simulates
+  a tape read head such that changes to the delay value are not
   instantaneous - the 'tape' is sped up or slowed down to reach the
   target delay time."
   [n delay-time]
@@ -591,6 +643,7 @@
       (* level right-scale in)])))
 
 (defn clip
+  "Clip an input signal when it exceeds threshold low/high values."
   ([in] (clip in -1 1))
   ([in lo hi]
    (let [c (add-node! (NewClip) "clip")
@@ -614,6 +667,7 @@
      wf)))
 
 (defn bitcrush
+  "Bitcrush an input signal."
   ([in bits] (bitcrush in bits 44100.0))
   ([in bits rate]
    (let [rate (as-node rate)

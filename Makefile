@@ -11,5 +11,6 @@ run:
 run-race: # disable checkptr because glojure uses an unsafe method to support dynamic vars.
 	@go run -gcflags=all=-d=checkptr=0 -race cmd/mrat/main.go  $(SCRIPT)
 
+.PHONY: build/bin/mrat # force rebuild
 build/bin/mrat:
 	@go build -o build/bin/mrat cmd/mrat/main.go
