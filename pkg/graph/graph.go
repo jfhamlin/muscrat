@@ -337,7 +337,7 @@ func (g *Graph) Run(ctx context.Context, cfg ugen.SampleConfig) {
 	var wg sync.WaitGroup
 	wg.Add(numWorkers)
 
-	g.bootstrapCyclesWorkers(ctx, rs)
+	g.bootstrapCycles(ctx, rs)
 
 	if debugMode {
 		// print edges of nodes in the order
@@ -571,84 +571,29 @@ Outer:
 	}
 }
 
-func (g *Graph) bootstrapCyclesWorkers(ctx context.Context, rs *runState) {
-	// initialize any channels required to bootstrap cycles, preventing
-	// deadlock.
-
-	queue := make([]NodeID, 0, len(rs.nodeOrder))
-	blocked := map[NodeID]struct{}{}
-	for _, nodeID := range rs.nodeOrder {
-		node := g.Node(nodeID)
-		if _, ok := node.(*OutNode); ok {
-			continue
-		}
-		if len(g.IncomingEdges(nodeID)) == 0 {
-			queue = append(queue, nodeID)
-		} else {
-			blocked[nodeID] = struct{}{}
-		}
+func (g *Graph) bootstrapCycles(ctx context.Context, rs *runState) {
+	q := make([]NodeID, 0, len(g.Sinks()))
+	for _, sink := range g.Sinks() {
+		q = append(q, sink.ID())
 	}
 
-	satisfiedNodes := make(map[NodeID]struct{})
-	for len(queue) > 0 || len(blocked) > 0 {
-		if len(queue) == 0 {
-			// all nodes are blocked. pick an unsatisfied dependency of the
-			// node with the most satisfied dependencies, and treat it as
-			// "satisfied," setting an offset of -1 for the chosen
-			// dependency in the blocked node's offset slice.
-			maxSatisfied := -1
-			var choice NodeID = -1
-			var choiceEdgeIndex = -1
-			var blockedID NodeID
+	visited := make(map[NodeID]struct{})
+	for len(q) > 0 {
+		cur := q[0]
+		q = q[1:]
 
-			for id := range blocked {
-				satisfiedDeps := 0
-				var unsatisfiedDep NodeID
-				var unsatisfiedDepIndex int
-				for i, e := range rs.NodeInfoByID(id).incomingEdges {
-					if _, ok := satisfiedNodes[e.From]; ok {
-						satisfiedDeps++
-					} else {
-						unsatisfiedDep = e.From
-						unsatisfiedDepIndex = i
-					}
-				}
-				if satisfiedDeps > maxSatisfied { // TODO: or if == and unsat < choice
-					maxSatisfied = satisfiedDeps
-					choice = unsatisfiedDep
-					choiceEdgeIndex = unsatisfiedDepIndex
-					blockedID = id
-				}
-			}
+		visited[cur] = struct{}{}
 
-			queue = append(queue, choice)
-			delete(blocked, choice)
-			ni := rs.NodeInfoByID(blockedID)
-
-			ni.incomingEdgesEpochOffsets[choiceEdgeIndex] = -1
-		}
-
-		var nodeID NodeID
-		nodeID, queue = queue[0], queue[1:]
-
-		satisfiedNodes[nodeID] = struct{}{}
-		// check for any unblocked nodes
-		for _, e := range g.OutgoingEdges(nodeID) {
-			if _, ok := satisfiedNodes[e.To]; ok {
+		info := rs.NodeInfoByID(cur)
+		for i, e := range info.incomingEdges {
+			from := e.From
+			// if already visited, then this is a feedback loop;
+			// allow older inputs from this node
+			if _, ok := visited[from]; ok {
+				info.incomingEdgesEpochOffsets[i] = -1
 				continue
 			}
-			satisfied := true
-			for _, inEdge := range g.IncomingEdges(e.To) {
-				if _, ok := satisfiedNodes[inEdge.From]; !ok {
-					satisfied = false
-					break
-				}
-			}
-			if !satisfied {
-				continue
-			}
-			delete(blocked, e.To)
-			queue = append(queue, e.To)
+			q = append(q, from)
 		}
 	}
 }

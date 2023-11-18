@@ -767,15 +767,6 @@
       (throw (fmt.Errorf "unsupported midi-in type: %s" typ))
       )))
 
-;; (defn midi-in
-;;   [name & flags]
-;;   (let [flags (validate-flags flags {:voices 1})
-;;         num-voices (:voices flags)
-;;         dev (NewMIDIInputDevice name "sw-keyboard" (WithVoices num-voices))]
-;;     (map #(vector (add-node! (.Notes dev %) "midi-note")
-;;                   (add-node! (.Gates dev %) "midi-gate"))
-;;          (range num-voices))))
-
 (defn wavout
   "Save the input to a 32-bit wav file (up to two channels) named by
   the :filename flag (default out.wav)."
