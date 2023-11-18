@@ -572,28 +572,26 @@ Outer:
 }
 
 func (g *Graph) bootstrapCycles(ctx context.Context, rs *runState) {
-	q := make([]NodeID, 0, len(g.Sinks()))
 	for _, sink := range g.Sinks() {
-		q = append(q, sink.ID())
-	}
+		q := []NodeID{sink.ID()}
+		visited := make(map[NodeID]struct{})
+		for len(q) > 0 {
+			cur := q[0]
+			q = q[1:]
 
-	visited := make(map[NodeID]struct{})
-	for len(q) > 0 {
-		cur := q[0]
-		q = q[1:]
+			visited[cur] = struct{}{}
 
-		visited[cur] = struct{}{}
-
-		info := rs.NodeInfoByID(cur)
-		for i, e := range info.incomingEdges {
-			from := e.From
-			// if already visited, then this is a feedback loop;
-			// allow older inputs from this node
-			if _, ok := visited[from]; ok {
-				info.incomingEdgesEpochOffsets[i] = -1
-				continue
+			info := rs.NodeInfoByID(cur)
+			for i, e := range info.incomingEdges {
+				from := e.From
+				// if already visited, then this is a feedback loop;
+				// allow older inputs from this node
+				if _, ok := visited[from]; ok {
+					info.incomingEdgesEpochOffsets[i] = -1
+					continue
+				}
+				q = append(q, from)
 			}
-			q = append(q, from)
 		}
 	}
 }
