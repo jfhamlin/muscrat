@@ -1,0 +1,2 @@
+go test fuzz v1
+[]byte("{ \"nodeCount\":1,\"edges\": [{\"00\":10}],\"outNode\":1}")

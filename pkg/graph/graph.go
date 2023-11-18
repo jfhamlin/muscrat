@@ -5,9 +5,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"math"
+	"os"
 	"runtime"
 	"runtime/debug"
 	"strconv"
+	"strings"
 	"sync"
 	"sync/atomic"
 
@@ -72,6 +74,10 @@ type (
 
 		outputs []*OutNode
 	}
+)
+
+var (
+	debugMode = os.Getenv("MUSCRAT_DEBUG") != "" && os.Getenv("MUSCRAT_DEBUG") != "0"
 )
 
 func (id NodeID) String() string {
@@ -155,6 +161,9 @@ func (g *Graph) AddEdge(from, to NodeID, port string) {
 	}
 	if int(to) >= len(g.Nodes) {
 		panic(fmt.Sprintf("edge destination %d is not in the graph", to))
+	}
+	if from == to {
+		panic(fmt.Sprintf("edge source %d and destination %d are the same", from, to))
 	}
 	if _, ok := g.Nodes[from].(*OutNode); ok {
 		panic(fmt.Sprintf("cannot add edge whose source %d is a sink node", from))
@@ -311,6 +320,11 @@ func (g *Graph) Run(ctx context.Context, cfg ugen.SampleConfig) {
 	// using 1/2 the number of CPUs gives good performance when
 	// benchmarking. using all CPUs gives worse performance.
 	numWorkers := runtime.NumCPU() / 2
+	if workerEnvVar := os.Getenv("MUSCRAT_WORKERS"); workerEnvVar != "" {
+		if n, err := strconv.Atoi(workerEnvVar); err == nil {
+			numWorkers = n
+		}
+	}
 	if numWorkers < 1 {
 		numWorkers = 1
 	}
@@ -324,6 +338,19 @@ func (g *Graph) Run(ctx context.Context, cfg ugen.SampleConfig) {
 	wg.Add(numWorkers)
 
 	g.bootstrapCyclesWorkers(ctx, rs)
+
+	if debugMode {
+		// print edges of nodes in the order
+		for _, nodeID := range rs.nodeOrder {
+			node := g.Node(nodeID)
+			info := rs.NodeInfoByID(nodeID)
+			fmt.Printf("node %d (%T) %s\n", nodeID, node, node)
+			for i, e := range info.incomingEdges {
+				offset := info.incomingEdgesEpochOffsets[i]
+				fmt.Printf("  - %d <- %d (offset=%d)\n", e.To, e.From, offset)
+			}
+		}
+	}
 
 	// start any generator nodes whose generator is a ugen.Starter
 	for _, node := range g.Nodes {
@@ -404,7 +431,14 @@ func (g *Graph) newRunState() *runState {
 	fullSampleSize := g.BufferSize * len(order)
 	bufSlice := make([]float64, fullSampleSize, fullSampleSize)
 	for i, id := range order {
-		rs.nodeInfo[i].incomingEdges = g.IncomingEdges(id)
+		incomingEdgesBySource := map[NodeID]*Edge{}
+		for _, e := range g.IncomingEdges(id) {
+			incomingEdgesBySource[e.From] = e
+		}
+		rs.nodeInfo[i].incomingEdges = make([]*Edge, 0, len(incomingEdgesBySource))
+		for _, e := range incomingEdgesBySource {
+			rs.nodeInfo[i].incomingEdges = append(rs.nodeInfo[i].incomingEdges, e)
+		}
 		rs.nodeInfo[i].incomingEdgesEpochOffsets = make([]int64, len(rs.nodeInfo[i].incomingEdges))
 		rs.nodeInfo[i].value = bufSlice[i*g.BufferSize : (i+1)*g.BufferSize]
 		rs.nodeIndexMap[id] = i
@@ -429,12 +463,17 @@ Outer:
 		default:
 		}
 
-		// fmt.Printf("- [%d] worker epoch %d\n", workerID, epoch)
-		// fmt.Printf("  - [%d] sinkDoneMask:  %064b\n", workerID, sinkDoneMask)
-		// fmt.Printf("  - [%d] sinksDoneBits: %064b\n", workerID, sinksDoneBits)
-		// for i := range rs.nodeEpochs {
-		// 	fmt.Printf("  - [%d] node %d epoch: %d\n", workerID, i, rs.nodeEpochs[i].Load())
-		// }
+		if debugMode {
+			fmt.Println(strings.Repeat("=", 80))
+			fmt.Printf("- [%d] worker epoch %d\n", workerID, epoch)
+			fmt.Printf("  - [%d] epoch:  %d\n", workerID, epoch)
+			fmt.Printf("  - [%d] minEpoch: %d\n", workerID, minEpoch)
+			for _, nodeID := range rs.nodeOrder {
+				i := rs.nodeIndexMap[nodeID]
+				info := rs.NodeInfoByIndex(i)
+				fmt.Printf("  - [%d] node (%d %T) %d:\t%d\n", workerID, nodeID, g.Node(nodeID), i, info.epoch.Load())
+			}
+		}
 
 		nextMinEpoch := int64(math.MaxInt64)
 
@@ -477,6 +516,10 @@ Outer:
 			// evaluated for this epoch
 			for i, e := range info.incomingEdges {
 				if rs.NodeInfoByID(e.From).epoch.Load() <= epoch+info.incomingEdgesEpochOffsets[i] {
+					if debugMode {
+						fmt.Printf("  - skipping eval for node %d, waiting\n", nodeID)
+						fmt.Printf("    - for: %v offset: %v %v\n", e.From, info.incomingEdgesEpochOffsets[i], info.incomingEdgesEpochOffsets)
+					}
 					info.evaling.Store(false)
 					continue NodeLoop
 				}
@@ -532,16 +575,17 @@ func (g *Graph) bootstrapCyclesWorkers(ctx context.Context, rs *runState) {
 	// initialize any channels required to bootstrap cycles, preventing
 	// deadlock.
 
-	queue := make([]NodeID, 0, len(g.Nodes))
+	queue := make([]NodeID, 0, len(rs.nodeOrder))
 	blocked := map[NodeID]struct{}{}
-	for _, node := range g.Nodes {
+	for _, nodeID := range rs.nodeOrder {
+		node := g.Node(nodeID)
 		if _, ok := node.(*OutNode); ok {
 			continue
 		}
-		if len(g.IncomingEdges(node.ID())) == 0 {
-			queue = append(queue, node.ID())
+		if len(g.IncomingEdges(nodeID)) == 0 {
+			queue = append(queue, nodeID)
 		} else {
-			blocked[node.ID()] = struct{}{}
+			blocked[nodeID] = struct{}{}
 		}
 	}
 
@@ -561,7 +605,7 @@ func (g *Graph) bootstrapCyclesWorkers(ctx context.Context, rs *runState) {
 				satisfiedDeps := 0
 				var unsatisfiedDep NodeID
 				var unsatisfiedDepIndex int
-				for i, e := range g.IncomingEdges(id) {
+				for i, e := range rs.NodeInfoByID(id).incomingEdges {
 					if _, ok := satisfiedNodes[e.From]; ok {
 						satisfiedDeps++
 					} else {
@@ -569,7 +613,7 @@ func (g *Graph) bootstrapCyclesWorkers(ctx context.Context, rs *runState) {
 						unsatisfiedDepIndex = i
 					}
 				}
-				if satisfiedDeps > maxSatisfied {
+				if satisfiedDeps > maxSatisfied { // TODO: or if == and unsat < choice
 					maxSatisfied = satisfiedDeps
 					choice = unsatisfiedDep
 					choiceEdgeIndex = unsatisfiedDepIndex
@@ -580,6 +624,7 @@ func (g *Graph) bootstrapCyclesWorkers(ctx context.Context, rs *runState) {
 			queue = append(queue, choice)
 			delete(blocked, choice)
 			ni := rs.NodeInfoByID(blockedID)
+
 			ni.incomingEdgesEpochOffsets[choiceEdgeIndex] = -1
 		}
 
@@ -606,23 +651,4 @@ func (g *Graph) bootstrapCyclesWorkers(ctx context.Context, rs *runState) {
 			queue = append(queue, e.To)
 		}
 	}
-}
-
-//
-////////////////////////////////////////////////////////////////////////////////
-
-// Dot returns a string representation of the graph in the DOT language.
-func (g *Graph) Dot() string {
-	var dot string
-	dot += "digraph {\n"
-	for _, node := range g.Nodes {
-		// add node with its String() representation as label
-		dot += fmt.Sprintf("\t%q [label=%q];\n", node.ID().String(), node.String())
-	}
-	for _, e := range g.Edges {
-		// add an edge from e.From to e.To, using e.ToPort as label
-		dot += fmt.Sprintf("\t%q -> %q [label=%q];\n", e.From.String(), e.To.String(), e.ToPort)
-	}
-	dot += "}\n"
-	return dot
 }

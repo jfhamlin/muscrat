@@ -2,6 +2,7 @@ package graph
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"testing"
 
@@ -124,4 +125,99 @@ func TestCycle(t *testing.T) {
 			t.Errorf("expected %d, got %f", i+1, result[i])
 		}
 	}
+}
+
+func FuzzGraphLiveness(f *testing.F) {
+	type edge struct {
+		From int `json:"from"`
+		To   int `json:"to"`
+	}
+
+	type testGraph struct {
+		NodeCount int    `json:"nodeCount"`
+		Edges     []edge `json:"edges"`
+		OutNode   int    `json:"outNode"`
+	}
+
+	seeds := []string{
+		`{
+       "nodeCount": 2,
+       "edges": [{"from": 0, "to": 1}],
+       "outNode": 1
+     }`,
+		`{
+       "nodeCount": 4,
+       "edges": [{"from": 0, "to": 1}, {"from": 1, "to": 2}, {"from": 2, "to": 1}, {"from": 2, "to": 3}],
+       "outNode": 3
+     }`,
+	}
+
+	for _, seed := range seeds {
+		f.Add([]byte(seed))
+	}
+
+	f.Fuzz(func(t *testing.T, b []byte) {
+		var tg testGraph
+		if err := json.Unmarshal(b, &tg); err != nil {
+			t.Skip()
+		}
+		if len(tg.Edges) == 0 || tg.NodeCount <= 0 {
+			t.Skip()
+		}
+
+		// normalize node ids
+		tg.OutNode = tg.OutNode % tg.NodeCount
+		for i := range tg.Edges {
+			edge := &tg.Edges[i]
+			edge.From = edge.From % tg.NodeCount
+			edge.To = edge.To % tg.NodeCount
+		}
+
+		g := &Graph{
+			BufferSize: 128,
+		}
+
+		var nodes []Node
+		var outNode *OutNode
+		for i := 0; i < tg.NodeCount; i++ {
+			var node Node
+			if i == tg.OutNode {
+				outNode = g.AddOutNode()
+				node = outNode
+			} else {
+				node = g.AddGeneratorNode(ugen.NewConstant(1.0))
+			}
+			nodes = append(nodes, node)
+		}
+
+		for _, edge := range tg.Edges {
+			fromIndex := edge.From
+			if fromIndex == tg.OutNode {
+				t.Skip()
+			}
+
+			from := nodes[fromIndex].ID()
+			to := nodes[edge.To].ID()
+			if from == to {
+				t.Skip()
+			}
+			g.AddEdge(from, to, fmt.Sprintf("%v -> %v", from, to))
+		}
+
+		if len(g.IncomingEdges(outNode.ID())) == 0 {
+			// TODO: implement graph validation
+			t.Skip()
+		}
+
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+		go g.Run(ctx, ugen.SampleConfig{SampleRateHz: 44100})
+
+		for i := 0; i < 10; i++ {
+			_, ok := <-outNode.Chan()
+			if !ok {
+				t.Fail()
+			}
+		}
+	})
 }
