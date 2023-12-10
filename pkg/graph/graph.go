@@ -573,25 +573,22 @@ Outer:
 
 func (g *Graph) bootstrapCycles(ctx context.Context, rs *runState) {
 	for _, sink := range g.Sinks() {
-		q := []NodeID{sink.ID()}
 		visited := make(map[NodeID]struct{})
-		for len(q) > 0 {
-			cur := q[0]
-			q = q[1:]
+		g.prepCyclesDFS(rs, sink.ID(), visited)
+	}
+}
 
-			visited[cur] = struct{}{}
+func (g *Graph) prepCyclesDFS(rs *runState, nodeID NodeID, visited map[NodeID]struct{}) {
+	visited[nodeID] = struct{}{}
+	defer delete(visited, nodeID)
 
-			info := rs.NodeInfoByID(cur)
-			for i, e := range info.incomingEdges {
-				from := e.From
-				// if already visited, then this is a feedback loop;
-				// allow older inputs from this node
-				if _, ok := visited[from]; ok {
-					info.incomingEdgesEpochOffsets[i] = -1
-					continue
-				}
-				q = append(q, from)
-			}
+	info := rs.NodeInfoByID(nodeID)
+	for i, e := range info.incomingEdges {
+		from := e.From
+		if _, ok := visited[from]; ok {
+			info.incomingEdgesEpochOffsets[i] = -1
+			continue
 		}
+		g.prepCyclesDFS(rs, from, visited)
 	}
 }
