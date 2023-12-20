@@ -1,0 +1,9 @@
+(ns examples.qwerty
+  (:require [mrat.core :refer :all] :reload
+            [mrat.welsh :refer :all] :reload
+            [mrat.midi :refer :all]))
+
+(def qwerty (qwerty-in "keyboard"))
+
+(play (* (:onoff qwerty)
+         (sin (midifreq (:note qwerty)))))

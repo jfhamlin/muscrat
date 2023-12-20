@@ -46,7 +46,7 @@
            (github.com$jfhamlin$muscrat$pkg$sampler NewSampler
                                                     LoadSample)
            (github.com$jfhamlin$muscrat$pkg$aio NewInputDevice
-                                                NewQwertyMIDI
+                                                NewSoftwareKeyboard
                                                 NewMIDIInputDevice
                                                 WithVoices
                                                 WithDeviceID
@@ -706,6 +706,16 @@
 (defn soundin
   []
   (add-node! (NewInputDevice) "in"))
+
+(defn qwerty-in
+  [name & {:keys [voices]}]
+  (let [num-voices (or voices 1)
+        opts [(WithVoices num-voices)]
+        kb (apply NewSoftwareKeyboard name opts)]
+    (map (fn [i]
+           {:note (add-node! (.Note kb i) (str "note-" i))
+            :onoff (add-node! (.Gate kb i) (str "gate-" i))})
+         (range num-voices))))
 
 (defn midi-in
   "Registers one or more input ugens that emit values from MIDI events.

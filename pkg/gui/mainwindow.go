@@ -1,12 +1,14 @@
 package gui
 
 import (
+	"fmt"
 	"math"
 	"math/cmplx"
 	"time"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/container"
+	"fyne.io/fyne/v2/driver/desktop"
 	"fyne.io/fyne/v2/layout"
 	"gonum.org/v1/gonum/dsp/fourier"
 
@@ -97,6 +99,35 @@ func NewMainWindow(a fyne.App) *MainWindow {
 		osc.SetData(nil, readBuffer[:len(readBuffer)/4])
 		spect.SetData(fft(readBuffer))
 	})
+
+	// set up key handler
+	{
+		if canvas, ok := w.Canvas().(desktop.Canvas); ok {
+			canvas.SetOnKeyDown(func(evt *fyne.KeyEvent) {
+				fmt.Printf("key down: %+v\n", evt)
+				if len(evt.Name) != 1 {
+					return
+				}
+				pubsub.Publish("midi-event", map[string]any{
+					"type": "noteOn",
+				})
+			})
+			canvas.SetOnKeyUp(func(evt *fyne.KeyEvent) {
+				fmt.Printf("key up: %+v\n", evt)
+				if len(evt.Name) != 1 {
+					return
+				}
+				pubsub.Publish("midi-event", map[string]any{
+					"type": "noteOff",
+				})
+			})
+		}
+		// select {
+
+		// case aio.StdinChan <- byte(strings.ToLower(string(evt.Name))[0]):
+		// default:
+		// }
+	}
 
 	return &MainWindow{
 		Window:       w,
