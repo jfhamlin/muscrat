@@ -5,7 +5,7 @@ go 1.21
 require (
 	fyne.io/fyne/v2 v2.4.0
 	github.com/fsnotify/fsnotify v1.6.0
-	github.com/glojurelang/glojure v0.0.0-20231001202830-646b6e0db03e
+	github.com/glojurelang/glojure v0.2.0
 	github.com/go-audio/audio v1.0.0
 	github.com/go-audio/wav v1.0.0
 	github.com/gordonklaus/portaudio v0.0.0-20221027163845-7c3b689db3cc

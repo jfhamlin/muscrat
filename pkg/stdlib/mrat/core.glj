@@ -703,7 +703,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; I/O devices
 
-(defn soundin
+(defn sound-in
   []
   (add-node! (NewInputDevice) "in"))
 

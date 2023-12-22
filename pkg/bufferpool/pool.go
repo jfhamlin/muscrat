@@ -7,8 +7,10 @@ import (
 )
 
 const (
-	MinSize = 1 << 7  // 128
-	MaxSize = 1 << 11 // 2048
+	minSizeLog2 = 6
+
+	MinSize = 1 << minSizeLog2 // 64
+	MaxSize = 1 << 11          // 2048
 )
 
 var (
@@ -29,7 +31,7 @@ func Get(sz int) *[]float64 {
 	if sz < MinSize || sz > MaxSize || !isPowerOfTwo(sz) {
 		panic(fmt.Sprintf("invalid size: %d", sz))
 	}
-	pool := pools[bits.TrailingZeros(uint(sz)>>7)]
+	pool := pools[bits.TrailingZeros(uint(sz)>>minSizeLog2)]
 
 	v := pool.Get()
 	if v == nil {
@@ -46,6 +48,6 @@ func Put(buf *[]float64) {
 	if !isPowerOfTwo(len(*buf)) {
 		panic(fmt.Sprintf("can't put buffer with size not a power of 2: %d", len(*buf)))
 	}
-	pool := pools[bits.TrailingZeros(uint(len(*buf))>>7)]
+	pool := pools[bits.TrailingZeros(uint(len(*buf))>>minSizeLog2)]
 	pool.Put(buf)
 }

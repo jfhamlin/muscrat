@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math"
 	"math/cmplx"
+	"strings"
 	"time"
 
 	"fyne.io/fyne/v2"
@@ -102,14 +103,37 @@ func NewMainWindow(a fyne.App) *MainWindow {
 
 	// set up key handler
 	{
+		octaveOffset := 0
+		activeNotes := map[byte]int{}
 		if canvas, ok := w.Canvas().(desktop.Canvas); ok {
 			canvas.SetOnKeyDown(func(evt *fyne.KeyEvent) {
 				fmt.Printf("key down: %+v\n", evt)
+				if evt.Name == "Up" {
+					octaveOffset++
+					if octaveOffset > 6 {
+						octaveOffset = 6
+					}
+					return
+				} else if evt.Name == "Down" {
+					octaveOffset--
+					if octaveOffset < -4 {
+						octaveOffset = -4
+					}
+					return
+				}
 				if len(evt.Name) != 1 {
 					return
 				}
+				char := strings.ToLower(string(evt.Name))[0]
+				num, ok := midiCharMap[char]
+				if !ok {
+					return
+				}
+				num += octaveOffset * 12
+				activeNotes[char] = num
 				pubsub.Publish("midi-event", map[string]any{
-					"type": "noteOn",
+					"type":       "noteOn",
+					"midiNumber": num,
 				})
 			})
 			canvas.SetOnKeyUp(func(evt *fyne.KeyEvent) {
@@ -117,16 +141,18 @@ func NewMainWindow(a fyne.App) *MainWindow {
 				if len(evt.Name) != 1 {
 					return
 				}
+				char := strings.ToLower(string(evt.Name))[0]
+				num, ok := activeNotes[char]
+				if !ok {
+					return
+				}
+				delete(activeNotes, char)
 				pubsub.Publish("midi-event", map[string]any{
-					"type": "noteOff",
+					"type":       "noteOff",
+					"midiNumber": num,
 				})
 			})
 		}
-		// select {
-
-		// case aio.StdinChan <- byte(strings.ToLower(string(evt.Name))[0]):
-		// default:
-		// }
 	}
 
 	return &MainWindow{
@@ -202,3 +228,20 @@ func rmsDBPeak(samples []float64) (db, peak float64) {
 	rms, peak := rmsPeak(samples)
 	return 20 * math.Log10(rms), peak
 }
+
+var (
+	midiCharMap = func() map[byte]int {
+		const f2 = 41
+		keys := []byte{
+			/*
+			 f         g         a         b    c         d         e*/
+			'a', 'w', 's', 'e', 'd', 'r', 'f', 'g', 'y', 'h', 'u', 'j',
+			'k', 'o', 'l', 'p', ';', '[', '\''}
+
+		ret := map[byte]int{}
+		for i, b := range keys {
+			ret[b] = f2 + i
+		}
+		return ret
+	}()
+)

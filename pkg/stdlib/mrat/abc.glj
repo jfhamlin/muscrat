@@ -116,6 +116,7 @@
   "Map from key to a map from note to the semitone offset (accidental)
   of that note in the key"
   {'C (fn [_] 0)
+   'D (fn [n] (if (contains? #{\F \C} n) 1 0))
    'G#m (fn [n] (if (contains? #{\A \C \D \F \G} n) 1 0))})
 
 (defn- note-pitch

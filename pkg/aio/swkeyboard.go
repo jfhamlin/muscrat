@@ -2,6 +2,7 @@ package aio
 
 import (
 	"context"
+	"fmt"
 	"math"
 	"sync"
 
@@ -62,9 +63,10 @@ func (s *SoftwareKeyboard) Start(ctx context.Context) error {
 	if s.cancel == nil {
 		s.cancel = pubsub.Subscribe("midi-event", func(evt string, data any) {
 			event := data.(map[string]interface{})
+			fmt.Printf("event: %v\n", event)
 			typ := event["type"].(string)
-			note := event["midiNumber"].(float64)
-			freq := math.Pow(2, (note-69)/12) * 440
+			note := float64(event["midiNumber"].(int))
+			fmt.Printf("note: %v\n", note)
 			switch typ {
 			case "noteOn":
 				// pick the oldest unused voice
@@ -77,7 +79,7 @@ func (s *SoftwareKeyboard) Start(ctx context.Context) error {
 					}
 				}
 				if selectedIdx >= 0 {
-					s.notes[selectedIdx] = freq
+					s.notes[selectedIdx] = note
 					s.gates[selectedIdx] = 1
 					s.counts[selectedIdx] = s.counter
 					s.counter++
@@ -85,7 +87,7 @@ func (s *SoftwareKeyboard) Start(ctx context.Context) error {
 				// TODO: reassign oldest note
 			case "noteOff":
 				for i := range s.notes {
-					if s.notes[i] == freq {
+					if s.notes[i] == note {
 						s.gates[i] = 0
 					}
 				}

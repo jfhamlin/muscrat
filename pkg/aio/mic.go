@@ -29,10 +29,14 @@ func chk(err error) {
 	}
 }
 
+const (
+	bufSize = 1024
+)
+
 var (
 	inStreamCount  int32
 	inStreamMtx    sync.RWMutex
-	inStreamChans  = make(map[*InputDevice]chan float64)
+	inStreamChans  = make(map[*InputDevice]chan []float64)
 	inStreamSem    = make(chan struct{}, 1)
 	inStreamCancel = make(chan struct{}, 1)
 )
@@ -46,7 +50,7 @@ func publishStream() {
 	portaudio.Initialize()
 	defer portaudio.Terminate()
 
-	in := make([]int32, 1024)
+	in := make([]int32, bufSize)
 	stream, err := portaudio.OpenDefaultStream(1, 0, 44100, len(in), in)
 	chk(err)
 	chk(stream.Start())
@@ -61,10 +65,16 @@ func publishStream() {
 		default:
 			chk(stream.Read())
 			inStreamMtx.RLock()
-			for _, sample := range in {
+			buf := make([]float64, len(in))
+			for i, sample := range in {
 				smp64 := float64(sample) / float64(math.MaxInt32)
-				for _, ch := range inStreamChans {
-					ch <- smp64
+				buf[i] = smp64
+			}
+			for _, ch := range inStreamChans {
+				select {
+				case ch <- buf:
+				default:
+					// don't wait for slow consumers
 				}
 			}
 			inStreamMtx.RUnlock()
@@ -73,7 +83,8 @@ func publishStream() {
 }
 
 type InputDevice struct {
-	sampleChan chan float64
+	latestBuf  []float64
+	sampleChan chan []float64
 	started    bool
 }
 
@@ -115,12 +126,18 @@ func (in *InputDevice) Stop(ctx context.Context) error {
 
 func NewInputDevice() ugen.UGen {
 	return &InputDevice{
-		sampleChan: make(chan float64, 1024),
+		// buffering to avoid blocking on intermittent interruptions
+		sampleChan: make(chan []float64, 4),
 	}
 }
 
 func (in *InputDevice) Gen(ctx context.Context, cfg ugen.SampleConfig, out []float64) {
-	for i := range out {
-		out[i] = <-in.sampleChan
+	for i := 0; i < len(out); i++ {
+		if len(in.latestBuf) == 0 {
+			in.latestBuf = <-in.sampleChan
+		}
+
+		out[i] = in.latestBuf[0]
+		in.latestBuf = in.latestBuf[1:]
 	}
 }
