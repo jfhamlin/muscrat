@@ -1,4 +1,4 @@
-(ns examples.wham
+(ns examples.qwerty
   (:require [mrat.core :refer :all] :reload
             [mrat.welsh :refer :all] :reload
             [mrat.abc :as abc] :reload
@@ -6,7 +6,6 @@
 
 (def qwerty (qwerty-in "keyboard" :voices 8))
 
-;; https://www.youtube.com/watch?v=3gMFvDGm1uM
 (def melody-score
   (abc/score
    {:clef :bass
