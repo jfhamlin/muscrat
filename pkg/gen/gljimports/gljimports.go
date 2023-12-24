@@ -50,6 +50,8 @@ func RegisterImports(_register func(string, interface{})) {
 	_register("github.com/jfhamlin/muscrat/pkg/aio.NewQwertyMIDI", github_com_jfhamlin_muscrat_pkg_aio.NewQwertyMIDI)
 	_register("github.com/jfhamlin/muscrat/pkg/aio.NewSoftwareKeyboard", github_com_jfhamlin_muscrat_pkg_aio.NewSoftwareKeyboard)
 	_register("github.com/jfhamlin/muscrat/pkg/aio.NewWavOut", github_com_jfhamlin_muscrat_pkg_aio.NewWavOut)
+	_register("github.com/jfhamlin/muscrat/pkg/aio.QwertyMIDI", reflect.TypeOf((*github_com_jfhamlin_muscrat_pkg_aio.QwertyMIDI)(nil)).Elem())
+	_register("github.com/jfhamlin/muscrat/pkg/aio.*QwertyMIDI", reflect.TypeOf((*github_com_jfhamlin_muscrat_pkg_aio.QwertyMIDI)(nil)))
 	_register("github.com/jfhamlin/muscrat/pkg/aio.SoftwareKeyboard", reflect.TypeOf((*github_com_jfhamlin_muscrat_pkg_aio.SoftwareKeyboard)(nil)).Elem())
 	_register("github.com/jfhamlin/muscrat/pkg/aio.*SoftwareKeyboard", reflect.TypeOf((*github_com_jfhamlin_muscrat_pkg_aio.SoftwareKeyboard)(nil)))
 	_register("github.com/jfhamlin/muscrat/pkg/aio.StdinChan", github_com_jfhamlin_muscrat_pkg_aio.StdinChan)
@@ -64,6 +66,7 @@ func RegisterImports(_register func(string, interface{})) {
 
 	// package github.com/jfhamlin/muscrat/pkg/effects
 	////////////////////////////////////////
+	_register("github.com/jfhamlin/muscrat/pkg/effects.NewAmplitude", github_com_jfhamlin_muscrat_pkg_effects.NewAmplitude)
 	_register("github.com/jfhamlin/muscrat/pkg/effects.NewBPF", github_com_jfhamlin_muscrat_pkg_effects.NewBPF)
 	_register("github.com/jfhamlin/muscrat/pkg/effects.NewBitcrusher", github_com_jfhamlin_muscrat_pkg_effects.NewBitcrusher)
 	_register("github.com/jfhamlin/muscrat/pkg/effects.NewClip", github_com_jfhamlin_muscrat_pkg_effects.NewClip)

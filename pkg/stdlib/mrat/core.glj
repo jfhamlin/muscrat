@@ -547,7 +547,10 @@
     lpf))
 
 (defn bpf
-  "A simple bandpass filter with center frequency and bandwidth."
+  "A simple bandpass filter with center frequency and bandwidth.
+   n - the input signal
+   freq - the center frequency in hertz
+   bw - the width of the filter, as a coefficient bandwidth/freq"
   [n freq bw]
   (let [n (as-node n)
         freq (as-node freq)
