@@ -36,7 +36,9 @@
            (github.com$jfhamlin$muscrat$pkg$mod NewEnvelope
                                                 WithReleaseNode
                                                 WithInterpolation)
-           (github.com$jfhamlin$muscrat$pkg$effects NewFreeverb
+           (github.com$jfhamlin$muscrat$pkg$effects NewAmplitude
+                                                    NewFreeverb
+                                                    NewLimiter
                                                     NewLowpassFilter
                                                     NewBPF
                                                     NewDelay
@@ -124,6 +126,17 @@
       (add-edge! (as-node e) n "exp")
       n)
     (math.Pow b e)))
+
+(defn sine
+  "Returns sin(theta). If theta is a node, creates a new node that
+  computes sin(theta). Else, returns the result of sin(theta)
+  directly."
+  [theta]
+  (if-not (instance? Node theta)
+    (math.Sin theta)
+    (let [n (add-node! (github.com$jfhamlin$muscrat$pkg$ugen.NewSine) "sine")]
+      (add-edge! theta n "in")
+      n)))
 
 (defn abs
   "Returns the absolute value of x. If x is a node, creates a new node
@@ -261,6 +274,8 @@
              colls (map #(take max-len (cycle %)) colls)]
          (apply map + colls))
        (apply +-internal args)))))
+
+(declare *)
 
 (defn -
   "Return the difference of any combination of numbers or ugens.
@@ -489,6 +504,36 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Effects
 
+(defn amplitude
+  ([in] (amplitude in 0.01 0.01))
+  ([in attack-time release-time & {:keys [mul add]}]
+   (let [opts []
+         opts (if mul (conj opts (WithMul mul)) opts)
+         opts (if add (conj opts (WithAdd add)) opts)
+         node (add-node! (apply NewAmplitude attack-time release-time opts) "amplitude")]
+     (add-edge! (as-node in) node "in")
+     node)))
+
+(defn limiter
+  "Limits the input amplitude to the given level. Limiter will not
+  overshoot, but it needs to look ahead in the audio. Thus there is a
+  delay equal to twice the value of the dur parameter.
+
+  Limiter is completely transparent for an in range signal.
+
+  in - The signal to be processed.
+  level - The peak output amplitude level to which to normalize the input.
+  dur - aka lookAheadTime. The buffer delay time. Shorter times will
+        produce smaller delays and quicker transient response times, but may
+        introduce amplitude modulation artifacts."
+  ([in] (limiter in 1.0))
+  ([in level] (limiter in level 0.01))
+  ([in level dur]
+   (let [node (add-node! (NewLimiter dur) "limiter")]
+     (add-edge! (as-node in) node "in")
+     (add-edge! (as-node level) node "amp")
+     node)))
+
 (defn pipe
   "Create a pipe, which copies the input to the output. The input may be
   set with pipeset!. This is useful for creating feedback loops."
@@ -634,27 +679,32 @@
   [in max-delay-time delay-time decay-time & flags]
   (apply -comb in max-delay-time delay-time decay-time delayc flags))
 
-(defn pan2
-  ([in pos] (pan2 in pos 1))
-  ([in pos level]
-   (let [pos (as-node pos)
-         mid (as-node 0.707)
-         sq (* -0.207 pos pos)
-         left-scale (+ mid (* -0.5 pos) sq)
-         right-scale (+ mid (* 0.5 pos) sq)]
-     [(* level left-scale in)
-      (* level right-scale in)])))
-
 (defn clip
   "Clip an input signal when it exceeds threshold low/high values."
   ([in] (clip in -1 1))
   ([in lo hi]
-   (let [c (add-node! (NewClip) "clip")
-         [in lo hi] (map as-node [in lo hi])]
-     (add-edge! in c "in")
-     (add-edge! lo c "lo")
-     (add-edge! hi c "hi")
-     c)))
+   (if (some (partial instance? Node) [in lo hi])
+     (let [c (add-node! (NewClip) "clip")
+           [in lo hi] (map as-node [in lo hi])]
+       (add-edge! in c "in")
+       (add-edge! lo c "lo")
+       (add-edge! hi c "hi")
+       c)
+     (-> in
+         (max lo)
+         (min hi)))))
+
+(defn pan2
+  ([in pos] (pan2 in pos 1))
+  ([in pos level]
+   (let [pos (clip pos)
+         pi4 (* math.Pi 0.25)
+         pi2 (* math.Pi 0.5)
+         theta (+ (* pi4 pos) pi4)
+         lamp (* level (sine (- pi2 theta)))
+         ramp (* level (sine theta))]
+     [(* in lamp)
+      (* in ramp)])))
 
 (defn wfold
   "Fold an input signal when it exceeds threshold low/high values.

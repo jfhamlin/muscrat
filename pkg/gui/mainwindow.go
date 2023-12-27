@@ -1,7 +1,6 @@
 package gui
 
 import (
-	"fmt"
 	"math"
 	"math/cmplx"
 	"strings"
@@ -107,7 +106,6 @@ func NewMainWindow(a fyne.App) *MainWindow {
 		activeNotes := map[byte]int{}
 		if canvas, ok := w.Canvas().(desktop.Canvas); ok {
 			canvas.SetOnKeyDown(func(evt *fyne.KeyEvent) {
-				fmt.Printf("key down: %+v\n", evt)
 				if evt.Name == "Up" {
 					octaveOffset++
 					if octaveOffset > 6 {
@@ -137,7 +135,6 @@ func NewMainWindow(a fyne.App) *MainWindow {
 				})
 			})
 			canvas.SetOnKeyUp(func(evt *fyne.KeyEvent) {
-				fmt.Printf("key up: %+v\n", evt)
 				if len(evt.Name) != 1 {
 					return
 				}

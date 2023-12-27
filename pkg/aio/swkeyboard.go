@@ -2,7 +2,6 @@ package aio
 
 import (
 	"context"
-	"fmt"
 	"math"
 	"sync"
 
@@ -63,10 +62,8 @@ func (s *SoftwareKeyboard) Start(ctx context.Context) error {
 	if s.cancel == nil {
 		s.cancel = pubsub.Subscribe("midi-event", func(evt string, data any) {
 			event := data.(map[string]interface{})
-			fmt.Printf("event: %v\n", event)
 			typ := event["type"].(string)
 			note := float64(event["midiNumber"].(int))
-			fmt.Printf("note: %v\n", note)
 			switch typ {
 			case "noteOn":
 				// pick the oldest unused voice
