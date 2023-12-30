@@ -1,0 +1,5 @@
+(ns examples.micin
+  (:require [mrat.core :refer :all]))
+
+(play (-> (sound-in)
+          (delayc 1 0.5)))

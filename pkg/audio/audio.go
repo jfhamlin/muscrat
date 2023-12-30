@@ -39,9 +39,9 @@ func Open(opts ...Option) error {
 		panic("audio already open")
 	}
 
-	// By default, 32-bit float samples, stereo, 44100 Hz
+	// By default, 32-bit float samples, stereo, sample rate
 	spec := &sdl.AudioSpec{
-		Freq:     44100,
+		Freq:     int32(conf.SampleRate),
 		Format:   sdl.AUDIO_F32SYS,
 		Channels: 2,
 		Samples:  uint16(conf.BufferSize),

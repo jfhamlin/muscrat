@@ -4,15 +4,14 @@ import (
 	"context"
 	"math"
 
+	"github.com/jfhamlin/muscrat/pkg/conf"
 	"github.com/jfhamlin/muscrat/pkg/ugen"
-)
-
-const (
-	sampleRate = 44100 // TODO: move to central, configurable location
 )
 
 var (
 	log1 = math.Log(0.1)
+
+	sampleRate = float64(conf.SampleRate)
 )
 
 func NewAmplitude(attackTime, releaseTime float64, opts ...ugen.Option) ugen.UGen {

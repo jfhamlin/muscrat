@@ -6,6 +6,7 @@ import (
 
 	"github.com/go-audio/audio"
 	"github.com/go-audio/wav"
+	"github.com/jfhamlin/muscrat/pkg/conf"
 )
 
 func LoadSample(filename string) []float64 {
@@ -46,12 +47,9 @@ func LoadSample(filename string) []float64 {
 		floatSamples = append(floatSamples, floatSample)
 	}
 
-	// resample to 44100 Hz, assumed to be the sample rate of the audio device
-	// TODOs:
-	// - make this configurable
-	// - don't assume 44100 Hz
-	const deviceSampleRate = 44100
-	if dec.SampleRate != deviceSampleRate {
+	deviceSampleRate := conf.SampleRate
+	// TODO: use lib to resample
+	if dec.SampleRate != uint32(deviceSampleRate) {
 		outputSamples := make([]float64, len(floatSamples)*deviceSampleRate/int(dec.SampleRate))
 		for i := range outputSamples {
 			t := float64(i) / float64(len(outputSamples)-1)

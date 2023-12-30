@@ -4,6 +4,7 @@ import (
 	"context"
 	"math"
 
+	"github.com/jfhamlin/muscrat/pkg/conf"
 	"github.com/jfhamlin/muscrat/pkg/ugen"
 )
 
@@ -15,7 +16,7 @@ func NewLimiter(dur float64) ugen.UGen {
 	// will produce smaller delays and quicker transient response times,
 	// but may introduce amplitude modulation artifacts.
 
-	bufsize := int(math.Ceil(dur * 44100))
+	bufsize := int(math.Ceil(dur * float64(conf.SampleRate)))
 	if bufsize < 1 {
 		bufsize = 1
 	}

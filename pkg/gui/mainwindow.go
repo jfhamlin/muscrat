@@ -12,6 +12,7 @@ import (
 	"fyne.io/fyne/v2/layout"
 	"gonum.org/v1/gonum/dsp/fourier"
 
+	"github.com/jfhamlin/muscrat/pkg/conf"
 	"github.com/jfhamlin/muscrat/pkg/gui/chart"
 	"github.com/jfhamlin/muscrat/pkg/gui/meter"
 	"github.com/jfhamlin/muscrat/pkg/pubsub"
@@ -19,7 +20,6 @@ import (
 
 const (
 	sampleBufferSize = 4096 * 2
-	sampleRate       = 44100
 	scopeUpdateRate  = 15
 )
 
@@ -59,7 +59,7 @@ func NewMainWindow(a fyne.App) *MainWindow {
 			Label: "Frequency (Hz)",
 			Log:   true,
 			Min:   20,
-			Max:   sampleRate / 2,
+			Max:   float64(conf.SampleRate) / 2,
 			Clamp: true,
 		},
 		Y: chart.AxisConfig{
@@ -203,7 +203,7 @@ func fft(samples []float64) (freqs, powerDB []float64) {
 
 	freqs = make([]float64, len(db))
 	for i := range freqs {
-		freqs[i] = float64(i) * sampleRate / float64(len(samples))
+		freqs[i] = float64(i) * float64(conf.SampleRate) / float64(len(samples))
 	}
 	freqs[0] += 0.0001 // avoid log(0)
 

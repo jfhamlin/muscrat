@@ -7,7 +7,9 @@ import (
 	"sync"
 
 	"github.com/gordonklaus/portaudio"
+	"github.com/jfhamlin/muscrat/pkg/conf"
 	"github.com/jfhamlin/muscrat/pkg/ugen"
+	"github.com/oov/audio/resampler"
 
 	// pprof
 	"net/http"
@@ -50,8 +52,19 @@ func publishStream() {
 	portaudio.Initialize()
 	defer portaudio.Terminate()
 
+	micSampleRate := conf.SampleRate
+	if !sampleRateSupported(micSampleRate) {
+		// fall back to 44100, which is very likely to be supported on all
+		// systems.
+		micSampleRate = 44100
+	}
+	// :shrug: just use quality 10 (0-10)
+	rsmp := resampler.NewWithSkipZeros(1, micSampleRate, conf.SampleRate, 10)
+	ratio := float64(conf.SampleRate) / float64(micSampleRate)
+	resampleOutBuf := make([]float64, int(bufSize*ratio+1))
+
 	in := make([]int32, bufSize)
-	stream, err := portaudio.OpenDefaultStream(1, 0, 44100, len(in), in)
+	stream, err := portaudio.OpenDefaultStream(1, 0, float64(micSampleRate), len(in), in)
 	chk(err)
 	chk(stream.Start())
 	defer func() {
@@ -70,9 +83,17 @@ func publishStream() {
 				smp64 := float64(sample) / float64(math.MaxInt32)
 				buf[i] = smp64
 			}
+			out := buf
+			if micSampleRate != conf.SampleRate {
+				rn, wn := rsmp.ProcessFloat64(0, buf, resampleOutBuf)
+				if rn != len(buf) {
+					panic(fmt.Sprintf("resampler did not process all samples: %d != %d", rn, len(buf)))
+				}
+				out = resampleOutBuf[:wn]
+			}
 			for _, ch := range inStreamChans {
 				select {
-				case ch <- buf:
+				case ch <- out:
 				default:
 					// don't wait for slow consumers
 				}
@@ -80,6 +101,23 @@ func publishStream() {
 			inStreamMtx.RUnlock()
 		}
 	}
+}
+
+func sampleRateSupported(rate int) bool {
+	defaultInputDevice, err := portaudio.DefaultInputDevice()
+	if err != nil {
+		return false
+	}
+
+	err = portaudio.IsFormatSupported(portaudio.StreamParameters{
+		Input: portaudio.StreamDeviceParameters{
+			Device:   defaultInputDevice,
+			Channels: 1,
+		},
+		SampleRate: float64(rate),
+	}, make([]int32, bufSize))
+
+	return err == nil
 }
 
 type InputDevice struct {

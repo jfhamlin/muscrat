@@ -11,11 +11,7 @@ const (
 	maxBandLimitedFreq       = 20480
 	bandLimitedSemitoneRange = 4
 
-	// TODO: make this configurable, though this isn't horrible; we'll
-	// still be removing inaudible frequencies even if they wouldn't
-	// alias at the higher sample rate.
-	sampleRate = 44100
-	nyquist    = sampleRate / 2
+	maxAudibleFrequency = 20000
 )
 
 func (t *Table) HermiteBL(freq, x float64) float64 {
@@ -66,7 +62,7 @@ func (t *Table) genBandLimited() {
 		if i == numTables-1 && freq != maxBandLimitedFreq {
 			panic("wavtabs: internal error: last band-limited table has incorrect frequency")
 		}
-		tbl := t.bandLimited(freq, nyquist)
+		tbl := t.bandLimited(freq, maxAudibleFrequency)
 		t.bandLimitedTbls[i] = append(tbl, tbl[0])
 		t.bandLimitedFreqs[i] = freq
 	}
