@@ -10,7 +10,7 @@ const (
 	minSizeLog2 = 6
 
 	MinSize = 1 << minSizeLog2 // 64
-	MaxSize = 1 << 11          // 2048
+	MaxSize = 1 << 15          // 32768
 )
 
 var (

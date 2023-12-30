@@ -4,6 +4,7 @@ import (
 	"time"
 	"unsafe"
 
+	"github.com/jfhamlin/muscrat/pkg/conf"
 	"github.com/veandco/go-sdl2/sdl"
 )
 
@@ -43,7 +44,7 @@ func Open(opts ...Option) error {
 		Freq:     44100,
 		Format:   sdl.AUDIO_F32SYS,
 		Channels: 2,
-		Samples:  512,
+		Samples:  uint16(conf.BufferSize),
 	}
 	if err := sdl.OpenAudio(spec, nil); err != nil {
 		return err

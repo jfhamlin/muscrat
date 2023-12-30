@@ -11,6 +11,7 @@ import (
 	value "github.com/glojurelang/glojure/pkg/lang"
 	"github.com/glojurelang/glojure/pkg/runtime"
 
+	"github.com/jfhamlin/muscrat/pkg/conf"
 	"github.com/jfhamlin/muscrat/pkg/graph"
 )
 
@@ -28,7 +29,7 @@ func EvalScript(filename string) (g *graph.Graph, err error) {
 	require := glj.Var("glojure.core", "require")
 	require.Invoke(glj.Read("mrat.core"))
 
-	g = &graph.Graph{BufferSize: bufferSize}
+	g = &graph.Graph{BufferSize: conf.BufferSize}
 	value.PushThreadBindings(value.NewMap(
 		glj.Var("mrat.core", "*graph*"), g,
 	))

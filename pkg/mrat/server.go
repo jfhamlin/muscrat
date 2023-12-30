@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/jfhamlin/muscrat/pkg/bufferpool"
+	"github.com/jfhamlin/muscrat/pkg/conf"
 	"github.com/jfhamlin/muscrat/pkg/gen/gljimports"
 	"github.com/jfhamlin/muscrat/pkg/graph"
 	"github.com/jfhamlin/muscrat/pkg/pubsub"
@@ -39,8 +40,6 @@ func init() {
 }
 
 const (
-	bufferSize = 128
-
 	vizBufferFlushSize = 1024
 )
 
@@ -204,7 +203,7 @@ func (s *Server) fadeTo(gr *graphRunner) {
 }
 
 func (s *Server) sendSamples() {
-	timePerBuf := time.Duration(bufferSize) * time.Second / time.Duration(audio.SampleRate())
+	timePerBuf := time.Duration(conf.BufferSize) * time.Second / time.Duration(audio.SampleRate())
 	for {
 		start := time.Now()
 		channelSamples := <-s.outputChannel
@@ -356,7 +355,7 @@ func (gr *graphRunner) outputTo(output chan<- [][]float64) {
 ////////////////////////////////////////////////////////////////////////////////
 
 func zeroGraph() *graph.Graph {
-	g := &graph.Graph{BufferSize: bufferSize}
+	g := &graph.Graph{BufferSize: conf.BufferSize}
 	s0 := g.AddOutNode()
 	s1 := g.AddOutNode()
 	zero := g.AddGeneratorNode(ugen.NewConstant(0))
