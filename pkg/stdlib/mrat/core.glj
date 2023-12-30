@@ -402,11 +402,13 @@
 
 (defn impulse
   [freq & flags]
-  (let [flags (validate-flags flags {:iphase 0})
+  (let [flags (validate-flags flags {:iphase 0 :mul 1.0 :add 0.0})
         iphase (:iphase flags)
         iphase (if iphase (as-node iphase))
         freq-node (as-node freq)
-        node (add-node! (NewImpulse) (WithLabel "impulse"))]
+        opts [(github.com$jfhamlin$muscrat$pkg$ugen.WithMul (:mul flags))
+              (github.com$jfhamlin$muscrat$pkg$ugen.WithAdd (:add flags))]
+        node (add-node! (apply NewImpulse opts) (WithLabel "impulse"))]
     (if iphase (add-edge! iphase node "iphase"))
     (add-edge! freq-node node "w")
     node))

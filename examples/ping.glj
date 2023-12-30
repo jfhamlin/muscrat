@@ -1,0 +1,26 @@
+(ns examples.ping
+  "Pinging in programmatic synthesizers involves using a sharp, brief
+  trigger signal to excite a resonant filter, producing a distinctive,
+  percussive sound. This technique is commonly used to create
+  rhythmic, tonal elements that mimic the characteristics of physical
+  percussion instruments."
+  (:require [mrat.core :refer :all]))
+
+(def feedback (pipe))
+
+(def click (impulse 4 :mul 2 :add -1))
+
+(defn filter-bank
+  [in freqs]
+  (map #(bpf in % 0.002) freqs))
+
+(def filtered
+  (let [freqs [100 200 800 1600 3200 6400]]
+    (-> (sum (filter-bank feedback freqs))
+        (* (decibels 20)))))
+
+(pipeset! feedback (+ click (* filtered 0.4)))
+
+(play (-> filtered
+          (combc 1 0.05 1)
+          (limiter 0.9)))

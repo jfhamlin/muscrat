@@ -5,7 +5,15 @@ import (
 	"math"
 )
 
-func NewImpulse() UGen {
+func NewImpulse(opts ...Option) UGen {
+	o := DefaultOptions()
+	for _, opt := range opts {
+		opt(&o)
+	}
+
+	add := o.Add
+	mul := o.Mul
+
 	var phaseOffset, freq, phase, phaseIncrement float64
 	initialized := false
 
@@ -45,7 +53,9 @@ func NewImpulse() UGen {
 			phase += phaseIncrement
 			if phase >= 1 {
 				phase = math.Mod(phase, 1)
-				out[i] = 1
+				out[i] = mul*1 + add
+			} else {
+				out[i] = add
 			}
 		}
 	})

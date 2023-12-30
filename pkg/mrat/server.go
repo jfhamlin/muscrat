@@ -212,7 +212,7 @@ func (s *Server) sendSamples() {
 			fmt.Printf("WARNING: expected %d channels, got %d\n", audio.NumChannels(), len(channelSamples))
 			continue
 		}
-		if dur := time.Since(start); dur > timePerBuf {
+		if dur := time.Since(start); dur > timePerBuf && false { // Enable to debug buffer timeouts.
 			fmt.Printf("WARNING: buffer took %s to fill, expected %s\n", dur, timePerBuf)
 		}
 
