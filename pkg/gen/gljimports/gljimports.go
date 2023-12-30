@@ -72,8 +72,13 @@ func RegisterImports(_register func(string, interface{})) {
 	_register("github.com/jfhamlin/muscrat/pkg/effects.NewClip", github_com_jfhamlin_muscrat_pkg_effects.NewClip)
 	_register("github.com/jfhamlin/muscrat/pkg/effects.NewDelay", github_com_jfhamlin_muscrat_pkg_effects.NewDelay)
 	_register("github.com/jfhamlin/muscrat/pkg/effects.NewFreeverb", github_com_jfhamlin_muscrat_pkg_effects.NewFreeverb)
+	_register("github.com/jfhamlin/muscrat/pkg/effects.NewHiShelf", github_com_jfhamlin_muscrat_pkg_effects.NewHiShelf)
 	_register("github.com/jfhamlin/muscrat/pkg/effects.NewLimiter", github_com_jfhamlin_muscrat_pkg_effects.NewLimiter)
+	_register("github.com/jfhamlin/muscrat/pkg/effects.NewLoShelf", github_com_jfhamlin_muscrat_pkg_effects.NewLoShelf)
 	_register("github.com/jfhamlin/muscrat/pkg/effects.NewLowpassFilter", github_com_jfhamlin_muscrat_pkg_effects.NewLowpassFilter)
+	_register("github.com/jfhamlin/muscrat/pkg/effects.NewPeakEQ", github_com_jfhamlin_muscrat_pkg_effects.NewPeakEQ)
+	_register("github.com/jfhamlin/muscrat/pkg/effects.NewRHPF", github_com_jfhamlin_muscrat_pkg_effects.NewRHPF)
+	_register("github.com/jfhamlin/muscrat/pkg/effects.NewRLPF", github_com_jfhamlin_muscrat_pkg_effects.NewRLPF)
 	_register("github.com/jfhamlin/muscrat/pkg/effects.NewTapeDelay", github_com_jfhamlin_muscrat_pkg_effects.NewTapeDelay)
 	_register("github.com/jfhamlin/muscrat/pkg/effects.NewWaveFolder", github_com_jfhamlin_muscrat_pkg_effects.NewWaveFolder)
 	_register("github.com/jfhamlin/muscrat/pkg/effects.WaveFolder", reflect.TypeOf((*github_com_jfhamlin_muscrat_pkg_effects.WaveFolder)(nil)).Elem())
@@ -179,6 +184,7 @@ func RegisterImports(_register func(string, interface{})) {
 	_register("github.com/jfhamlin/muscrat/pkg/ugen.WithMul", github_com_jfhamlin_muscrat_pkg_ugen.WithMul)
 	_register("github.com/jfhamlin/muscrat/pkg/ugen.WithRand", github_com_jfhamlin_muscrat_pkg_ugen.WithRand)
 	_register("github.com/jfhamlin/muscrat/pkg/ugen.WithSeed", github_com_jfhamlin_muscrat_pkg_ugen.WithSeed)
+	_register("github.com/jfhamlin/muscrat/pkg/ugen.ZapGremlins", github_com_jfhamlin_muscrat_pkg_ugen.ZapGremlins)
 
 	// package github.com/jfhamlin/muscrat/pkg/wavtabs
 	////////////////////////////////////////

@@ -102,6 +102,14 @@ func (lc *LineChart) SetData(xs, ys []float64) {
 	}
 	copy(newXs, xs)
 	copy(newYs, ys)
+	for i := range newYs {
+		if newXs != nil && math.IsNaN(newXs[i]) {
+			newXs[i] = 0
+		}
+		if math.IsNaN(newYs[i]) {
+			newYs[i] = 0
+		}
+	}
 
 	lc.dataMtx.Lock()
 	lc.xs = newXs
@@ -209,8 +217,15 @@ func (r *lineChartRenderer) Layout(size fyne.Size) {
 			return
 		}
 	}
+	w, h := size.Width, size.Height
+	if w <= 0 {
+		w = 1
+	}
+	if h <= 0 {
+		h = 1
+	}
 
-	r.pltCanvas = vgimg.New(font.Length(size.Width), font.Length(size.Height))
+	r.pltCanvas = vgimg.New(font.Length(w), font.Length(h))
 	r.image = canvas.NewImageFromImage(r.pltCanvas.Image())
 	r.image.FillMode = canvas.ImageFillContain
 	r.image.SetMinSize(size)
@@ -288,7 +303,7 @@ func (t log2Ticks) Ticks(min, max float64) []plot.Tick {
 			if ticks[i].Label == "" {
 				continue
 			}
-			if labelIndex%keep != 0 {
+			if keep == 0 || labelIndex%keep != 0 {
 				ticks[i].Label = ""
 			}
 			labelIndex++

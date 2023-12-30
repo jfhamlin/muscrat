@@ -75,7 +75,9 @@ func NewMainWindow(a fyne.App) *MainWindow {
 
 	scopes := container.NewVSplit(osc, spect)
 	logoMeter := container.New(layout.NewBorderLayout(logo, nil, nil, nil), logo, volumeMeter)
-	contents := container.New(layout.NewBorderLayout(nil, nil, logoMeter, nil), logoMeter, scopes)
+	console := NewConsole()
+	contents := container.New(
+		layout.NewBorderLayout(nil, nil, logoMeter, console), logoMeter, scopes, console)
 
 	w.SetContent(contents)
 

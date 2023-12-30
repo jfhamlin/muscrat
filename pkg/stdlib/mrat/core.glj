@@ -40,7 +40,12 @@
                                                     NewFreeverb
                                                     NewLimiter
                                                     NewLowpassFilter
+                                                    NewRLPF
+                                                    NewRHPF
                                                     NewBPF
+                                                    NewLoShelf
+                                                    NewHiShelf
+                                                    NewPeakEQ
                                                     NewDelay
                                                     NewTapeDelay
                                                     NewWaveFolder
@@ -504,7 +509,7 @@
     sig))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; Effects
+;; Filters and Effects
 
 (defn amplitude
   ([in] (amplitude in 0.01 0.01))
@@ -582,7 +587,8 @@
     fv-node))
 
 (defn lores
-  "A simple lowpass filter with cutoff and resonance."
+  "A simple lowpass filter with cutoff and resonance, modeled after the
+  Max/MSP lores~ object."
   [n cutoff res]
   (let [n (as-node n)
         cutoff (as-node cutoff)
@@ -592,6 +598,32 @@
     (add-edge! cutoff lpf "cutoff")
     (add-edge! res lpf "resonance")
     lpf))
+
+(defn rlpf
+  "A resonant low-pass filter."
+  [in freq rq & {:keys [mul add]}]
+  (let [in (as-node in)
+        freq (as-node freq)
+        rq (as-node rq)
+        opts [(WithMul (or mul 1.0)) (WithAdd (or add 0.0))]
+        node (add-node! (apply NewRLPF opts) "rlpf")]
+    (add-edge! in node "in")
+    (add-edge! freq node "freq")
+    (add-edge! rq node "reson")
+    node))
+
+(defn rhpf
+  "A resonant high-pass filter."
+  [in freq rq & {:keys [mul add]}]
+  (let [in (as-node in)
+        freq (as-node freq)
+        rq (as-node rq)
+        opts [(WithMul (or mul 1.0)) (WithAdd (or add 0.0))]
+        node (add-node! (apply NewRHPF opts) "rhpf")]
+    (add-edge! in node "in")
+    (add-edge! freq node "freq")
+    (add-edge! rq node "reson")
+    node))
 
 (defn bpf
   "A simple bandpass filter with center frequency and bandwidth.
@@ -607,6 +639,63 @@
     (add-edge! freq filter "w")
     (add-edge! bw filter "bw")
     filter))
+
+(defn loshelf
+  ([in] (loshelf in 1200.0))
+  ([in freq] (loshelf in freq 1.0))
+  ([in freq rs] (loshelf in freq rs 0))
+  ([in freq rs db & {:keys [mul add]}]
+   (let [in (as-node in)
+         freq (as-node freq)
+         rs (as-node rs)
+         db (as-node db)
+         mul (or mul 1.0)
+         add (or add 0.0)
+         opts [(WithMul mul) (WithAdd add)]
+         node (add-node! (apply NewLoShelf opts) "loshelf")]
+     (add-edge! in node "in")
+     (add-edge! freq node "w")
+     (add-edge! rs node "rs")
+     (add-edge! db node "db")
+     node)))
+
+(defn hishelf
+  ([in] (hishelf in 1200.0))
+  ([in freq] (hishelf in freq 1.0))
+  ([in freq rs] (hishelf in freq rs 0))
+  ([in freq rs db & {:keys [mul add]}]
+   (let [in (as-node in)
+         freq (as-node freq)
+         rs (as-node rs)
+         db (as-node db)
+         mul (or mul 1.0)
+         add (or add 0.0)
+         opts [(WithMul mul) (WithAdd add)]
+         node (add-node! (apply NewHiShelf opts) "hishelf")]
+     (add-edge! in node "in")
+     (add-edge! freq node "w")
+     (add-edge! rs node "rs")
+     (add-edge! db node "db")
+     node)))
+
+(defn peakeq
+  ([in] (peakeq in 1200.0))
+  ([in freq] (peakeq in freq 1.0))
+  ([in freq rq] (peakeq in freq rq 0))
+  ([in freq rq db & {:keys [mul add]}]
+   (let [in (as-node in)
+         freq (as-node freq)
+         rq (as-node rq)
+         db (as-node db)
+         mul (or mul 1.0)
+         add (or add 0.0)
+         opts [(WithMul mul) (WithAdd add)]
+         node (add-node! (apply NewPeakEQ opts) "peakeq")]
+     (add-edge! in node "in")
+     (add-edge! freq node "w")
+     (add-edge! rq node "rq")
+     (add-edge! db node "db")
+     node)))
 
 (defn- -delay
   [in max-delay-time delay-time interp-opt & flags]
