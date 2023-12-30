@@ -5,9 +5,11 @@ import (
 	"fmt"
 	"math"
 	"sync"
+	"time"
 
 	"github.com/gordonklaus/portaudio"
 	"github.com/jfhamlin/muscrat/pkg/conf"
+	"github.com/jfhamlin/muscrat/pkg/pubsub"
 	"github.com/jfhamlin/muscrat/pkg/ugen"
 	"github.com/oov/audio/resampler"
 
@@ -32,7 +34,7 @@ func chk(err error) {
 }
 
 const (
-	bufSize = 1024
+	bufDur = 20 * time.Millisecond // grab 20ms of audio at a time
 )
 
 var (
@@ -58,12 +60,15 @@ func publishStream() {
 		// systems.
 		micSampleRate = 44100
 	}
+	bufSize := int(float64(micSampleRate) * bufDur.Seconds())
+
 	// :shrug: just use quality 10 (0-10)
 	rsmp := resampler.NewWithSkipZeros(1, micSampleRate, conf.SampleRate, 10)
 	ratio := float64(conf.SampleRate) / float64(micSampleRate)
-	resampleOutBuf := make([]float64, int(bufSize*ratio+1))
 
+	resampleOutBuf := make([]float64, int(float64(bufSize)*ratio+1))
 	in := make([]int32, bufSize)
+
 	stream, err := portaudio.OpenDefaultStream(1, 0, float64(micSampleRate), len(in), in)
 	chk(err)
 	chk(stream.Start())
@@ -78,6 +83,7 @@ func publishStream() {
 		default:
 			chk(stream.Read())
 			inStreamMtx.RLock()
+
 			buf := make([]float64, len(in))
 			for i, sample := range in {
 				smp64 := float64(sample) / float64(math.MaxInt32)
@@ -94,8 +100,8 @@ func publishStream() {
 			for _, ch := range inStreamChans {
 				select {
 				case ch <- out:
-				default:
-					// don't wait for slow consumers
+				default: // don't wait for slow consumers
+					pubsub.Publish("console.debug", "dropping audio sample")
 				}
 			}
 			inStreamMtx.RUnlock()
@@ -115,7 +121,7 @@ func sampleRateSupported(rate int) bool {
 			Channels: 1,
 		},
 		SampleRate: float64(rate),
-	}, make([]int32, bufSize))
+	}, make([]int32, 1024))
 
 	return err == nil
 }

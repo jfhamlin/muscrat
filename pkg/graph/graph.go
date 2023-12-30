@@ -239,9 +239,6 @@ func (g *Graph) OutputChans() []SinkChan {
 }
 
 func (g *Graph) Node(id NodeID) Node {
-	if int(id) >= len(g.Nodes) {
-		return nil
-	}
 	return g.Nodes[id]
 }
 
