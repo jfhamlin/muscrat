@@ -159,6 +159,8 @@ func RegisterImports(_register func(string, interface{})) {
 	_register("github.com/jfhamlin/muscrat/pkg/ugen.NewConstant", github_com_jfhamlin_muscrat_pkg_ugen.NewConstant)
 	_register("github.com/jfhamlin/muscrat/pkg/ugen.NewCopySign", github_com_jfhamlin_muscrat_pkg_ugen.NewCopySign)
 	_register("github.com/jfhamlin/muscrat/pkg/ugen.NewExp", github_com_jfhamlin_muscrat_pkg_ugen.NewExp)
+	_register("github.com/jfhamlin/muscrat/pkg/ugen.NewFMA", github_com_jfhamlin_muscrat_pkg_ugen.NewFMA)
+	_register("github.com/jfhamlin/muscrat/pkg/ugen.NewFMAStatic", github_com_jfhamlin_muscrat_pkg_ugen.NewFMAStatic)
 	_register("github.com/jfhamlin/muscrat/pkg/ugen.NewFreqRatio", github_com_jfhamlin_muscrat_pkg_ugen.NewFreqRatio)
 	_register("github.com/jfhamlin/muscrat/pkg/ugen.NewImpulse", github_com_jfhamlin_muscrat_pkg_ugen.NewImpulse)
 	_register("github.com/jfhamlin/muscrat/pkg/ugen.NewMIDIFreq", github_com_jfhamlin_muscrat_pkg_ugen.NewMIDIFreq)

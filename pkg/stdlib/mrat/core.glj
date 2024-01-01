@@ -6,6 +6,8 @@
            (github.com$jfhamlin$muscrat$pkg$ugen NewConstant
                                                  NewSum
                                                  NewProduct
+                                                 NewFMA
+                                                 NewFMAStatic
                                                  NewQuotient
                                                  NewAbs
                                                  NewExp
@@ -121,6 +123,19 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; macros
 
+(defn fma
+  [in mul add]
+  (if (and (== mul 1) (== add 0))
+      in
+      (let [node (if (and (number? mul)
+                          (number? add))
+                   (add-node! (NewFMAStatic mul add) "fma")
+                   (let [n (add-node! (NewFMA mul add) "fma")]
+                     (add-edge! (as-node mul) n "mul")
+                     (add-edge! (as-node add) n "add")
+                     n))]
+        (add-edge! (as-node in) node "in"))))
+
 (defmacro defugen
   "Defines a new generator node constructor with semantics similar to defn,
   but with specific constraints and enhancements for argument
@@ -163,7 +178,7 @@
              ugen# (do ~@body)]
          (let [mul# (get ~assignments-sym :mul 1)
                add# (get ~assignments-sym :add 0)]
-           (+ (* mul# ugen#) add#))))))
+           (fma ugen# mul# add#))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Utilities
