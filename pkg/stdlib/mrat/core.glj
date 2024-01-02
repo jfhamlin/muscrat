@@ -435,25 +435,22 @@
 
 (defmacro defosc
   [name ctor & {:keys [default-duty] :or {default-duty 1}}]
-  `(defugen ~name
-     [~'freq default-freq
-      ~'duty nil
-      ~'phase nil
-      ~'sync nil
-      ~'iphase nil]
-     (let [wt-opts# [(~'WithDefaultDutyCycle ~default-duty)]
-           gen# (apply ~ctor wt-opts#)
-           label# (~'WithLabel ~(str name))
-           osc-node# (add-node! gen# label#)
-           freq-node# (as-node ~'freq)]
-       (add-edge! freq-node# osc-node# "w")
-;;       (handle-extra-gen-args osc-node# {})
-       osc-node#)))
+  (let [opt-args '[duty iphase sync phase]]
+    `(defugen ~name
+       [~'freq default-freq
+        ~@(mapcat #(vector % nil) opt-args)]
+       (let [wt-opts# [(~'WithDefaultDutyCycle ~default-duty)]
+             gen# (apply ~ctor wt-opts#)
+             label# (~'WithLabel ~(str name))
+             osc-node# (add-node! gen# label#)
+             freq-node# (as-node ~'freq)
+             extra-args# ~(mapv #(vector (keyword %) %) opt-args)
+             extra-args# (into {} (remove (comp nil? second) extra-args#))]
+         (add-edge! freq-node# osc-node# "w")
+         (handle-extra-gen-args osc-node# extra-args#)
+         osc-node#))))
 
 (defosc sin NewSine)
-
-(println (macroexpand '(defosc sin NewSine)))
-
 (defosc saw NewSaw)
 (defosc tri NewTri)
 (defosc phasor NewPhasor)
