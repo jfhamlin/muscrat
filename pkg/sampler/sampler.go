@@ -7,38 +7,31 @@ import (
 	"github.com/jfhamlin/muscrat/pkg/ugen"
 )
 
-func NewSampler(buf []float64, loop bool) ugen.UGen {
+func NewSampler(buf []float64) ugen.UGen {
 	if len(buf) == 0 {
 		return ugen.NewConstant(0)
 	}
 
 	sampleLen := float64(len(buf))
 	index := 0.0
-	lastGate := false
+	lastTrig := false
 	stopped := true
 	return ugen.UGenFunc(func(ctx context.Context, cfg ugen.SampleConfig, out []float64) {
-		gate := cfg.InputSamples["trigger"]
+		trigs := cfg.InputSamples["trigger"]
 		rates := cfg.InputSamples["rate"]
-		if len(gate) == 0 {
-			// always play if no trigger
-			stopped = false
-			lastGate = true
-		}
+		loops := cfg.InputSamples["loop"]
+		startIndex := cfg.InputSamples["start-pos"]
 
 		for i := range out {
-			if !lastGate && gate[i] > 0 {
+			if !lastTrig && trigs[i] > 0 {
 				stopped = false
-				index = 0
+				index = startIndex[i]
 			}
-			if len(gate) > 0 {
-				lastGate = gate[i] > 0
-			}
-			rate := 1.0
-			if len(rates) > 0 {
-				rate = rates[i]
-				if rate < 0 {
-					rate = 0
-				}
+			lastTrig = trigs[i] > 0
+
+			rate := rates[i]
+			if rate < 0 {
+				rate = 0
 			}
 
 			if stopped {
@@ -73,8 +66,8 @@ func NewSampler(buf []float64, loop bool) ugen.UGen {
 
 			index += rate
 			if index >= sampleLen {
-				index = 0
-				if !loop || len(gate) > 0 && !lastGate {
+				index = startIndex[i]
+				if loops[i] <= 0 {
 					stopped = true
 				}
 			}

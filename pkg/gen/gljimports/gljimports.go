@@ -5,6 +5,7 @@ import (
 	"github.com/glojurelang/glojure/pkg/pkgmap"
 	github_com_jfhamlin_freeverb_go "github.com/jfhamlin/freeverb-go"
 	github_com_jfhamlin_muscrat_pkg_aio "github.com/jfhamlin/muscrat/pkg/aio"
+	github_com_jfhamlin_muscrat_pkg_conf "github.com/jfhamlin/muscrat/pkg/conf"
 	github_com_jfhamlin_muscrat_pkg_effects "github.com/jfhamlin/muscrat/pkg/effects"
 	github_com_jfhamlin_muscrat_pkg_graph "github.com/jfhamlin/muscrat/pkg/graph"
 	github_com_jfhamlin_muscrat_pkg_mod "github.com/jfhamlin/muscrat/pkg/mod"
@@ -63,6 +64,11 @@ func RegisterImports(_register func(string, interface{})) {
 	_register("github.com/jfhamlin/muscrat/pkg/aio.WithDeviceID", github_com_jfhamlin_muscrat_pkg_aio.WithDeviceID)
 	_register("github.com/jfhamlin/muscrat/pkg/aio.WithDeviceName", github_com_jfhamlin_muscrat_pkg_aio.WithDeviceName)
 	_register("github.com/jfhamlin/muscrat/pkg/aio.WithVoices", github_com_jfhamlin_muscrat_pkg_aio.WithVoices)
+
+	// package github.com/jfhamlin/muscrat/pkg/conf
+	////////////////////////////////////////
+	_register("github.com/jfhamlin/muscrat/pkg/conf.BufferSize", github_com_jfhamlin_muscrat_pkg_conf.BufferSize)
+	_register("github.com/jfhamlin/muscrat/pkg/conf.SampleRate", github_com_jfhamlin_muscrat_pkg_conf.SampleRate)
 
 	// package github.com/jfhamlin/muscrat/pkg/effects
 	////////////////////////////////////////

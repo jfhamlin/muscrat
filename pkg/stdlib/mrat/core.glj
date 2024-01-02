@@ -40,6 +40,7 @@
                                                 WithInterpolation)
            (github.com$jfhamlin$muscrat$pkg$effects NewAmplitude
                                                     NewFreeverb
+                                                    NewBitcrusher
                                                     NewLimiter
                                                     NewLowpassFilter
                                                     NewRLPF
@@ -65,6 +66,9 @@
                                                 WithDefaultValue
                                                 NewWavOut)
            (github.com$jfhamlin$freeverb-go NewRevModel)))
+
+(def SAMPLE-RATE github.com$jfhamlin$muscrat$pkg$conf.SampleRate)
+(def BUFFER-SIZE github.com$jfhamlin$muscrat$pkg$conf.BufferSize)
 
 (defmacro doseq-idx
   [[locals seq-expr] & body]
@@ -106,6 +110,12 @@
 (extend-protocol AsNode
   go/int64
   (as-node [x] (add-node! (NewConstant x) x)))
+
+(extend-protocol AsNode
+  go/bool
+  (as-node [x]
+    (let [val (if x 1 0)]
+      (add-node! (NewConstant val) (str x \- \( val \))))))
 
 (extend-protocol AsNode
   *BigInt
@@ -815,52 +825,57 @@
     [(* in lamp)
      (* in ramp)]))
 
-(defn wfold
+(defugen wfold
   "Fold an input signal when it exceeds threshold low/high values.
   The signal is reflected across the low and high threshold values.
   Default low and high are -1 and 1."
-  ([in] (wfold in -1 1))
-  ([in lo hi]
-   (let [wf (add-node! (NewWaveFolder) "wfold")
-         [in lo hi] (map as-node [in lo hi])]
-     (add-edge! in wf "in")
-     (add-edge! lo wf "lo")
-     (add-edge! hi wf "hi")
-     wf)))
+  [in 0
+   lo -1
+   hi 1]
+  (add-node! (NewWaveFolder) "wfold"
+             :in-edges {:in in
+                        :lo lo
+                        :hi hi}))
 
-(defn bitcrush
+(defugen bitcrush
   "Bitcrush an input signal."
-  ([in bits] (bitcrush in bits 44100.0))
-  ([in bits rate]
-   (let [rate (as-node rate)
-         bits (as-node bits)
-         out (add-node! (github.com$jfhamlin$muscrat$pkg$effects.NewBitcrusher) "bitcrush")]
-     (add-edge! in out "in")
-     (add-edge! rate out "rate")
-     (add-edge! bits out "bits")
-     out)))
+  [in 0
+   rate 44100
+   bits 24]
+  (add-node! (NewBitcrusher) "bitcrush"
+             :in-edges {:in in
+                        :rate rate
+                        :bits bits}))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Sampler
 
 (defn load-sample
+  "Load an audio sample from a file into a buffer (slice of float64s) or
+  a slice of buffers for multi-channel audio. The buffer will be
+  resampled from the source to the engine's sample rate (available in
+  the SAMPLE-RATE var). See play-buf for an example of how to play a
+  loaded sample."
   [path] (LoadSample path))
 
-(defn sampler
-  ([sample & flags]
-   (let [[gate flags] (if-not (keyword? (first flags))
-                        [(first flags) (rest flags)]
-                        [nil flags])
-         [rate flags] (if-not (keyword? (first flags))
-                        [(first flags) (rest flags)]
-                        [nil flags])
-         flags (validate-flags flags {:loop false})
-         node (add-node! (NewSampler (seq sample) (:loop flags)) "sampler")]
-     (if gate
-       (add-edge! (as-node gate) node "trigger"))
-     (if (and rate (not= rate 1.0))
-       (add-edge! (as-node rate) node "rate"))
-     node)))
+(defugen play-buf
+  "Play a buffer (single-channel) or slice of buffers (multi-channel)."
+  [buf-or-bufs nil
+   rate 1
+   trigger 1
+   start-pos 0
+   loop 0]
+  (when-not (pos? (count buf-or-bufs))
+    (throw (errors.New "play-buf requires a non-empty buffer or slice of buffers")))
+  (let [bufs (if (number? (first buf-or-bufs))
+               [buf-or-bufs]
+               buf-or-bufs)]
+    (for [buf bufs]
+      (add-node! (NewSampler buf) "play-buf"
+                 :in-edges {:trigger trigger
+                            :rate rate
+                            :start-pos start-pos
+                            :loop (or loop 0)}))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; I/O devices
