@@ -537,24 +537,22 @@
   [gate [a d]]
   (env gate [0 1 0] [a d]))
 
-(defn line
+(defugen line
   "Generates a line from the start value to the end value over the given
   duration."
-  [start end dur & {:keys [mul add]}]
-  (let [sig (env 1 [start end] [dur] :interp :lin)
-        sig (if mul (* mul sig) sig)
-        sig (if add (+ sig add) sig)]
-    sig))
+  [start 0
+   end 1
+   dur 1]
+  (env 1 [start end] [dur] :interp :lin))
 
-(defn xline
+(defugen xline
   "Generates an exponential curve from the start value to the end
   value. Both the start and end values must be non-zero and have the
   same sign."
-  [start end dur & {:keys [mul add]}]
-  (let [sig (env 1 [start end] [dur] :interp :exp)
-        sig (if mul (* mul sig) sig)
-        sig (if add (+ sig add) sig)]
-    sig))
+  [start 1
+   end 2
+   dur 1]
+  (env 1 [start end] [dur] :interp :exp))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Filters and Effects
