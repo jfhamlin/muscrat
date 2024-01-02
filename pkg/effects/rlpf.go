@@ -8,15 +8,7 @@ import (
 	"github.com/jfhamlin/muscrat/pkg/ugen"
 )
 
-func NewRLPF(opts ...ugen.Option) ugen.UGen {
-	o := ugen.DefaultOptions()
-	for _, opt := range opts {
-		opt(&o)
-	}
-
-	add := o.Add
-	mul := o.Mul
-
+func NewRLPF() ugen.UGen {
 	sampleRate := float64(conf.SampleRate)
 	radiansPerSample := twopi / sampleRate
 	var y1, y2, prevFreq, prevReson float64
@@ -49,7 +41,7 @@ func NewRLPF(opts ...ugen.Option) ugen.UGen {
 			}
 
 			y0 := a0*in[i] + b1*y1 + b2*y2
-			out[i] = mul*(y0+2.0*y1+y2) + add
+			out[i] = y0 + 2.0*y1 + y2
 
 			y2 = ugen.ZapGremlins(y1)
 			y1 = ugen.ZapGremlins(y0)

@@ -20,8 +20,6 @@ type PinkNoise struct {
 	// dice[k] is the previous value of the kth octave
 	dice [numVMCOctaves]float64
 	rand *rand.Rand
-	add  float64
-	mul  float64
 }
 
 var (
@@ -42,14 +40,12 @@ func NewPinkNoise(opts ...ugen.Option) *PinkNoise {
 	return &PinkNoise{
 		rand: o.Rand,
 		dice: dice,
-		add:  o.Add,
-		mul:  o.Mul,
 	}
 }
 
 func (pn *PinkNoise) Gen(ctx context.Context, cfg ugen.SampleConfig, out []float64) {
 	for i := range out {
-		out[i] = pn.mul*pn.generateSample() + pn.add
+		out[i] = pn.generateSample()
 	}
 }
 

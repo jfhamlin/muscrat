@@ -20,9 +20,6 @@ func NewAmplitude(attackTime, releaseTime float64, opts ...ugen.Option) ugen.UGe
 		opt(&o)
 	}
 
-	add := o.Add
-	mul := o.Mul
-
 	clampCoef := 0.0
 	if attackTime != 0 {
 		math.Exp(log1 / (attackTime * sampleRate))
@@ -47,7 +44,7 @@ func NewAmplitude(attackTime, releaseTime float64, opts ...ugen.Option) ugen.UGe
 				val = val + (prevIn-val)*clampCoef
 			}
 			prevIn = val
-			out[i] = mul*val + add
+			out[i] = val
 		}
 	})
 }

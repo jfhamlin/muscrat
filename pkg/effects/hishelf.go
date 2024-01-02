@@ -10,15 +10,7 @@ import (
 
 const twopi = 2 * math.Pi
 
-func NewHiShelf(opts ...ugen.Option) ugen.UGen {
-	o := ugen.DefaultOptions()
-	for _, opt := range opts {
-		opt(&o)
-	}
-
-	add := o.Add
-	mul := o.Mul
-
+func NewHiShelf() ugen.UGen {
 	sampleRate := float64(conf.SampleRate)
 	var y1, y2, prevFreq, prevRS, prevDB float64
 	var a0, a1, a2, b1, b2 float64
@@ -59,7 +51,7 @@ func NewHiShelf(opts ...ugen.Option) ugen.UGen {
 			}
 
 			y0 := in[i] + b1*y1 + b2*y2
-			out[i] = mul*(a0*y0+a1*y1+a2*y2) + add
+			out[i] = a0*y0 + a1*y1 + a2*y2
 
 			y2 = ugen.ZapGremlins(y1)
 			y1 = ugen.ZapGremlins(y0)

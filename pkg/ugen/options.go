@@ -7,8 +7,6 @@ type (
 
 	Options struct {
 		Rand             *rand.Rand
-		Add              float64
-		Mul              float64
 		Interp           Interp
 		DefaultDutyCycle float64
 	}
@@ -23,8 +21,6 @@ const (
 func DefaultOptions() Options {
 	return Options{
 		Rand:             rand.New(rand.NewSource(rand.Int63())),
-		Add:              0.0,
-		Mul:              1.0,
 		DefaultDutyCycle: 1.0,
 	}
 }
@@ -43,18 +39,6 @@ func WithSeed(seed int64) Option {
 func WithRand(r *rand.Rand) Option {
 	return func(o *Options) {
 		o.Rand = r
-	}
-}
-
-func WithAdd(add float64) Option {
-	return func(o *Options) {
-		o.Add = add
-	}
-}
-
-func WithMul(mul float64) Option {
-	return func(o *Options) {
-		o.Mul = mul
 	}
 }
 

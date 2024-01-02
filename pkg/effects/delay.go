@@ -13,9 +13,6 @@ func NewDelay(maxDelay float64, opts ...ugen.Option) ugen.UGen {
 		opt(&o)
 	}
 
-	add := o.Add
-	mul := o.Mul
-
 	var mask int
 	var buf []float64
 	var writePos int
@@ -66,7 +63,7 @@ func NewDelay(maxDelay float64, opts ...ugen.Option) ugen.UGen {
 			delaySamplesInt, delaySamplesFrac := math.Modf(delaySamples)
 
 			readPos := writePos - int(delaySamplesInt)
-			out[i] = mul*interp(readPos, delaySamplesFrac) + add
+			out[i] = interp(readPos, delaySamplesFrac)
 
 			writePos++
 		}

@@ -8,15 +8,7 @@ import (
 	"github.com/jfhamlin/muscrat/pkg/ugen"
 )
 
-func NewLoShelf(opts ...ugen.Option) ugen.UGen {
-	o := ugen.DefaultOptions()
-	for _, opt := range opts {
-		opt(&o)
-	}
-
-	add := o.Add
-	mul := o.Mul
-
+func NewLoShelf() ugen.UGen {
 	const twopi = 2 * math.Pi
 
 	sampleRate := float64(conf.SampleRate)
@@ -59,7 +51,7 @@ func NewLoShelf(opts ...ugen.Option) ugen.UGen {
 			}
 
 			y0 := in[i] + b1*y1 + b2*y2
-			out[i] = mul*(a0*y0+a1*y1+a2*y2) + add
+			out[i] = a0*y0 + a1*y1 + a2*y2
 
 			y2 = ugen.ZapGremlins(y1)
 			y1 = ugen.ZapGremlins(y0)
