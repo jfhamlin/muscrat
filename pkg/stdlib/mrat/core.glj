@@ -671,98 +671,76 @@
                         :w freq
                         :bw rq}))
 
-(defn loshelf
-  ([in] (loshelf in 1200.0))
-  ([in freq] (loshelf in freq 1.0))
-  ([in freq rs] (loshelf in freq rs 0))
-  ([in freq rs db & {:keys [mul add]}]
-   (let [in (as-node in)
-         freq (as-node freq)
-         rs (as-node rs)
-         db (as-node db)
-         mul (or mul 1.0)
-         add (or add 0.0)
-         opts [(WithMul mul) (WithAdd add)]
-         node (add-node! (apply NewLoShelf opts) "loshelf")]
-     (add-edge! in node "in")
-     (add-edge! freq node "w")
-     (add-edge! rs node "rs")
-     (add-edge! db node "db")
-     node)))
+(defugen loshelf
+  [in 0
+   freq 1200
+   rs 1
+   db 0]
+  (add-node! (NewLoShelf) "loshelf"
+             :in-edges {:in in
+                        :w freq
+                        :rs rs
+                        :db db}))
 
-(defn hishelf
-  ([in] (hishelf in 1200.0))
-  ([in freq] (hishelf in freq 1.0))
-  ([in freq rs] (hishelf in freq rs 0))
-  ([in freq rs db & {:keys [mul add]}]
-   (let [in (as-node in)
-         freq (as-node freq)
-         rs (as-node rs)
-         db (as-node db)
-         mul (or mul 1.0)
-         add (or add 0.0)
-         opts [(WithMul mul) (WithAdd add)]
-         node (add-node! (apply NewHiShelf opts) "hishelf")]
-     (add-edge! in node "in")
-     (add-edge! freq node "w")
-     (add-edge! rs node "rs")
-     (add-edge! db node "db")
-     node)))
+(defugen hishelf
+  [in 0
+   freq 1200
+   rs 1
+   db 0]
+  (add-node! (NewHiShelf) "hishelf"
+             :in-edges {:in in
+                        :w freq
+                        :rs rs
+                        :db db}))
 
-(defn peakeq
-  ([in] (peakeq in 1200.0))
-  ([in freq] (peakeq in freq 1.0))
-  ([in freq rq] (peakeq in freq rq 0))
-  ([in freq rq db & {:keys [mul add]}]
-   (let [in (as-node in)
-         freq (as-node freq)
-         rq (as-node rq)
-         db (as-node db)
-         mul (or mul 1.0)
-         add (or add 0.0)
-         opts [(WithMul mul) (WithAdd add)]
-         node (add-node! (apply NewPeakEQ opts) "peakeq")]
-     (add-edge! in node "in")
-     (add-edge! freq node "w")
-     (add-edge! rq node "rq")
-     (add-edge! db node "db")
-     node)))
+(defugen peakeq
+  [in 0
+   freq 1200
+   rq 1
+   db 0]
+  (add-node! (NewPeakEQ) "peakeq"
+             :in-edges {:in in
+                        :w freq
+                        :rq rq
+                        :db db}))
 
 (defn- -delay
-  [in max-delay-time delay-time interp-opt & flags]
-  (let [flags (validate-flags flags {:mul 1.0 :add 0.0})
-        opts [(github.com$jfhamlin$muscrat$pkg$ugen.WithMul (:mul flags))
-              (github.com$jfhamlin$muscrat$pkg$ugen.WithAdd (:add flags))]
-        delay (add-node! (apply NewDelay max-delay-time interp-opt opts) "delay")]
-    (add-edge! (as-node in) delay "in")
-    (add-edge! (as-node delay-time) delay "delay")
-    delay))
+  [in max-delay-time delay-time interp-opt]
+  (add-node! (NewDelay max-delay-time (WithInterp interp-opt)) "delay"
+             :in-edges {:in in
+                        :delay delay-time}))
 
-(defn delayn
+(defugen delayn
   "Delay line with no interpolation."
-  [in max-delay-time delay-time & flags]
-  (apply -delay in max-delay-time delay-time (WithInterp InterpNone) flags))
+  [in 0
+   max-delay-time 0.2
+   delay-time 0.2]
+  (-delay in max-delay-time delay-time InterpNone))
 
-(defn delayl
+(defugen delayl
   "Delay line with linear interpolation."
-  [in max-delay-time delay-time & flags]
-  (apply -delay in max-delay-time delay-time (WithInterp InterpLinear) flags))
+  [in 0
+   max-delay-time 0.2
+   delay-time 0.2]
+  (-delay in max-delay-time delay-time InterpLinear))
 
-(defn delayc
+(defugen delayc
   "Delay line with cubic interpolation."
-  [in max-delay-time delay-time & flags]
-  (apply -delay in max-delay-time delay-time (WithInterp InterpCubic) flags))
+  [in 0
+   max-delay-time 0.2
+   delay-time 0.2]
+  (-delay in max-delay-time delay-time InterpCubic))
 
-(defn tape-delayl
+(defugen tape-delayl
   "Tape delay line with linear interpolation. This generator simulates
   a tape read head such that changes to the delay value are not
   instantaneous - the 'tape' is sped up or slowed down to reach the
   target delay time."
-  [n delay-time]
-  (let [delay (add-node! (NewTapeDelay) "tape-delay")]
-    (add-edge! (as-node n) delay "$0")
-    (add-edge! (as-node delay-time) delay "delay")
-    delay))
+  [in 0
+   delay-time 0.2]
+  (add-node! (NewTapeDelay) "tape-delay"
+             :in-edges {:$0 in
+                        :delay delay-time}))
 
 (defn- comb-feedback
   [delay-time decay-time]
@@ -775,31 +753,37 @@
       (copy-sign absret decay-time))))
 
 (defn- -comb
-  [in max-delay-time delay-time decay-time delay-fn & flags]
-  (let [flags (validate-flags flags {:mul 1.0 :add 0.0})
-        opts [(github.com$jfhamlin$muscrat$pkg$ugen.WithMul (:mul flags))
-              (github.com$jfhamlin$muscrat$pkg$ugen.WithAdd (:add flags))]
-        feedback (pipe)
+  [in max-delay-time delay-time decay-time delay-fn]
+  (let [feedback (pipe)
         delay (delay-fn feedback max-delay-time delay-time)
         fb-coefficient (comb-feedback delay-time decay-time)
         comb (+ in (* fb-coefficient delay))]
     (pipeset! feedback comb)
     comb))
 
-(defn combn
+(defugen combn
   "Comb filter with no interpolation."
-  [in max-delay-time delay-time decay-time & flags]
-  (apply -comb in max-delay-time delay-time decay-time delayn flags))
+  [in 0
+   max-delay-time 0.2
+   delay-time 0.2
+   decay-time 1]
+  (-comb in max-delay-time delay-time decay-time delayn))
 
-(defn combl
+(defugen combl
   "Comb filter with linear interpolation."
-  [in max-delay-time delay-time decay-time & flags]
-  (apply -comb in max-delay-time delay-time decay-time delayl flags))
+  [in 0
+   max-delay-time 0.2
+   delay-time 0.2
+   decay-time 1]
+  (-comb in max-delay-time delay-time decay-time delayl))
 
-(defn combc
+(defugen combc
   "Comb filter with cubic interpolation."
-  [in max-delay-time delay-time decay-time & flags]
-  (apply -comb in max-delay-time delay-time decay-time delayc flags))
+  [in 0
+   max-delay-time 0.2
+   delay-time 0.2
+   decay-time 1]
+  (-comb in max-delay-time delay-time decay-time delayc))
 
 (defn clip
   "Clip an input signal when it exceeds threshold low/high values."
