@@ -880,7 +880,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; I/O devices
 
-(defn sound-in
+(defugen sound-in
   []
   (add-node! (NewInputDevice) "in"))
 
@@ -954,20 +954,19 @@
       (throw (fmt.Errorf "unsupported midi-in type: %s" typ))
       )))
 
-(defn wavout
+(defugen wavout
   "Save the input to a 32-bit wav file (up to two channels) named by
   the :filename flag (default out.wav)."
-  [chs & flags]
+  [chs 1
+   filename "out.wav"]
   (let [chs (if (coll? chs) chs [chs])
-        flags (validate-flags flags {:filename "out.wav"})
         _ (if (> (count chs) 2) (throw (str "wavout: too many channels supplied: " (count chs))))
-        ch0 (as-node (first chs))
+        ch0 (first chs)
         ch1 (second chs)
-        n (add-node! (NewWavOut (:filename flags)) "wavout" :sink true)]
-    (add-edge! ch0 n "$0")
-    (when ch1
-      (add-edge! ch1 n "$1"))
-    n))
+        node (add-node! (NewWavOut filename) "wavout" :sink true :in-edges {:$0 ch0})]
+    (when-let [ch1 (second chs)]
+      (add-edge! (as-node ch1) node "$1"))
+    node))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Pattern utilities
