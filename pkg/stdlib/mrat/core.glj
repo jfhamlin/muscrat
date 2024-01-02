@@ -359,18 +359,20 @@
 (defn fma
   "A fused multiply and add ugen."
   [in mul add]
-  (if (and (every? number? [mul add])
-           (== mul 1)
-           (== add 0))
-      in
+  (if (coll? in) ;; handle multiple channels
+    (map #(fma % mul add) in)
+    (if (and (every? number? [mul add])
+             (== mul 1)
+             (== add 0))
+      in ;; no-op
       (let [node (if (every? number? [mul add])
-                   (add-node! (NewFMAStatic mul add) "fma")
+                   (add-node! (NewFMAStatic mul add) "fma") ;; optimized for static mul and add
                    (let [n (add-node! (NewFMA) "fma")]
                      (add-edge! (as-node mul) n "mul")
                      (add-edge! (as-node add) n "add")
                      n))]
         (add-edge! (as-node in) node "in")
-        node)))
+        node))))
 
 (defmacro defugen
   "Defines a new generator node constructor with semantics similar to defn,
@@ -785,32 +787,33 @@
    decay-time 1]
   (-comb in max-delay-time delay-time decay-time delayc))
 
-(defn clip
+(defugen clip
   "Clip an input signal when it exceeds threshold low/high values."
-  ([in] (clip in -1 1))
-  ([in lo hi]
-   (if (some (partial instance? Node) [in lo hi])
-     (let [c (add-node! (NewClip) "clip")
-           [in lo hi] (map as-node [in lo hi])]
-       (add-edge! in c "in")
-       (add-edge! lo c "lo")
-       (add-edge! hi c "hi")
-       c)
-     (-> in
-         (max lo)
-         (min hi)))))
+  [in 0
+   lo -1
+   hi 1]
+  (if (some (partial instance? Node) [in lo hi])
+    (add-node! (NewClip) "clip"
+               :in-edges {:in in
+                          :lo lo
+                          :hi hi})
+    (-> in
+        (max lo)
+        (min hi))))
 
-(defn pan2
-  ([in pos] (pan2 in pos 1))
-  ([in pos level]
-   (let [pos (clip pos)
-         pi4 (* math.Pi 0.25)
-         pi2 (* math.Pi 0.5)
-         theta (+ (* pi4 pos) pi4)
-         lamp (* level (sine (- pi2 theta)))
-         ramp (* level (sine theta))]
-     [(* in lamp)
-      (* in ramp)])))
+(defugen pan2
+  "A two-channel, equal-power panner."
+  [in 0
+   pos 0
+   level 1]
+  (let [pos (clip pos)
+        pi4 (* math.Pi 0.25)
+        pi2 (* math.Pi 0.5)
+        theta (+ (* pi4 pos) pi4)
+        lamp (* level (sine (- pi2 theta)))
+        ramp (* level (sine theta))]
+    [(* in lamp)
+     (* in ramp)]))
 
 (defn wfold
   "Fold an input signal when it exceeds threshold low/high values.
