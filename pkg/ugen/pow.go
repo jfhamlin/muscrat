@@ -10,7 +10,11 @@ func NewPow() UGen {
 		base := cfg.InputSamples["base"]
 		exp := cfg.InputSamples["exp"]
 		for i := range out {
-			out[i] = math.Pow(base[i], exp[i])
+			if base[i] < 0 {
+				out[i] = -math.Pow(-base[i], exp[i])
+			} else {
+				out[i] = math.Pow(base[i], exp[i])
+			}
 		}
 	})
 }

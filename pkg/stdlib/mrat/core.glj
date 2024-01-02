@@ -86,6 +86,7 @@
   (as-node [ug]))
 
 (declare add-edge!)
+(declare constant-node)
 
 (defn add-node!
   [ug label & {:keys [sink in-edges]}]
@@ -136,32 +137,52 @@
       (let [gen (as-node ch)
             chan-id (+ num-sinks i)
             sink (.AddOutNode *graph* (WithLabel (fmt.Sprintf "out%d" chan-id)))]
-        (add-edge! gen sink "w"))))) ;; TODO: "w" seems wrong
+        (add-edge! gen sink "in"))))) ;; port name doesn't matter for out nodes
+
+(def ^:private constant-cache
+  "Cache of constant nodes for the latest graph."
+  (atom {:graph *graph*
+         :nodes {}}))
+
+(defn constant-node
+  [x]
+  (let [x (double x)
+        cache @constant-cache]
+    (if (and (= (:graph cache) *graph*)
+             (contains? (:nodes cache) x))
+      (get-in cache [:nodes x])
+      (let [update-cache (fn [cache]
+                           (let [cache (if (= (:graph cache) *graph*) cache {:graph *graph*, :nodes {}})
+                                 node (or (get-in cache [:nodes x])
+                                          (add-node! (NewConstant x) x))]
+                             (assoc-in cache [:nodes x] node)))
+            cache (swap! constant-cache update-cache)]
+        (println "constant-node cache:" cache)
+        (get-in cache [:nodes x])))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Utilities
 
 (defn pow
-  "Returns b^e. If b or e are nodes, creates a new node that computes b^e. Else,
-  returns the result of b^e directly."
-  [b e]
-  (if (some (partial instance? Node) [b e])
-    (let [n (add-node! (NewPow) "pow")]
-      (add-edge! (as-node b) n "base")
-      (add-edge! (as-node e) n "exp")
-      n)
-    (math.Pow b e)))
+  "Returns b^p. If b or p are nodes, creates a new node that computes b^p. Else,
+  returns the result of b^p directly. pow extends exponentiation to
+  allow for a negative base with a non-integral exponent, returning
+  -((-b)^p) when b is negative."
+  [b p]
+  (if (some (partial instance? Node) [b p])
+    (add-node! (NewPow) "pow" :in-edges {"base" b "exp" p})
+    (if (neg? b)
+      (- (math.Pow (- b) p))
+      (math.Pow b p))))
 
 (defn sine
   "Returns sin(theta). If theta is a node, creates a new node that
   computes sin(theta). Else, returns the result of sin(theta)
   directly."
   [theta]
-  (if-not (instance? Node theta)
-    (math.Sin theta)
-    (let [n (add-node! (github.com$jfhamlin$muscrat$pkg$ugen.NewSine) "sine")]
-      (add-edge! theta n "in")
-      n)))
+  (if (instance? Node theta)
+    (add-node! (github.com$jfhamlin$muscrat$pkg$ugen.NewSine) "sine" :in-edges {:in theta})
+    (math.Sin theta)))
 
 (defn abs
   "Returns the absolute value of x. If x is a node, creates a new node
@@ -169,9 +190,7 @@
   value of x directly."
   [x]
   (if (instance? Node x)
-    (let [n (add-node! (NewAbs) "abs")]
-      (add-edge! x n "in")
-      n)
+    (add-node! (NewAbs) "abs" :in-edges {:in x})
     (math.Abs x)))
 
 (defn exp
@@ -179,9 +198,7 @@
   Else, returns e^x directly."
   [x]
   (if (instance? Node x)
-    (let [n (add-node! (NewExp) "exp")]
-      (add-edge! x n "in")
-      n)
+    (add-node! (NewExp) "exp" :in-edges {:in x})
     (math.Exp x)))
 
 (defn copy-sign
@@ -190,17 +207,12 @@
   s directly."
   [x s]
   (if (or (instance? Node x) (instance? Node s))
-    (let [n (add-node! (NewCopySign) "copy-sign")]
-      (add-edge! (as-node x) n "in")
-      (add-edge! (as-node s) n "sign")
-      n)
+    (add-node! (NewCopySign) "copy-sign" :in-edges {"in" x "sign" s})
     (math.Copysign x s)))
 
 (defn- freq-ratio
   [x kind]
-  (let [n (add-node! (NewFreqRatio kind) kind)]
-    (add-edge! x n "in")
-    n))
+  (add-node! (NewFreqRatio kind) kind :in-edges {"in" x}))
 
 (defn decibels
   "Return the amplitude ratio corresponding to the given decibel value."
@@ -214,9 +226,7 @@
   cents."
   [x]
   (if (instance? Node x)
-    (let [cnt (add-node! (NewFreqRatio "cents") "cents")]
-      (add-edge! x cnt "in")
-      cnt)
+    (add-node! (NewFreqRatio "cents") "cents" :in-edges {"in" x})
     (pow 2 (/ x 1200.0))))
 
 (defn semitones
@@ -224,9 +234,7 @@
   semitones."
   [x]
   (if (instance? Node x)
-    (let [stn (add-node! (NewFreqRatio "semitones") "semitones")]
-      (add-edge! x stn "in")
-      stn)
+    (add-node! (NewFreqRatio "semitones") "semitones" :in-edges {"in" x})
     (pow 2 (/ x 12.0))))
 
 (defn octaves
@@ -234,18 +242,14 @@
   octaves."
   [x]
   (if (instance? Node x)
-    (let [oct (add-node! (NewFreqRatio "octaves") "octaves")]
-      (add-edge! x oct "in")
-      oct)
+    (add-node! (NewFreqRatio "octaves") "octaves" :in-edges {"in" x})
     (pow 2 x)))
 
 (defn midifreq
   "Return the frequency corresponding to the given MIDI note number."
   [note]
   (if (instance? Node note)
-    (let [mf (add-node! (NewMIDIFreq) "midifreq")]
-      (add-edge! note mf "in")
-      mf)
+    (add-node! (NewMIDIFreq) "midifreq" :in-edges {"in" note})
     (* 440.0 (pow 2 (/ (- note 69.0) 12.0)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

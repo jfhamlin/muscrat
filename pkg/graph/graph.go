@@ -267,15 +267,18 @@ func (g *Graph) OutgoingEdges(id NodeID) []*Edge {
 
 type (
 	runNodeInfo struct {
-		epoch         atomic.Int64 // the _next_ epoch in which this node will be evaluated
-		evaling       atomic.Bool
-		value         []float64 // value of the node in the last epoch
-		incomingEdges []*Edge
+		epoch   atomic.Int64 // the _next_ epoch in which this node will be evaluated
+		evaling atomic.Bool
+		value   []float64 // value of the node in the last epoch
+
+		incomingEdges []*Edge // edges whose destination is this node
+
+		predecessors []NodeID // nodes that must be evaluated before this node
 
 		// offset to apply to the epoch of each incoming edge when
 		// checking if the dependency has been satisfied. this is
 		// necessary to handle cycles in the graph.
-		incomingEdgesEpochOffsets []int64
+		predecessorEpochOffsets []int64
 	}
 
 	// we evaluate the graph in epochs, where each epoch is a buffer
@@ -342,9 +345,9 @@ func (g *Graph) Run(ctx context.Context, cfg ugen.SampleConfig) {
 			node := g.Node(nodeID)
 			info := rs.NodeInfoByID(nodeID)
 			fmt.Printf("node %d (%T) %s\n", nodeID, node, node)
-			for i, e := range info.incomingEdges {
-				offset := info.incomingEdgesEpochOffsets[i]
-				fmt.Printf("  - %d <- %d (offset=%d)\n", e.To, e.From, offset)
+			for i, pid := range info.predecessors {
+				offset := info.predecessorEpochOffsets[i]
+				fmt.Printf("  - %d <- %d (offset=%d)\n", nodeID, pid, offset)
 			}
 		}
 	}
@@ -428,15 +431,17 @@ func (g *Graph) newRunState() *runState {
 	fullSampleSize := g.BufferSize * len(order)
 	bufSlice := make([]float64, fullSampleSize, fullSampleSize)
 	for i, id := range order {
-		incomingEdgesBySource := map[NodeID]*Edge{}
+		predecessorNodes := map[NodeID]struct{}{}
+		incomingEdges := g.IncomingEdges(id)
+		rs.nodeInfo[i].incomingEdges = incomingEdges
 		for _, e := range g.IncomingEdges(id) {
-			incomingEdgesBySource[e.From] = e
+			predecessorNodes[e.From] = struct{}{}
 		}
-		rs.nodeInfo[i].incomingEdges = make([]*Edge, 0, len(incomingEdgesBySource))
-		for _, e := range incomingEdgesBySource {
-			rs.nodeInfo[i].incomingEdges = append(rs.nodeInfo[i].incomingEdges, e)
+		rs.nodeInfo[i].predecessors = make([]NodeID, 0, len(predecessorNodes))
+		for pid := range predecessorNodes {
+			rs.nodeInfo[i].predecessors = append(rs.nodeInfo[i].predecessors, pid)
 		}
-		rs.nodeInfo[i].incomingEdgesEpochOffsets = make([]int64, len(rs.nodeInfo[i].incomingEdges))
+		rs.nodeInfo[i].predecessorEpochOffsets = make([]int64, len(predecessorNodes))
 		rs.nodeInfo[i].value = bufSlice[i*g.BufferSize : (i+1)*g.BufferSize]
 		rs.nodeIndexMap[id] = i
 	}
@@ -509,13 +514,13 @@ Outer:
 				continue
 			}
 
-			// first, check that all nodes with incoming edges have been
-			// evaluated for this epoch
-			for i, e := range info.incomingEdges {
-				if rs.NodeInfoByID(e.From).epoch.Load() <= epoch+info.incomingEdgesEpochOffsets[i] {
+			// first, check that all predecessors have been evaluated for
+			// this epoch
+			for i, pid := range info.predecessors {
+				if rs.NodeInfoByID(pid).epoch.Load() <= epoch+info.predecessorEpochOffsets[i] {
 					if debugMode {
 						fmt.Printf("  - skipping eval for node %d, waiting\n", nodeID)
-						fmt.Printf("    - for: %v offset: %v %v\n", e.From, info.incomingEdgesEpochOffsets[i], info.incomingEdgesEpochOffsets)
+						fmt.Printf("    - for: %v offset: %v %v\n", pid, info.predecessorEpochOffsets[i], info.predecessorEpochOffsets)
 					}
 					info.evaling.Store(false)
 					continue NodeLoop
@@ -583,7 +588,7 @@ func (g *Graph) prepCyclesDFS(rs *runState, nodeID NodeID, visited map[NodeID]st
 	for i, e := range info.incomingEdges {
 		from := e.From
 		if _, ok := visited[from]; ok {
-			info.incomingEdgesEpochOffsets[i] = -1
+			info.predecessorEpochOffsets[i] = -1
 			continue
 		}
 		g.prepCyclesDFS(rs, from, visited)
