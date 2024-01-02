@@ -1,4 +1,29 @@
 (ns examples.simple
-  (:require [mrat.core :refer :all]))
+  (:require [mrat.core :refer :all] :reload))
 
-(play (sin 440))
+(println (apply str (repeat 80 "=")))
+
+;; (def niegalo-todo
+;;   (load-sample "/Users/jfhamlin/Projects/muscrat-projects/niegalo-todo/niegalo_todo.wav"))
+
+;; (def slc-smp
+;;   (fn [smp start dur]
+;;     (let [start (int (* start SAMPLE-RATE))
+;;           end (int (* dur SAMPLE-RATE))]
+;;       (go/slice smp start end))))
+
+;; (def metro (impulse 8))
+
+(def sig
+  (-> (tri 100)
+      (* (env-asr (sqr 0.5) [1.0 1.0 1.0]))
+      ))
+
+
+
+(println (apply str (repeat 80 "=")))
+(println "Num Nodes:" (count (.Nodes *graph*)))
+(doall (->> *graph* .Nodes (map println)))
+(println (apply str (repeat 80 "=")))
+
+(play (-> sig))

@@ -142,7 +142,7 @@
   (atom {:graph *graph*
          :nodes {}}))
 
-(defn constant-node
+(defn- constant-node
   [x]
   (let [x (double x)
         cache @constant-cache]
