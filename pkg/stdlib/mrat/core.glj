@@ -17,8 +17,6 @@
                                                  NewMIDIFreq
                                                  NewImpulse
                                                  SimpleUGenFunc
-                                                 WithAdd
-                                                 WithMul
                                                  WithInterp
                                                  WithDefaultDutyCycle
                                                  InterpNone
@@ -106,25 +104,25 @@
 
 (extend-protocol AsNode
   go/float64
-  (as-node [x] (add-node! (NewConstant x) x)))
+  (as-node [x] (constant-node x)))
 
 (extend-protocol AsNode
   go/int64
-  (as-node [x] (add-node! (NewConstant x) x)))
+  (as-node [x] (constant-node x)))
 
 (extend-protocol AsNode
   go/bool
   (as-node [x]
     (let [val (if x 1 0)]
-      (add-node! (NewConstant val) (str x \- \( val \))))))
+      (constant-node val))))
 
 (extend-protocol AsNode
   *BigInt
-  (as-node [x] (add-node! (NewConstant (double x)) x)))
+  (as-node [x] (constant-node x)))
 
 (extend-protocol AsNode
   *Ratio
-  (as-node [x] (add-node! (NewConstant (double x)) x)))
+  (as-node [x] (constant-node x)))
 
 (defn play
   [channels]
@@ -157,7 +155,6 @@
                                           (add-node! (NewConstant x) x))]
                              (assoc-in cache [:nodes x] node)))
             cache (swap! constant-cache update-cache)]
-        (println "constant-node cache:" cache)
         (get-in cache [:nodes x])))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -280,7 +277,7 @@
       (let [sum-node (add-node! (NewSum) "+")
             nodes (if (zero? num-sum)
                     ugens
-                    (conj ugens (add-node! (NewConstant num-sum) num-sum)))]
+                    (conj ugens (constant-node num-sum)))]
         (doseq [[n i] (map vector nodes (range (count nodes)))]
           (add-edge! n sum-node (str \$ i)))
         sum-node))))
@@ -322,7 +319,7 @@
     (if (empty? ugens)
       num-prod
       (let [prod-node (add-node! (NewProduct) "*")
-            nodes (conj ugens (add-node! (NewConstant (double num-prod)) num-prod))]
+            nodes (conj ugens (constant-node num-prod))]
         (doseq [[n i] (map vector nodes (range (count nodes)))]
           (add-edge! n prod-node (str \$ i)))
         prod-node))))
@@ -466,7 +463,7 @@
         ~@(mapcat #(vector % nil) opt-args)]
        (let [wt-opts# [(~'WithDefaultDutyCycle ~default-duty)]
              gen# (apply ~ctor wt-opts#)
-             label# (~'WithLabel ~(str name))
+             label# ~(str name)
              osc-node# (add-node! gen# label#)
              freq-node# (as-node ~'freq)
              extra-args# ~(mapv #(vector (keyword %) %) opt-args)
