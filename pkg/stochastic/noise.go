@@ -16,10 +16,8 @@ func NewNoise(opts ...ugen.Option) ugen.UGen {
 	}
 
 	rnd := o.Rand
-	add := o.Add
-	mul := o.Mul
 
-	last := mul*2*rnd.Float64() - 1 + add
+	last := 2*rnd.Float64() - 1
 	counter := 0
 	// Logic taken from supercollider LFNoise0 ugen
 	return ugen.UGenFunc(func(ctx context.Context, cfg ugen.SampleConfig, out []float64) {
@@ -34,13 +32,13 @@ func NewNoise(opts ...ugen.Option) ugen.UGen {
 			freq = math.Max(0, freq)
 			if freq == 0 {
 				counter = 1
-				last = mul*(2*rnd.Float64()-1) + add
+				last = (2*rnd.Float64() - 1)
 			} else if counter <= 0 {
 				counter = int(float64(cfg.SampleRateHz) / freq)
 				if counter <= 0 {
 					counter = 1
 				}
-				last = mul*(2*rnd.Float64()-1) + add
+				last = (2*rnd.Float64() - 1)
 			}
 			nsamp := counter
 			if nsamp > remain {

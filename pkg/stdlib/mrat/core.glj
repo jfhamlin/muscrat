@@ -66,26 +66,34 @@
                                                 NewWavOut)
            (github.com$jfhamlin$freeverb-go NewRevModel)))
 
-(def ^:dynamic *graph* nil)
-
 (defmacro doseq-idx
   [[locals seq-expr] & body]
   `(let [s# ~seq-expr]
      (doseq [~locals (map vector s# (range (count s#)))]
        ~@body)))
 
-(defn add-node!
-  [ug label & {:keys [sink]}]
-  (if sink
-    (.AddGeneratorNode *graph* ug (WithLabel (str label)) (WithSink))
-    (.AddGeneratorNode *graph* ug (WithLabel (str label)))))
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Graph
 
-(defn add-edge!
-  [x y port] (.AddEdge *graph* (.ID x) (.ID y) port))
+(def ^:dynamic *graph* nil)
 
 (defprotocol AsNode
   "Protocol for types that can be converted to generator nodes."
   (as-node [ug]))
+
+(declare add-edge!)
+
+(defn add-node!
+  [ug label & {:keys [sink in-edges]}]
+  (let [node (if sink
+               (.AddGeneratorNode *graph* ug (WithLabel (str label)) (WithSink))
+               (.AddGeneratorNode *graph* ug (WithLabel (str label))))]
+    (doseq [[port val] in-edges]
+      (add-edge! (as-node val) node (name port)))
+    node))
+
+(defn add-edge!
+  [x y port] (.AddEdge *graph* (.ID x) (.ID y) port))
 
 (extend-protocol AsNode
   Node
@@ -477,37 +485,23 @@
 
 ;; todo: add/mul flags
 
-(defn noise
+(defugen noise
   "Generates random values between -1 and 1 at the given frequency.
   If frequency is zero or not provided, generates white
-  noise. Currently, frequency must be a number, not a node."
-  ([] (noise 0))
-  ([freq & flags]
-   (let [flags (validate-flags flags {:mul 1.0 :add 0.0})
-         opts [(github.com$jfhamlin$muscrat$pkg$ugen.WithMul (:mul flags))
-               (github.com$jfhamlin$muscrat$pkg$ugen.WithAdd (:add flags))]
-         n (add-node! (apply NewNoise opts) "noise")
-         f (as-node freq)]
-     (add-edge! f n "w")
-     n)))
+  noise."
+  [freq 0]
+  (add-node! (NewNoise) "noise" :in-edges {:w freq}))
 
-(defn pink-noise
+(defugen pink-noise
   []
   (add-node! (NewPinkNoise) "pink-noise"))
 
-(defn noise-quad
+(defugen noise-quad
   "Generates quadratically-interpolated random values between -1 and 1
   at the given frequency. If frequency is zero or not provided,
   generates at 500 hz."
-  ([] (noise-quad 500.0))
-  ([freq & flags]
-   (let [flags (validate-flags flags {:mul 1.0 :add 0.0})
-         opts [(github.com$jfhamlin$muscrat$pkg$ugen.WithMul (:mul flags))
-               (github.com$jfhamlin$muscrat$pkg$ugen.WithAdd (:add flags))]
-         n (add-node! (apply NewNoiseQuad opts) "noise-quad")
-         f (as-node freq)]
-     (add-edge! f n "w")
-     n)))
+  [freq 500]
+  (add-node! (NewNoiseQuad) "noise-quad" :in-edges {:w freq}))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Modulators

@@ -18,10 +18,8 @@ func NewNoiseQuad(opts ...ugen.Option) ugen.UGen {
 	}
 
 	rnd := o.Rand
-	add := o.Add
-	mul := o.Mul
 
-	level := mul*(2*rnd.Float64()-1) + add
+	level := (2*rnd.Float64() - 1)
 	slope := 0.0
 	curve := 0.0
 	nextValue := 0.0
@@ -44,7 +42,7 @@ func NewNoiseQuad(opts ...ugen.Option) ugen.UGen {
 
 			if counter <= 0 {
 				value := nextValue
-				nextValue = mul*(2*rnd.Float64()-1) + add
+				nextValue = (2*rnd.Float64() - 1)
 				level = nextMidPt
 				nextMidPt = (value + nextValue) * 0.5
 
