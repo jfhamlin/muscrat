@@ -108,13 +108,6 @@ func (o *Osc) Gen(ctx context.Context, cfg ugen.SampleConfig, out []float64) {
 		}
 	}
 
-	if o.options.Mul != 1.0 || o.options.Add != 0.0 {
-		mul, add := o.options.Mul, o.options.Add
-		for i := range out {
-			out[i] = out[i]*mul + add
-		}
-	}
-
 	o.lastPhase = phase
 	o.lastSync = lastSync
 }

@@ -11,9 +11,6 @@ func NewImpulse(opts ...Option) UGen {
 		opt(&o)
 	}
 
-	add := o.Add
-	mul := o.Mul
-
 	var phaseOffset, freq, phase, phaseIncrement float64
 	initialized := false
 
@@ -53,9 +50,9 @@ func NewImpulse(opts ...Option) UGen {
 			phase += phaseIncrement
 			if phase >= 1 {
 				phase = math.Mod(phase, 1)
-				out[i] = mul*1 + add
+				out[i] = 1
 			} else {
-				out[i] = add
+				out[i] = 0
 			}
 		}
 	})
