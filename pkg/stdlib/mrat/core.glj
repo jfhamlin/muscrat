@@ -357,6 +357,7 @@
 ;; macros
 
 (defn fma
+  "A fused multiply and add ugen."
   [in mul add]
   (if (and (every? number? [mul add])
            (== mul 1)
@@ -483,8 +484,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Noise
 
-;; todo: add/mul flags
-
 (defugen noise
   "Generates random values between -1 and 1 at the given frequency.
   If frequency is zero or not provided, generates white
@@ -557,17 +556,13 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Filters and Effects
 
-(defn amplitude
-  ([in] (amplitude in 0.01 0.01))
-  ([in attack-time release-time & {:keys [mul add]}]
-   (let [opts []
-         opts (if mul (conj opts (WithMul mul)) opts)
-         opts (if add (conj opts (WithAdd add)) opts)
-         node (add-node! (apply NewAmplitude attack-time release-time opts) "amplitude")]
-     (add-edge! (as-node in) node "in")
-     node)))
+(defugen amplitude
+  [in 0
+   attack-time 0.01
+   release-time 0.01]
+  (add-node! (NewAmplitude attack-time release-time) "amplitude" :in-edges {:in in}))
 
-(defn limiter
+(defugen limiter
   "Limits the input amplitude to the given level. Limiter will not
   overshoot, but it needs to look ahead in the audio. Thus there is a
   delay equal to twice the value of the dur parameter.
@@ -579,13 +574,13 @@
   dur - aka lookAheadTime. The buffer delay time. Shorter times will
         produce smaller delays and quicker transient response times, but may
         introduce amplitude modulation artifacts."
-  ([in] (limiter in 1.0))
-  ([in level] (limiter in level 0.01))
-  ([in level dur]
-   (let [node (add-node! (NewLimiter dur) "limiter")]
-     (add-edge! (as-node in) node "in")
-     (add-edge! (as-node level) node "amp")
-     node)))
+  [in 0
+   level 1
+   dur 0.01]
+  (add-node! (NewLimiter dur)
+             "limiter"
+             :in-edges {:in in
+                        :amp level}))
 
 (defn pipe
   "Create a pipe, which copies the input to the output. The input may be
@@ -632,59 +627,49 @@
     (add-edge! dry-node fv-node "dry")
     fv-node))
 
-(defn lores
+(defugen lores
   "A simple lowpass filter with cutoff and resonance, modeled after the
   Max/MSP lores~ object."
-  [n cutoff res]
-  (let [n (as-node n)
-        cutoff (as-node cutoff)
-        res (as-node res)
-        lpf (add-node! (NewLowpassFilter) "lores")]
-    (add-edge! n lpf "in")
-    (add-edge! cutoff lpf "cutoff")
-    (add-edge! res lpf "resonance")
-    lpf))
+  [in 0
+   freq 1200
+   reson 0]
+  (add-node! (NewLowpassFilter) "lores"
+             :in-edges {:in in
+                        :cutoff freq
+                        :resonance reson}))
 
-(defn rlpf
+(defugen rlpf
   "A resonant low-pass filter."
-  [in freq rq & {:keys [mul add]}]
-  (let [in (as-node in)
-        freq (as-node freq)
-        rq (as-node rq)
-        opts [(WithMul (or mul 1.0)) (WithAdd (or add 0.0))]
-        node (add-node! (apply NewRLPF opts) "rlpf")]
-    (add-edge! in node "in")
-    (add-edge! freq node "freq")
-    (add-edge! rq node "reson")
-    node))
+  [in 0
+   freq 440
+   rq 1]
+  (add-node! (NewRLPF) "rlpf"
+             :in-edges {:in in
+                        :freq freq
+                        :reson rq}))
 
-(defn rhpf
+(defugen rhpf
   "A resonant high-pass filter."
-  [in freq rq & {:keys [mul add]}]
-  (let [in (as-node in)
-        freq (as-node freq)
-        rq (as-node rq)
-        opts [(WithMul (or mul 1.0)) (WithAdd (or add 0.0))]
-        node (add-node! (apply NewRHPF opts) "rhpf")]
-    (add-edge! in node "in")
-    (add-edge! freq node "freq")
-    (add-edge! rq node "reson")
-    node))
+  [in 0
+   freq 440
+   rq 1]
+  (add-node! (NewRHPF) "rhpf"
+             :in-edges {:in in
+                        :freq freq
+                        :reson rq}))
 
-(defn bpf
+(defugen bpf
   "A simple bandpass filter with center frequency and bandwidth.
    n - the input signal
    freq - the center frequency in hertz
-   bw - the width of the filter, as a coefficient bandwidth/freq"
-  [n freq bw]
-  (let [n (as-node n)
-        freq (as-node freq)
-        bw (as-node bw)
-        filter (add-node! (NewBPF) "bpf")]
-    (add-edge! n filter "in")
-    (add-edge! freq filter "w")
-    (add-edge! bw filter "bw")
-    filter))
+   rq - the width of the filter, as a coefficient bandwidth/freq"
+  [in 0
+   freq 440
+   rq 1]
+  (add-node! (NewBPF) "bpf"
+             :in-edges {:in in
+                        :w freq
+                        :bw rq}))
 
 (defn loshelf
   ([in] (loshelf in 1200.0))
