@@ -16,6 +16,11 @@ import (
 type (
 	// Console is a fyne widget that displays the debug console.
 	Console struct {
+		*fyne.Container
+
+		history []*consoleEntry
+		entries *fyne.Container
+		title   fyne.CanvasObject
 	}
 
 	consoleEntry struct {
@@ -27,27 +32,37 @@ type (
 
 // NewConsole creates a new Console widget.
 func NewConsole() fyne.CanvasObject {
-	history := []*consoleEntry{}
-	entries := container.New(layout.NewVBoxLayout())
+	titleText := canvas.NewText("Console", theme.TextColor())
+	title := container.New(layout.NewHBoxLayout(), titleText)
 
-	pubsub.Subscribe("console.debug", func(event string, data any) {
-		switch data := data.(type) {
-		case string:
-			if len(history) == 0 || history[len(history)-1].text != data {
-				obj := canvas.NewText(data, theme.TextColor())
-				history = append(history, &consoleEntry{
-					text:   data,
-					object: obj,
-				})
-				entries.AddObject(obj)
-				entries.Refresh()
-			} else {
-				last := history[len(history)-1]
-				last.inc()
-			}
+	console := &Console{
+		history: []*consoleEntry{},
+		title:   title,
+		entries: container.New(layout.NewVBoxLayout()),
+	}
+
+	console.Container = container.New(layout.NewBorderLayout(title, nil, nil, nil), title, console.entries)
+
+	pubsub.Subscribe("console.debug", console.onDebugMessage)
+	return console.Container
+}
+
+func (c *Console) onDebugMessage(event string, data any) {
+	switch data := data.(type) {
+	case string:
+		if len(c.history) == 0 || c.history[len(c.history)-1].text != data {
+			obj := canvas.NewText(data, theme.TextColor())
+			c.history = append(c.history, &consoleEntry{
+				text:   data,
+				object: obj,
+			})
+			c.entries.AddObject(obj)
+			c.entries.Refresh()
+		} else {
+			last := c.history[len(c.history)-1]
+			last.inc()
 		}
-	})
-	return entries
+	}
 }
 
 func (ce *consoleEntry) String() string {

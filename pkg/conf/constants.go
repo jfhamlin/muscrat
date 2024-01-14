@@ -23,6 +23,10 @@ var (
 		return clamp(bufferpool.MinSize, bufferpool.MaxSize, val)
 	}()
 
+	// OutputBufferSize is the size of the buffer used for outputting
+	// samples to the audio system.
+	OutputBufferSize = clamp(BufferSize, 4096, getValueInt("MUSCRAT_OUTPUT_BUFFER_SIZE", BufferSize))
+
 	// SampleRate is the sample rate of the audio system.
 	SampleRate = clamp(22050, 192000, getValueInt("MUSCRAT_SAMPLE_RATE", 44100))
 )

@@ -76,8 +76,9 @@ func NewMainWindow(a fyne.App) *MainWindow {
 	scopes := container.NewVSplit(osc, spect)
 	logoMeter := container.New(layout.NewBorderLayout(logo, nil, nil, nil), logo, volumeMeter)
 	console := NewConsole()
+	sidebar := NewCollapsibleSidebar(console, false)
 	contents := container.New(
-		layout.NewBorderLayout(nil, nil, logoMeter, console), logoMeter, scopes, console)
+		layout.NewBorderLayout(nil, nil, logoMeter, sidebar), logoMeter, scopes, sidebar)
 
 	w.SetContent(contents)
 
@@ -99,7 +100,7 @@ func NewMainWindow(a fyne.App) *MainWindow {
 		}
 		lastUpdateTime = time.Now()
 		osc.SetData(nil, readBuffer[:len(readBuffer)/4])
-		spect.SetData(fft(readBuffer))
+		//spect.SetData(fft(readBuffer))
 	})
 
 	// set up key handler
