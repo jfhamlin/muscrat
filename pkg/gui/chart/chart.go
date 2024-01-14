@@ -2,19 +2,12 @@ package chart
 
 import (
 	"math"
-	"strconv"
 	"sync"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/canvas"
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
-
-	"gonum.org/v1/plot"
-	"gonum.org/v1/plot/font"
-	"gonum.org/v1/plot/plotter"
-	"gonum.org/v1/plot/vg/draw"
-	"gonum.org/v1/plot/vg/vgimg"
 )
 
 const (
@@ -48,11 +41,9 @@ type (
 	}
 
 	lineChartRenderer struct {
-		lineChart *LineChart
+		widget *LineChart
 
-		drawMtx   sync.Mutex
-		pltCanvas *vgimg.Canvas
-		image     *canvas.Image
+		segments []*canvas.Line
 
 		objects []fyne.CanvasObject
 	}
@@ -63,10 +54,6 @@ type (
 		Prec  int
 		Width float64
 	}
-)
-
-var (
-	_ fyne.WidgetRenderer = (*lineChartRenderer)(nil)
 )
 
 func NewLineChart(cfg LineChartConfig) *LineChart {
@@ -84,36 +71,16 @@ func (lc *LineChart) SetMinSize(size fyne.Size) {
 }
 
 func (lc *LineChart) SetData(xs, ys []float64) {
-	if xs != nil && len(xs) != len(ys) {
+	if xs == nil {
+		xs = make([]float64, len(ys))
+	}
+	if len(xs) != len(ys) {
 		panic("xs and ys must have the same length")
 	}
 
-	newXs := lc.xs
-	newYs := lc.ys
-	if len(xs) != len(lc.xs) {
-		if xs == nil {
-			newXs = nil
-		} else {
-			newXs = make([]float64, len(xs))
-		}
-	}
-	if len(ys) != len(lc.ys) {
-		newYs = make([]float64, len(ys))
-	}
-	copy(newXs, xs)
-	copy(newYs, ys)
-	for i := range newYs {
-		if newXs != nil && math.IsNaN(newXs[i]) {
-			newXs[i] = 0
-		}
-		if math.IsNaN(newYs[i]) {
-			newYs[i] = 0
-		}
-	}
-
 	lc.dataMtx.Lock()
-	lc.xs = newXs
-	lc.ys = newYs
+	lc.xs = xs
+	lc.ys = ys
 	lc.dataMtx.Unlock()
 
 	lc.Refresh()
@@ -123,196 +90,162 @@ func (lc *LineChart) CreateRenderer() fyne.WidgetRenderer {
 	lc.ExtendBaseWidget(lc)
 
 	r := &lineChartRenderer{
-		lineChart: lc,
+		widget: lc,
 	}
 	r.Layout(lc.minSize)
-	r.objects = []fyne.CanvasObject{r.image}
 
 	return r
 }
 
-////////////////////////////////////////////////////////////////////////////////
-// Renderer
-
-func (r *lineChartRenderer) draw() {
-	p := plot.New()
-	p.BackgroundColor = theme.BackgroundColor()
-
-	xConfig, yConfig := r.lineChart.config.X, r.lineChart.config.Y
-
-	p.X.Label.Text = xConfig.Label
-	p.X.Label.TextStyle.Color = theme.ForegroundColor()
-	p.X.Tick.Label.Color = theme.ForegroundColor()
-	p.X.Tick.Color = theme.ForegroundColor()
-	p.X.LineStyle.Color = theme.ForegroundColor()
-	p.X.Min = xConfig.Min
-	p.X.Max = xConfig.Max
-	if xConfig.Log && len(r.lineChart.ys) > 0 { // avoid log w/ empty data
-		p.X.Scale = log2Scale{}
-		p.X.Tick.Marker = log2Ticks{
-			Prec:  1,
-			Width: float64(r.lineChart.Size().Width),
-		}
-	}
-
-	p.Y.Label.Text = yConfig.Label
-	p.Y.Label.TextStyle.Color = theme.ForegroundColor()
-	p.Y.LineStyle.Color = theme.ForegroundColor()
-	p.Y.Tick.Label.Color = theme.ForegroundColor()
-	p.Y.Tick.Color = theme.ForegroundColor()
-	p.Y.Min = yConfig.Min
-	p.Y.Max = yConfig.Max
-	if yConfig.Log && len(r.lineChart.ys) > 0 { // avoid log w/ empty data
-		p.Y.Scale = log2Scale{}
-		p.Y.Tick.Marker = log2Ticks{Prec: 1}
-	}
-
-	r.lineChart.dataMtx.RLock()
-	pts := make(plotter.XYs, len(r.lineChart.ys))
-	for i := range r.lineChart.ys {
-		var x, y float64
-		if r.lineChart.xs == nil {
-			x = float64(i)
-		} else {
-			x = r.lineChart.xs[i]
-		}
-		y = r.lineChart.ys[i]
-
-		if xConfig.Clamp {
-			x = math.Max(xConfig.Min, math.Min(xConfig.Max, x))
-		} else {
-			p.X.Min = math.Min(p.X.Min, x)
-			p.X.Max = math.Max(p.X.Max, x)
-		}
-
-		if yConfig.Clamp {
-			y = math.Max(yConfig.Min, math.Min(yConfig.Max, y))
-		} else {
-			p.Y.Min = math.Min(p.Y.Min, y)
-			p.Y.Max = math.Max(p.Y.Max, y)
-		}
-
-		pts[i].X = x
-		pts[i].Y = y
-	}
-	r.lineChart.dataMtx.RUnlock()
-
-	line, err := plotter.NewLine(pts)
-	if err != nil {
-		panic(err)
-	}
-	line.Color = theme.ForegroundColor()
-	p.Add(line)
-
-	p.Draw(draw.New(r.pltCanvas))
+func (r *lineChartRenderer) MinSize() fyne.Size {
+	return fyne.NewSize(200, 100) // Minimum size of the widget
 }
 
 func (r *lineChartRenderer) Layout(size fyne.Size) {
-	r.drawMtx.Lock()
-	defer r.drawMtx.Unlock()
-
-	if r.pltCanvas != nil {
-		w, h := r.pltCanvas.Size()
-		if float32(w) == size.Width && float32(h) == size.Height {
-			return
-		}
-	}
-	w, h := size.Width, size.Height
-	if w <= 0 {
-		w = 1
-	}
-	if h <= 0 {
-		h = 1
-	}
-
-	r.pltCanvas = vgimg.New(font.Length(w), font.Length(h))
-	r.image = canvas.NewImageFromImage(r.pltCanvas.Image())
-	r.image.FillMode = canvas.ImageFillContain
-	r.image.SetMinSize(size)
-	r.image.Resize(size)
-	r.objects = []fyne.CanvasObject{r.image}
-	r.draw()
-}
-
-func (r *lineChartRenderer) MinSize() fyne.Size {
-	return r.lineChart.minSize
+	r.Refresh() // Refresh the drawing when layout changes
 }
 
 func (r *lineChartRenderer) Refresh() {
-	r.Layout(r.lineChart.Size())
+	if len(r.widget.xs) <= 1 {
+		r.objects = nil
+		return
+	}
+	if len(r.segments) != len(r.widget.xs)-1 {
+		segments := len(r.widget.xs) - 1
+		r.segments = make([]*canvas.Line, segments)
+		r.objects = r.objects[:0]
+		for i := 0; i < segments; i++ {
+			r.segments[i] = canvas.NewLine(theme.ForegroundColor())
+			r.segments[i].StrokeWidth = 1
+			r.objects = append(r.objects, r.segments[i])
+		}
+	}
+	max := math.Inf(-1)
+	min := math.Inf(1)
+	for _, y := range r.widget.ys {
+		if y > max {
+			max = y
+		}
+		if y < min {
+			min = y
+		}
+	}
 
-	r.drawMtx.Lock()
-	defer r.drawMtx.Unlock()
+	w, h := r.widget.Size().Width, r.widget.Size().Height
+	for i, line := range r.segments {
+		y1 := float64(h) - (r.widget.ys[i]-min)/(max-min)*float64(h)
+		y2 := float64(h) - (r.widget.ys[i+1]-min)/(max-min)*float64(h)
 
-	r.draw()
+		// ignore widget xs; position equally spaced
+		x1 := float64(i) / float64(len(r.widget.xs)-1) * float64(w)
+		x2 := float64(i+1) / float64(len(r.widget.xs)-1) * float64(w)
 
-	r.image.Refresh()
+		line.Position1.X = float32(x1)
+		line.Position1.Y = float32(y1)
+		line.Position2.X = float32(x2)
+		line.Position2.Y = float32(y2)
+	}
 }
 
 func (r *lineChartRenderer) Objects() []fyne.CanvasObject {
 	return r.objects
 }
 
-func (r *lineChartRenderer) Destroy() {
-}
+func (r *lineChartRenderer) Destroy() {}
 
-////////////////////////////////////////////////////////////////////////////////
-// log2Scale
+// Renderer
 
-func (log2Scale) Normalize(min, max, x float64) float64 {
-	if min <= 0 || max <= 0 || x <= 0 {
-		panic("Values must be greater than 0 for a log2 scale.")
-	}
-	logMin := math.Log2(min)
-	return (math.Log2(x) - logMin) / (math.Log2(max) - logMin)
-}
+// func (r *lineChartRenderer) drawAxis(xConfig, yConfig AxisConfig) []fyne.CanvasObject {
+// 	objs := []fyne.CanvasObject{}
 
-////////////////////////////////////////////////////////////////////////////////
-// log2Ticks
+// 	width := r.lineChart.Size().Width
+// 	height := r.lineChart.Size().Height
 
-func (t log2Ticks) Ticks(min, max float64) []plot.Tick {
-	if min <= 0 || max <= 0 {
-		panic("Values must be greater than 0 for a log scale.")
-	}
+// 	// Draw X-axis
+// 	xAxis := canvas.NewLine(theme.ForegroundColor())
+// 	xAxis.StrokeWidth = 2
+// 	xAxis.Position1 = fyne.NewPos(0, height-20)
+// 	xAxis.Position2 = fyne.NewPos(width, height-20)
+// 	objs = append(objs, xAxis)
 
-	numLabels := 0
+// 	// Draw Y-axis
+// 	yAxis := canvas.NewLine(theme.ForegroundColor())
+// 	yAxis.StrokeWidth = 2
+// 	yAxis.Position1 = fyne.NewPos(20, 0)
+// 	yAxis.Position2 = fyne.NewPos(20, height)
+// 	objs = append(objs, yAxis)
 
-	val := math.Pow(2, float64(int(math.Log2(min))))
-	max = math.Pow(2, float64(int(math.Ceil(math.Log2(max)))))
-	var ticks []plot.Tick
-	for val < max {
-		for i := 0; i < 12; i++ {
-			tickVal := val * math.Pow(2, float64(i)/float64(12))
-			tick := plot.Tick{Value: tickVal}
-			if i == 0 || i == 6 {
-				tick.Label = formatFloatTick(tickVal, t.Prec)
-				numLabels++
-			}
-			ticks = append(ticks, tick)
-		}
-		val *= 2
-	}
-	ticks = append(ticks, plot.Tick{Value: max, Label: formatFloatTick(max, t.Prec)})
+// 	// Draw labels (basic example, needs more work for proper positioning and formatting)
+// 	xLabel := canvas.NewText(xConfig.Label, theme.ForegroundColor())
+// 	xLabel.TextSize = 12
+// 	xLabel.Move(fyne.NewPos(width/2, height-10))
+// 	objs = append(objs, xLabel)
 
-	pixelsPerLabel := float64(t.Width) / float64(numLabels)
-	if pixelsPerLabel < minPixelsPerLabel {
-		targetNumLabels := int(float64(t.Width) / minPixelsPerLabel)
-		keep := int(math.Ceil(float64(numLabels) / float64(targetNumLabels)))
-		labelIndex := 0
-		for i := range ticks {
-			if ticks[i].Label == "" {
-				continue
-			}
-			if keep == 0 || labelIndex%keep != 0 {
-				ticks[i].Label = ""
-			}
-			labelIndex++
-		}
-	}
+// 	yLabel := canvas.NewText(yConfig.Label, theme.ForegroundColor())
+// 	yLabel.TextSize = 12
+// 	yLabel.Move(fyne.NewPos(10, height/2))
+// 	objs = append(objs, yLabel)
 
-	return ticks
-}
+// 	return objs
+// }
 
-func formatFloatTick(v float64, prec int) string {
-	return strconv.FormatFloat(v, 'f', prec, 64)
-}
+// func (r *lineChartRenderer) drawLineChart(xConfig, yConfig AxisConfig) []fyne.CanvasObject {
+// 	r.lineChart.dataMtx.RLock()
+// 	defer r.lineChart.dataMtx.RUnlock()
+
+// 	objs := []fyne.CanvasObject{}
+
+// 	width := r.lineChart.Size().Width - 40   // 20px padding on each side
+// 	height := r.lineChart.Size().Height - 40 // 20px padding on each side
+// 	xMin, xMax := xConfig.Min, xConfig.Max
+// 	yMin, yMax := yConfig.Min, yConfig.Max
+
+// 	for i := 0; i < len(r.lineChart.ys)-1; i++ {
+// 		x1 := normalize(r.lineChart.xs[i], xMin, xMax) * width
+// 		y1 := (1 - normalize(r.lineChart.ys[i], yMin, yMax)) * height
+// 		x2 := normalize(r.lineChart.xs[i+1], xMin, xMax) * width
+// 		y2 := (1 - normalize(r.lineChart.ys[i+1], yMin, yMax)) * height
+
+// 		line := canvas.NewLine(theme.ForegroundColor())
+// 		line.Position1 = fyne.NewPos(x1+20, y1+20)
+// 		line.Position2 = fyne.NewPos(x2+20, y2+20)
+// 		line.StrokeWidth = 2
+// 		objs = append(objs, line)
+// 	}
+
+// 	return objs
+// }
+
+// func normalize(value, min, max float64) float32 {
+// 	return float32((value - min) / (max - min))
+// }
+
+// func (r *lineChartRenderer) Layout(size fyne.Size) {
+// 	// Redraw the chart with the new size
+// 	r.Refresh()
+// }
+
+// func (r *lineChartRenderer) Refresh() {
+// 	// Clear existing objects
+// 	objects := r.objects[:0]
+
+// 	// Redraw the axes and the line chart
+// 	objects = append(objects, r.drawAxis(r.lineChart.config.X, r.lineChart.config.Y)...)
+// 	objects = append(objects, r.drawLineChart(r.lineChart.config.X, r.lineChart.config.Y)...)
+// 	r.objects = objects
+
+// 	// Update the canvas objects
+// 	canvas.Refresh(r.lineChart)
+// }
+
+// func (r *lineChartRenderer) MinSize() fyne.Size {
+// 	return r.lineChart.minSize
+// }
+
+// func (r *lineChartRenderer) Objects() []fyne.CanvasObject {
+// 	return r.objects
+// }
+
+// func (r *lineChartRenderer) Destroy() {
+// 	// Cleanup resources if any
+// }

@@ -100,7 +100,7 @@ func NewMainWindow(a fyne.App) *MainWindow {
 		}
 		lastUpdateTime = time.Now()
 		osc.SetData(nil, readBuffer[:len(readBuffer)/4])
-		//spect.SetData(fft(readBuffer))
+		spect.SetData(fft(readBuffer))
 	})
 
 	// set up key handler
