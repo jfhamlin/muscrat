@@ -56,11 +56,12 @@ func NewMainWindow(a fyne.App) *MainWindow {
 	spect := NewLineChart(LineChartConfig{
 		Smooth: true,
 		X: AxisConfig{
-			Label: "Frequency (Hz)",
-			Log:   true,
-			Min:   20,
-			Max:   float64(conf.SampleRate) / 2,
-			Clamp: true,
+			Label:     "Frequency (Hz)",
+			Log:       true,
+			Min:       20,
+			Max:       float64(conf.SampleRate) / 2,
+			Clamp:     true,
+			Precision: 0,
 		},
 		Y: AxisConfig{
 			Label:     "Power (dB)",

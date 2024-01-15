@@ -13,7 +13,7 @@ import (
 )
 
 const (
-	minPixelsPerLabel = 50
+	tickLength = 5
 )
 
 type (
@@ -145,6 +145,10 @@ func (lc *LineChart) CreateRenderer() fyne.WidgetRenderer {
 // renderer
 
 func (a axisItems) Objects() []fyne.CanvasObject {
+	if a.text.Text == "" {
+		return nil
+	}
+
 	objects := make([]fyne.CanvasObject, 0, len(a.ticks)+2)
 	objects = append(objects, a.text, a.line)
 	for _, tick := range a.ticks {
@@ -153,7 +157,7 @@ func (a axisItems) Objects() []fyne.CanvasObject {
 	return objects
 }
 
-func (a axisItems) placeLabels(minVal, maxVal float32, logScale bool, axisSize float32, prec int) float32 {
+func (a axisItems) placeYLabels(minVal, maxVal float32, logScale bool, axisSize float32, prec int) float32 {
 	// evenly distribute labels along the axis
 	// find tick text with the largest width
 	// move ticks and axis line to the right to make room for the text
@@ -168,7 +172,7 @@ func (a axisItems) placeLabels(minVal, maxVal float32, logScale bool, axisSize f
 
 	viewportStep := axisSize / float32(numTicks)
 	offset := viewportStep / 2
-	for i, tick := range a.ticks {
+	for _, tick := range a.ticks {
 		// position the tick
 		tick.line.Position1 = fyne.NewPos(0, offset)
 		tick.line.Position2 = fyne.NewPos(0, offset)
@@ -179,7 +183,7 @@ func (a axisItems) placeLabels(minVal, maxVal float32, logScale bool, axisSize f
 		// set the text
 		var val float32
 		if logScale {
-			val = minVal + (maxVal-minVal)*float32(math.Pow(2, float64(i)))
+			// ?
 		} else {
 			val = minVal + (maxVal-minVal)*float32(offset/axisSize)
 		}
@@ -195,22 +199,58 @@ func (a axisItems) placeLabels(minVal, maxVal float32, logScale bool, axisSize f
 		offset += viewportStep
 	}
 
-	const axisPadding = 4
-
 	// now right-align the text, center it vertically, and place the tick mark
 	for _, tick := range a.ticks {
 		pos := tick.text.Position()
 		tick.text.Move(fyne.NewPos(maxWidth-tick.text.MinSize().Width, pos.Y-tick.text.MinSize().Height/2))
 		tick.line.Position1.X = maxWidth
-		tick.line.Position2.X = maxWidth + axisPadding
+		tick.line.Position2.X = maxWidth + tickLength
 	}
 
 	// position the axis line
-	axisX := maxWidth + axisPadding
+	axisX := maxWidth + tickLength
 	a.line.Position1 = fyne.NewPos(axisX, 0)
 	a.line.Position2 = fyne.NewPos(axisX, axisSize)
 
 	return axisX
+}
+
+func (a axisItems) placeXLabels(minVal, maxVal float32, logScale bool, left, top, width, height float32, prec int) {
+	textSize := a.text.MinSize()
+	a.text.Move(fyne.NewPos(left+width/2-textSize.Width/2, top+height-textSize.Height))
+
+	a.line.Position1 = fyne.NewPos(left, top)
+	a.line.Position2 = fyne.NewPos(left+width, top)
+
+	precFormat := "%." + strconv.Itoa(prec) + "f"
+
+	numTicks := len(a.ticks)
+
+	scale := math.Log2(float64(maxVal / minVal))
+
+	viewportStep := width / float32(numTicks)
+	offset := viewportStep / 2
+	for _, tick := range a.ticks {
+		tickX := left + offset
+
+		tick.line.Position1 = fyne.NewPos(tickX, top)
+		tick.line.Position2 = fyne.NewPos(tickX, top+tickLength)
+
+		var val float32
+		if logScale {
+			val = minVal * float32(math.Pow(2, scale*float64(offset/width)))
+		} else {
+			val = minVal + (maxVal-minVal)*float32(offset/width)
+		}
+		newText := fmt.Sprintf(precFormat, val)
+		if newText != tick.text.Text {
+			tick.text.Text = newText
+			tick.text.Refresh()
+		}
+		tick.text.Move(fyne.NewPos(tickX-tick.text.MinSize().Width/2, top+tickLength))
+
+		offset += viewportStep
+	}
 }
 
 func (r *lineChartRenderer) MinSize() fyne.Size {
@@ -236,18 +276,57 @@ func (r *lineChartRenderer) Refresh() {
 	// the renderer changes.
 	var updateObjects bool
 
-	const tickYPadding = 10
+	const tickLabelPadding = 10 // min padding between tick labels
+
+	var xAxisHeight float32
+
+	////////////////////////////////////////////////////////////////////////////////
+	// X axis
+	if r.xAxis.text.Text != "" {
+		// how many ticks? distribute them evenly along widget width, with
+		// space for y-axis labels.
+
+		axisLabel := r.xAxis.text
+		textHeight := axisLabel.MinSize().Height
+
+		xAxisHeight = 2*textHeight + tickLength
+
+		const maxLabelWidth = 25
+
+		ticks := int(math.Max(2, float64((w-maxLabelWidth)/(maxLabelWidth+tickLabelPadding))))
+
+		if ticks < len(r.xAxis.ticks) {
+			updateObjects = true
+			r.xAxis.ticks = r.xAxis.ticks[:ticks]
+		} else if ticks > len(r.xAxis.ticks) {
+			updateObjects = true
+			for i := len(r.xAxis.ticks); i < ticks; i++ {
+				r.xAxis.ticks = append(r.xAxis.ticks, axisTick{
+					text: canvas.NewText("", theme.ForegroundColor()),
+					line: canvas.NewLine(theme.ForegroundColor()),
+				})
+				text := r.xAxis.ticks[i].text
+				text.TextSize = TextLabelSize()
+				line := r.xAxis.ticks[i].line
+				line.StrokeWidth = 1
+			}
+		}
+	}
+	// X axis
+	////////////////////////////////////////////////////////////////////////////////
+
+	graphH := h - xAxisHeight
 
 	////////////////////////////////////////////////////////////////////////////////
 	// Y axis
 	{
 		// how many ticks? distribute them evenly along widget height with
 		// a minimum of 2
-		titleWidth := r.yAxis.text.MinSize().Height
+		titleWidth := r.yAxis.text.MinSize().Width
 		r.yAxis.text.Move(fyne.NewPos(w/2-titleWidth/2, 0))
 
 		textHeight := r.yAxis.text.MinSize().Height
-		ticks := int(math.Max(2, float64(h/(textHeight+tickYPadding))))
+		ticks := int(math.Max(2, float64(graphH/(textHeight+tickLabelPadding))))
 		if ticks < len(r.yAxis.ticks) {
 			updateObjects = true
 			r.yAxis.ticks = r.yAxis.ticks[:ticks]
@@ -264,17 +343,6 @@ func (r *lineChartRenderer) Refresh() {
 				line.StrokeWidth = 1
 			}
 		}
-
-		// setting tick positions
-		for i := range r.yAxis.ticks {
-			// position each tick evenly along the height
-			line := r.yAxis.ticks[i].line
-			line.Position1 = fyne.NewPos(5, float32(i)*(h/float32(ticks)))
-			line.Position2 = fyne.NewPos(10, float32(i)*(h/float32(ticks)))
-		}
-
-		r.yAxis.line.Position1 = fyne.NewPos(10, 0)
-		r.yAxis.line.Position2 = fyne.NewPos(10, h)
 	}
 	// Y axis
 	////////////////////////////////////////////////////////////////////////////////
@@ -293,6 +361,7 @@ func (r *lineChartRenderer) Refresh() {
 	if updateObjects {
 		r.objects = r.objects[:0]
 		r.objects = append(r.objects, r.yAxis.Objects()...)
+		r.objects = append(r.objects, r.xAxis.Objects()...)
 		for _, seg := range r.segments {
 			r.objects = append(r.objects, seg)
 		}
@@ -336,8 +405,10 @@ func (r *lineChartRenderer) Refresh() {
 	logMinY := math.Log2(minY)
 	logMaxY := math.Log2(maxY)
 
-	graphX := r.yAxis.placeLabels(float32(minY), float32(maxY), r.widget.config.Y.Log, h, r.widget.config.Y.Precision)
+	graphX := r.yAxis.placeYLabels(float32(minY), float32(maxY), r.widget.config.Y.Log, graphH, r.widget.config.Y.Precision)
 	graphW := w - graphX
+
+	r.xAxis.placeXLabels(float32(minX), float32(maxX), r.widget.config.X.Log, graphX, graphH, graphW, xAxisHeight, r.widget.config.X.Precision)
 
 	for i, line := range r.segments {
 		var x1, x2, y1, y2 float64
@@ -381,8 +452,8 @@ func (r *lineChartRenderer) Refresh() {
 		line.Position1.X = graphW*float32(x1) + graphX
 		line.Position2.X = graphW*float32(x2) + graphX
 
-		line.Position1.Y = h * float32(y1)
-		line.Position2.Y = h * float32(y2)
+		line.Position1.Y = graphH * float32(y1)
+		line.Position2.Y = graphH * float32(y2)
 	}
 }
 
