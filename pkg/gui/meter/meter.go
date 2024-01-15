@@ -73,7 +73,7 @@ func (v *Volume) CreateRenderer() fyne.WidgetRenderer {
 
 	peakBar := canvas.NewRectangle(theme.PrimaryColor())
 
-	volumeLabel := canvas.NewText("0dB", theme.BackgroundColor())
+	volumeLabel := canvas.NewText("0", theme.BackgroundColor())
 	tickLabels := []*canvas.Text{}
 	for i := 0; i < numTicks; i++ {
 		label := canvas.NewText("", theme.TextColor())
@@ -137,12 +137,12 @@ func (r *volumeRenderer) update() {
 
 	size := r.volume.Size()
 
-	const labelPadding = 2
+	const labelPadding = 5
 	maxLabelWidth := float32(0)
 	for i := 0; i < numTicks; i++ {
 		label := r.tickLabels[i]
 		tickValue := r.volume.Max - delta*float64(i)/(numTicks-1)
-		label.Text = fmt.Sprintf("%.0fdB", tickValue)
+		label.Text = fmt.Sprintf("%.0f", tickValue)
 		if i == 0 {
 			label.Move(fyne.NewPos(0, 0))
 		} else if i == numTicks-1 {
@@ -154,8 +154,17 @@ func (r *volumeRenderer) update() {
 			maxLabelWidth = label.MinSize().Width
 		}
 	}
+	// left-pad the labels
+	maxLabelWidth += labelPadding
+
+	// right-align the labels
+	for i := 0; i < numTicks; i++ {
+		label := r.tickLabels[i]
+		label.Move(fyne.NewPos(maxLabelWidth-label.MinSize().Width, label.Position().Y))
+	}
+
 	meterLeft := maxLabelWidth + labelPadding
-	meterSize := fyne.NewSize(size.Width-meterLeft, size.Height)
+	meterSize := fyne.NewSize((size.Width-meterLeft)/2, size.Height)
 
 	r.background.Resize(meterSize)
 	r.background.Move(fyne.NewPos(meterLeft, 0))
@@ -194,7 +203,7 @@ func (r *volumeRenderer) update() {
 		r.peakBar.Move(fyne.NewPos(meterLeft+meterSize.Width-peakWidth, meterSize.Height-r.peakBar.Size().Height))
 	}
 
-	r.volumeLabel.Text = fmt.Sprintf("%.0fdB", r.volume.Value)
+	r.volumeLabel.Text = fmt.Sprintf("%.0f", r.volume.Value)
 	// place the label horizontally centered and vertically just below
 	// the top of the bar
 	r.volumeLabel.Move(fyne.NewPos(

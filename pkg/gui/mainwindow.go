@@ -55,6 +55,7 @@ func NewMainWindow(a fyne.App) *MainWindow {
 		},
 	})
 	spect := chart.NewLineChart(chart.LineChartConfig{
+		Smooth: true,
 		X: chart.AxisConfig{
 			Label: "Frequency (Hz)",
 			Log:   true,
