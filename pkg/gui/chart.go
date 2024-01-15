@@ -1,8 +1,9 @@
-package chart
+package gui
 
 import (
 	"fmt"
 	"math"
+	"strconv"
 	"sync"
 
 	"fyne.io/fyne/v2"
@@ -152,10 +153,12 @@ func (a axisItems) Objects() []fyne.CanvasObject {
 	return objects
 }
 
-func (a axisItems) placeLabels(minVal, maxVal float32, logScale bool, axisSize float32) float32 {
+func (a axisItems) placeLabels(minVal, maxVal float32, logScale bool, axisSize float32, prec int) float32 {
 	// evenly distribute labels along the axis
 	// find tick text with the largest width
 	// move ticks and axis line to the right to make room for the text
+
+	precFormat := "%." + strconv.Itoa(prec) + "f"
 
 	// log scale is log2
 
@@ -178,9 +181,9 @@ func (a axisItems) placeLabels(minVal, maxVal float32, logScale bool, axisSize f
 		if logScale {
 			val = minVal + (maxVal-minVal)*float32(math.Pow(2, float64(i)))
 		} else {
-			val = minVal + (maxVal-minVal)*float32(i)/float32(numTicks-1)
+			val = minVal + (maxVal-minVal)*float32(offset/axisSize)
 		}
-		newText := fmt.Sprintf("%.0f", val)
+		newText := fmt.Sprintf(precFormat, val)
 		if newText != tick.text.Text {
 			tick.text.Text = newText
 			tick.text.Refresh()
@@ -191,14 +194,19 @@ func (a axisItems) placeLabels(minVal, maxVal float32, logScale bool, axisSize f
 
 		offset += viewportStep
 	}
-	// now right-align the text
+
+	const axisPadding = 4
+
+	// now right-align the text, center it vertically, and place the tick mark
 	for _, tick := range a.ticks {
 		pos := tick.text.Position()
-		tick.text.Move(fyne.NewPos(maxWidth-tick.text.MinSize().Width, pos.Y))
+		tick.text.Move(fyne.NewPos(maxWidth-tick.text.MinSize().Width, pos.Y-tick.text.MinSize().Height/2))
+		tick.line.Position1.X = maxWidth
+		tick.line.Position2.X = maxWidth + axisPadding
 	}
 
 	// position the axis line
-	axisX := maxWidth + 2
+	axisX := maxWidth + axisPadding
 	a.line.Position1 = fyne.NewPos(axisX, 0)
 	a.line.Position2 = fyne.NewPos(axisX, axisSize)
 
@@ -251,7 +259,7 @@ func (r *lineChartRenderer) Refresh() {
 					line: canvas.NewLine(theme.ForegroundColor()),
 				})
 				text := r.yAxis.ticks[i].text
-				text.TextSize = 2 * theme.TextSize() / 3
+				text.TextSize = TextLabelSize()
 				line := r.yAxis.ticks[i].line
 				line.StrokeWidth = 1
 			}
@@ -328,7 +336,7 @@ func (r *lineChartRenderer) Refresh() {
 	logMinY := math.Log2(minY)
 	logMaxY := math.Log2(maxY)
 
-	graphX := r.yAxis.placeLabels(float32(minY), float32(maxY), r.widget.config.Y.Log, h)
+	graphX := r.yAxis.placeLabels(float32(minY), float32(maxY), r.widget.config.Y.Log, h, r.widget.config.Y.Precision)
 	graphW := w - graphX
 
 	for i, line := range r.segments {

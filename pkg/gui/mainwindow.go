@@ -13,8 +13,6 @@ import (
 	"gonum.org/v1/gonum/dsp/fourier"
 
 	"github.com/jfhamlin/muscrat/pkg/conf"
-	"github.com/jfhamlin/muscrat/pkg/gui/chart"
-	"github.com/jfhamlin/muscrat/pkg/gui/meter"
 	"github.com/jfhamlin/muscrat/pkg/pubsub"
 )
 
@@ -28,8 +26,8 @@ type (
 	MainWindow struct {
 		fyne.Window
 
-		oscilloscope *chart.LineChart
-		spectrogram  *chart.LineChart
+		oscilloscope *LineChart
+		spectrogram  *LineChart
 
 		unsub func()
 	}
@@ -47,31 +45,33 @@ func NewMainWindow(a fyne.App) *MainWindow {
 	logo := LogoImage()
 	logo.SetMinSize(fyne.NewSize(100, 100))
 
-	osc := chart.NewLineChart(chart.LineChartConfig{
-		Y: chart.AxisConfig{
-			Label: "Amplitude",
-			Min:   -1,
-			Max:   1,
+	osc := NewLineChart(LineChartConfig{
+		Y: AxisConfig{
+			Label:     "Amplitude",
+			Min:       -1,
+			Max:       1,
+			Precision: 2,
 		},
 	})
-	spect := chart.NewLineChart(chart.LineChartConfig{
+	spect := NewLineChart(LineChartConfig{
 		Smooth: true,
-		X: chart.AxisConfig{
+		X: AxisConfig{
 			Label: "Frequency (Hz)",
 			Log:   true,
 			Min:   20,
 			Max:   float64(conf.SampleRate) / 2,
 			Clamp: true,
 		},
-		Y: chart.AxisConfig{
-			Label: "Power (dB)",
-			Max:   0,
-			Min:   -100,
-			Clamp: true,
+		Y: AxisConfig{
+			Label:     "Power (dB)",
+			Max:       0,
+			Min:       -100,
+			Clamp:     true,
+			Precision: 0,
 		},
 	})
 
-	volumeMeter := meter.NewVolume(-60, 0)
+	volumeMeter := NewVolume(-60, 0)
 	volumeMeter.SetMinSize(fyne.NewSize(10, 400))
 
 	scopes := container.NewVSplit(osc, spect)

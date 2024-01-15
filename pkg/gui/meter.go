@@ -1,4 +1,4 @@
-package meter
+package gui
 
 import (
 	"fmt"
@@ -223,7 +223,7 @@ func (r *volumeRenderer) applyTheme() {
 	r.volumeLabel.Color = theme.PrimaryColor()
 
 	textColor := theme.TextColor()
-	textSize := 2 * theme.TextSize() / 3
+	textSize := TextLabelSize()
 	for _, label := range r.tickLabels {
 		label.Color = textColor
 		label.TextSize = textSize
