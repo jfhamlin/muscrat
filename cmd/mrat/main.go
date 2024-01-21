@@ -79,7 +79,14 @@ func main() {
 
 	{
 		a := app.New()
-		w := gui.NewMainWindow(a)
-		w.ShowAndRun()
+		main := gui.NewMainWindow(a)
+		main.SetMaster()
+
+		code := gui.NewCodeWindow(a, scriptFile)
+
+		main.Show()
+		code.Show()
+
+		a.Run()
 	}
 }
