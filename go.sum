@@ -99,8 +99,8 @@ github.com/fyne-io/glfw-js v0.0.0-20220120001248-ee7290d23504/go.mod h1:gLRWYfYn
 github.com/fyne-io/image v0.0.0-20220602074514-4956b0afb3d2 h1:hnLq+55b7Zh7/2IRzWCpiTcAvjv/P8ERF+N7+xXbZhk=
 github.com/fyne-io/image v0.0.0-20220602074514-4956b0afb3d2/go.mod h1:eO7W361vmlPOrykIg+Rsh1SZ3tQBaOsfzZhsIOb/Lm0=
 github.com/ghodss/yaml v1.0.0/go.mod h1:4dBDuWmgqj2HViK6kFavaiC9ZROes6MMH2rRYeMEF04=
-github.com/glojurelang/glojure v0.2.1 h1:pNNJGPjtykBfAT+HGyXqkg1Q6gdHph098WT+g29iSMA=
-github.com/glojurelang/glojure v0.2.1/go.mod h1:wbKmjpKBqMBHKSgj5DjGg7NJVxQva2W7BqdVWW8UfFA=
+github.com/glojurelang/glojure v0.2.2 h1:SiA+YpV5DNglo6zejSqikk5vx+dHJglKp5Crfe1ufys=
+github.com/glojurelang/glojure v0.2.2/go.mod h1:wbKmjpKBqMBHKSgj5DjGg7NJVxQva2W7BqdVWW8UfFA=
 github.com/go-audio/audio v1.0.0 h1:zS9vebldgbQqktK4H0lUqWrG8P0NxCJVqcj7ZpNnwd4=
 github.com/go-audio/audio v1.0.0/go.mod h1:6uAu0+H2lHkwdGsAY+j2wHPNPpPoeg5AaEFh9FlA+Zs=
 github.com/go-audio/riff v1.0.0 h1:d8iCGbDvox9BfLagY94fBynxSPHO80LmZCaOsmKxokA=

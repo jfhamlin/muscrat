@@ -267,17 +267,17 @@
 ;; Operators
 
 (defn- arrange-multi-channel-args
-  "Arrange an sequence of arguments, some of which may be collections,
+  "Arrange a collection of arguments, some of which may be collections,
   into a sequence of sequences, where the i-th subsequence is an
   arguments sequence composed of the i-th element of each argument
   collection, wrapping around the collection for those shorter than
   the collection with maximum length.
 
   For example:
-    (arrange-multi-channel-args [1 2 3] [4 5] [6 7 8 9])
+    (arrange-multi-channel-args [[1 2 3] [4 5] [6 7 8 9]])
   returns:
     ([1 4 6] [2 5 7] [3 4 8] [1 5 9])"
-  [& args]
+  [args]
   (let [colls (map #(if (coll? %) % [%]) args)
         max-len (apply max (map count colls))
         colls (map #(take max-len (cycle %)) colls)]
@@ -439,13 +439,21 @@
                                            (rest arg-names#)
                                            (rest args#)))))
              ~assignments-sym (merge defaults# ~assignments-sym)
-             ~@(mapcat (fn [[arg-name default]]
-                         `(~arg-name (get ~assignments-sym ~(keyword arg-name))))
-                       arg-pairs)
-             ugen# (do ~@body)]
-         (let [mul# (get ~assignments-sym :mul 1)
-               add# (get ~assignments-sym :add 0)]
-           (fma ugen# mul# add#))))))
+             ;; duplicate the argument pairs for each argument value
+             ;; to handle multiple channels.
+             expand-arg# (fn [[k# v#]] (if (coll? v#)
+                                         (map #(vector k# %) v#)
+                                         [[k# v#]]))
+             arg-lists# (arrange-multi-channel-args (map expand-arg# (seq ~assignments-sym)))]
+         (for [arg-list# arg-lists#]
+           (let [~assignments-sym (into {} arg-list#)
+                 ~@(mapcat (fn [[arg-name default]]
+                             `(~arg-name (get ~assignments-sym ~(keyword arg-name))))
+                           arg-pairs)
+                 ugen# (do ~@body)
+                 mul# (get ~assignments-sym :mul 1)
+                 add# (get ~assignments-sym :add 0)]
+             (fma ugen# mul# add#)))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Oscillators
@@ -907,7 +915,7 @@
 
 (defugen play-buf
   "Play a buffer (single-channel) or slice of buffers (multi-channel)."
-  [buf-or-bufs nil
+  [^:static buf-or-bufs nil
    rate 1
    trigger 1
    start-pos 0
