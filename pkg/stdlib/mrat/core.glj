@@ -266,6 +266,24 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Operators
 
+(defn- arrange-multi-channel-args
+  "Arrange an sequence of arguments, some of which may be collections,
+  into a sequence of sequences, where the i-th subsequence is an
+  arguments sequence composed of the i-th element of each argument
+  collection, wrapping around the collection for those shorter than
+  the collection with maximum length.
+
+  For example:
+    (arrange-multi-channel-args [1 2 3] [4 5] [6 7 8 9])
+  returns:
+    ([1 4 6] [2 5 7] [3 4 8] [1 5 9])"
+  [& args]
+  (let [colls (map #(if (coll? %) % [%]) args)
+        max-len (apply max (map count colls))
+        colls (map #(take max-len (cycle %)) colls)]
+    (apply map vector colls)))
+
+
 (defn- +-internal
   [& xs]
   (let [groups (group-by #(instance? Node %) xs)
