@@ -5,11 +5,13 @@ go 1.21
 require (
 	fyne.io/fyne/v2 v2.4.0
 	github.com/fsnotify/fsnotify v1.6.0
-	github.com/glojurelang/glojure v0.2.0
+	github.com/glojurelang/glojure v0.2.1
 	github.com/go-audio/audio v1.0.0
-	github.com/go-audio/wav v1.0.0
+	github.com/go-audio/wav v1.1.0
 	github.com/gordonklaus/portaudio v0.0.0-20221027163845-7c3b689db3cc
 	github.com/jfhamlin/freeverb-go v1.0.0
+	github.com/mewkiz/flac v1.0.10
+	github.com/oov/audio v0.0.0-20171004131523-88a2be6dbe38
 	github.com/stretchr/testify v1.8.4
 	github.com/veandco/go-sdl2 v0.4.0
 	gitlab.com/gomidi/midi/v2 v2.0.30
@@ -39,13 +41,14 @@ require (
 	github.com/godbus/dbus/v5 v5.1.0 // indirect
 	github.com/golang/freetype v0.0.0-20170609003504-e2365dfdc4a0 // indirect
 	github.com/gopherjs/gopherjs v1.17.2 // indirect
+	github.com/icza/bitio v1.1.0 // indirect
 	github.com/jsummers/gobmp v0.0.0-20151104160322-e2ba15ffa76e // indirect
 	github.com/kr/text v0.2.0 // indirect
+	github.com/mewkiz/pkg v0.0.0-20230226050401-4010bf0fec14 // indirect
 	github.com/mitchellh/hashstructure/v2 v2.0.2 // indirect
 	github.com/modern-go/gls v0.0.0-20220109145502-612d0167dce5 // indirect
 	github.com/modern-go/reflect2 v1.0.2 // indirect
 	github.com/niemeyer/pretty v0.0.0-20200227124842-a10e7caefd8e // indirect
-	github.com/oov/audio v0.0.0-20171004131523-88a2be6dbe38 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/srwiley/oksvg v0.0.0-20221011165216-be6e8873101c // indirect
 	github.com/srwiley/rasterx v0.0.0-20220730225603-2ab79fcdd4ef // indirect

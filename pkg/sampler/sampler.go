@@ -30,9 +30,6 @@ func NewSampler(buf []float64) ugen.UGen {
 			lastTrig = trigs[i] > 0
 
 			rate := rates[i]
-			if rate < 0 {
-				rate = 0
-			}
 
 			if stopped {
 				continue
@@ -65,6 +62,9 @@ func NewSampler(buf []float64) ugen.UGen {
 			}
 
 			index += rate
+			if index < 0 {
+				index = float64(len(buf) - 1)
+			}
 			if index >= sampleLen {
 				index = startIndex[i]
 				if loops[i] <= 0 {

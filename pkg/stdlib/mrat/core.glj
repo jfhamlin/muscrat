@@ -851,13 +851,41 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Sampler
 
+(defn find-sample-path
+  "find-sample-path searches the directory given by the env var
+  MUSCRAT_SAMPLE_PATH for a sample file whose base name matches the
+  given keyword. If the sample is not found, an error is thrown.
+
+  Supports the following file extensions: .wav, .aiff, .aif, .flac,"
+  [kw]
+  (letfn [(file-exists? [file] (some? (first (os.Stat file))))]
+    (let [supported-suffixes [".wav" ".aiff" ".aif" ".flac"]
+          sample-path (os.Getenv "MUSCRAT_SAMPLE_PATH")
+          sample-path (if sample-path
+                        (strings.Split sample-path ":"))
+          sample-path (if (empty? sample-path)
+                        (throw (errors.New "MUSCRAT_SAMPLE_PATH not set"))
+                        sample-path)
+          sample-path (map #(strings.TrimRight % "/") sample-path)
+          matches (for [path sample-path
+                        suffix supported-suffixes
+                        file [(str path "/" (name kw) suffix)]
+                        :when (file-exists? file)]
+                    file)]
+      (if (empty? matches)
+        (throw (errors.New (str "sample not found: " kw)))
+        (first matches)))))
+
 (defn load-sample
   "Load an audio sample from a file into a buffer (slice of float64s) or
   a slice of buffers for multi-channel audio. The buffer will be
   resampled from the source to the engine's sample rate (available in
   the SAMPLE-RATE var). See play-buf for an example of how to play a
   loaded sample."
-  [path] (LoadSample path))
+  [path-or-kw]
+  (if (keyword? path-or-kw)
+    (load-sample (find-sample-path path-or-kw))
+    (LoadSample path-or-kw)))
 
 (defugen play-buf
   "Play a buffer (single-channel) or slice of buffers (multi-channel)."
@@ -866,17 +894,23 @@
    trigger 1
    start-pos 0
    loop 0]
-  (when-not (pos? (count buf-or-bufs))
-    (throw (errors.New "play-buf requires a non-empty buffer or slice of buffers")))
-  (let [bufs (if (number? (first buf-or-bufs))
-               [buf-or-bufs]
-               buf-or-bufs)]
-    (for [buf bufs]
-      (add-node! (NewSampler buf) "play-buf"
-                 :in-edges {:trigger trigger
-                            :rate rate
-                            :start-pos start-pos
-                            :loop (or loop 0)}))))
+  (let [buf-or-bufs (if (keyword? buf-or-bufs)
+                      (load-sample buf-or-bufs)
+                      buf-or-bufs)]
+      (when-not (pos? (count buf-or-bufs))
+        (throw (errors.New "play-buf requires a non-empty buffer or slice of buffers")))
+    (let [bufs (if (#(or (number? %) (keyword? %)) (first buf-or-bufs))
+                 [buf-or-bufs] ;; wrap single buffer in a vector
+                 buf-or-bufs)]
+      (for [buf bufs]
+        (let [buf (if (keyword? buf)
+                    (load-sample buf)
+                    buf)]
+          (add-node! (NewSampler buf) "play-buf"
+                     :in-edges {:trigger trigger
+                                :rate rate
+                                :start-pos start-pos
+                                :loop (or loop 0)}))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; I/O devices
