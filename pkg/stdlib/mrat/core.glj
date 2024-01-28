@@ -444,16 +444,19 @@
              expand-arg# (fn [[k# v#]] (if (coll? v#)
                                          (map #(vector k# %) v#)
                                          [[k# v#]]))
-             arg-lists# (arrange-multi-channel-args (map expand-arg# (seq ~assignments-sym)))]
-         (for [arg-list# arg-lists#]
-           (let [~assignments-sym (into {} arg-list#)
-                 ~@(mapcat (fn [[arg-name default]]
-                             `(~arg-name (get ~assignments-sym ~(keyword arg-name))))
-                           arg-pairs)
-                 ugen# (do ~@body)
-                 mul# (get ~assignments-sym :mul 1)
-                 add# (get ~assignments-sym :add 0)]
-             (fma ugen# mul# add#)))))))
+             arg-lists# (arrange-multi-channel-args (map expand-arg# (seq ~assignments-sym)))
+             channels# (for [arg-list# arg-lists#]
+                         (let [~assignments-sym (into {} arg-list#)
+                               ~@(mapcat (fn [[arg-name default]]
+                                           `(~arg-name (get ~assignments-sym ~(keyword arg-name))))
+                                         arg-pairs)
+                               ugen# (do ~@body)
+                               mul# (get ~assignments-sym :mul 1)
+                               add# (get ~assignments-sym :add 0)]
+                           (fma ugen# mul# add#)))]
+         (if (= 1 (count channels#))
+           (first channels#)
+           channels#)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Oscillators
@@ -635,36 +638,18 @@
   [p in]
   (add-edge! (as-node in) p "in"))
 
-(defn- freeverb-gen
-  [& opts]
-  (let [wet (get opts :wet 0.5)
-        damp (get opts :damp 0.5)
-        width (get opts :width 1.0)]
-    (NewFreeverb
-     (doto (NewRevModel)
-       (.SetWet wet)
-       (.SetDamp damp)
-       (.SetWidth width)))))
-
-(defn freeverb
-  "A reverb effect. Options are:
-  :dry - the amount of dry signal to mix in (0-1)
-  :wet - the amount of wet signal to mix in (0-1)
-  :room-size - the size of the room (0-1)
-  :damp - the damping factor (0-1)"
-  [node & opts]
-  (let [opts (apply hash-map opts)
-        supported #{:dry :wet :room-size :damp :width}
-        unsupported (seq (remove supported (keys opts)))
-        _ (if unsupported (throw (apply str "freeverb: unsupported option(s) supplied: "
-                                        (interpose \, unsupported))))
-        fv-node (add-node! (apply freeverb-gen opts) "freeverb")
-        rs-node (as-node (get opts :room-size 0.5))
-        dry-node (as-node (get opts :dry 0.5))]
-    (add-edge! node fv-node "$0")
-    (add-edge! rs-node fv-node "room-size")
-    (add-edge! dry-node fv-node "dry")
-    fv-node))
+(defugen freeverb
+  [in 0
+   mix 1/3
+   room-size 0.5
+   damp 0.5]
+  (let [model (NewRevModel)]
+    (add-node! (NewFreeverb model)
+               "freeverb"
+               :in-edges {:in in
+                          :mix mix
+                          :room-size room-size
+                          :damp damp})))
 
 (defugen lores
   "A simple lowpass filter with cutoff and resonance, modeled after the
