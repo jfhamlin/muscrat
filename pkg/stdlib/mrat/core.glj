@@ -30,7 +30,8 @@
                                                 NewPhasor
                                                 NewLFSaw
                                                 NewLFPulse)
-           (github.com$jfhamlin$muscrat$pkg$stochastic NewNoise
+           (github.com$jfhamlin$muscrat$pkg$stochastic NewRRand
+                                                       NewNoise
                                                        NewNoiseQuad
                                                        NewPinkNoise)
            (github.com$jfhamlin$muscrat$pkg$mod NewEnvelope
@@ -67,6 +68,9 @@
 
 (def SAMPLE-RATE github.com$jfhamlin$muscrat$pkg$conf.SampleRate)
 (def BUFFER-SIZE github.com$jfhamlin$muscrat$pkg$conf.BufferSize)
+
+(def ^:dynamic *rand-seed* 0)
+(def ^:dynamic *rand-stream* (math$rand.New (math$rand.NewSource *rand-seed*)))
 
 (defmacro doseq-idx
   [[locals seq-expr] & body]
@@ -524,7 +528,7 @@
     node))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; Noise
+;; Noise/Randomness
 
 (defugen noise
   "Generates random values between -1 and 1 at the given frequency.
@@ -543,6 +547,18 @@
   generates at 500 hz."
   [freq 500]
   (add-node! (NewNoiseQuad) "noise-quad" :in-edges {:w freq}))
+
+(defugen rrand
+  "Generates random values between the given min and max values
+  when triggered."
+  [min 0
+   max 1
+   trig 1]
+  (let [add min
+        mul (- max min)]
+    (if (and (number? trig) (== trig 1))
+      (fma (.Float64 *rand-stream*) mul add)
+      (add-node! (NewRRand *rand-stream*) "rrand" :in-edges {:min min :max max :trig trig}))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Modulators

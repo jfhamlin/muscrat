@@ -68,6 +68,7 @@ func RegisterImports(_register func(string, interface{})) {
 	// package github.com/jfhamlin/muscrat/pkg/conf
 	////////////////////////////////////////
 	_register("github.com/jfhamlin/muscrat/pkg/conf.BufferSize", github_com_jfhamlin_muscrat_pkg_conf.BufferSize)
+	_register("github.com/jfhamlin/muscrat/pkg/conf.OutputBufferSize", github_com_jfhamlin_muscrat_pkg_conf.OutputBufferSize)
 	_register("github.com/jfhamlin/muscrat/pkg/conf.SampleRate", github_com_jfhamlin_muscrat_pkg_conf.SampleRate)
 
 	// package github.com/jfhamlin/muscrat/pkg/effects
@@ -148,6 +149,7 @@ func RegisterImports(_register func(string, interface{})) {
 	_register("github.com/jfhamlin/muscrat/pkg/stochastic.NewNoise", github_com_jfhamlin_muscrat_pkg_stochastic.NewNoise)
 	_register("github.com/jfhamlin/muscrat/pkg/stochastic.NewNoiseQuad", github_com_jfhamlin_muscrat_pkg_stochastic.NewNoiseQuad)
 	_register("github.com/jfhamlin/muscrat/pkg/stochastic.NewPinkNoise", github_com_jfhamlin_muscrat_pkg_stochastic.NewPinkNoise)
+	_register("github.com/jfhamlin/muscrat/pkg/stochastic.NewRRand", github_com_jfhamlin_muscrat_pkg_stochastic.NewRRand)
 	_register("github.com/jfhamlin/muscrat/pkg/stochastic.PinkNoise", reflect.TypeOf((*github_com_jfhamlin_muscrat_pkg_stochastic.PinkNoise)(nil)).Elem())
 	_register("github.com/jfhamlin/muscrat/pkg/stochastic.*PinkNoise", reflect.TypeOf((*github_com_jfhamlin_muscrat_pkg_stochastic.PinkNoise)(nil)))
 
