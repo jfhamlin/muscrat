@@ -402,13 +402,9 @@ func (g *Graph) Run(ctx context.Context, cfg ugen.SampleConfig) {
 	}
 
 	for {
-		select {
-		case <-ctx.Done():
-			return
-		default:
+		if err := q.Run(ctx); err != nil {
+			break
 		}
-
-		q.Run(ctx)
 	}
 
 	// for i := 0; i < numWorkers; i++ {

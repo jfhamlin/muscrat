@@ -54,7 +54,7 @@ func (q *Queue) addInitialItem(item *QueueItem) {
 	q.initiallyRunnable = append(q.initiallyRunnable, item)
 }
 
-func (q *Queue) Run(ctx context.Context) {
+func (q *Queue) Run(ctx context.Context) error {
 	q.remainingItems.Store(q.numItems)
 
 	// room for all items to be runnable at once, so workers don't
@@ -69,6 +69,13 @@ func (q *Queue) Run(ctx context.Context) {
 	}
 
 	q.wg.Wait()
+
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	default:
+		return nil
+	}
 }
 
 func (q *Queue) runWorker(ctx context.Context) {
