@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/jfhamlin/muscrat/pkg/ugen"
 )
@@ -113,11 +114,15 @@ func TestCycle(t *testing.T) {
 
 	var result []float64
 	for i := 0; i < 10; i++ {
-		res, ok := <-out.Chan()
-		if !ok {
-			t.Fail()
+		select {
+		case res, ok := <-out.Chan():
+			if !ok {
+				t.Fail()
+			}
+			result = append(result, res[0])
+		case <-time.After(1 * time.Second):
+			t.Fatal("timeout")
 		}
-		result = append(result, res[0])
 	}
 	// it should = [1, 2, ..., 10]
 	for i := 0; i < 10; i++ {
@@ -214,9 +219,13 @@ func FuzzGraphLiveness(f *testing.F) {
 		go g.Run(ctx, ugen.SampleConfig{SampleRateHz: 44100})
 
 		for i := 0; i < 10; i++ {
-			_, ok := <-outNode.Chan()
-			if !ok {
-				t.Fail()
+			select {
+			case _, ok := <-outNode.Chan():
+				if !ok {
+					t.Fail()
+				}
+			case <-time.After(1 * time.Second):
+				t.Fatal("timeout")
 			}
 		}
 	})

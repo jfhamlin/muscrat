@@ -10,7 +10,6 @@ import (
 	"runtime/debug"
 	"strconv"
 	"strings"
-	"sync"
 	"sync/atomic"
 
 	"github.com/jfhamlin/muscrat/pkg/bufferpool"
@@ -334,8 +333,8 @@ func (g *Graph) Run(ctx context.Context, cfg ugen.SampleConfig) {
 		numWorkers = len(rs.nodeOrder)
 	}
 
-	var wg sync.WaitGroup
-	wg.Add(numWorkers)
+	// var wg sync.WaitGroup
+	// wg.Add(numWorkers)
 
 	g.bootstrapCycles(ctx, rs)
 
@@ -371,15 +370,45 @@ func (g *Graph) Run(ctx context.Context, cfg ugen.SampleConfig) {
 		}
 	}()
 
-	for i := 0; i < numWorkers; i++ {
-		id := i
-		go func() {
-			defer wg.Done()
-			g.runWorker(ctx, cfg, rs, id)
-		}()
+	makeRunFunc := func(nodeID NodeID) func() {
+		return func() {
+		}
 	}
 
-	wg.Wait()
+	q := NewQueue(numWorkers)
+	items := make([]*QueueItem, len(rs.nodeOrder))
+	for nodeIndex, nodeID := range rs.nodeOrder {
+		info := rs.NodeInfoByIndex(nodeIndex)
+
+		var numPreds int
+		for _, predOffset := range info.predecessorEpochOffsets {
+			if predOffset == 0 {
+				numPreds++
+			}
+		}
+		items[nodeIndex] = q.AddItem(makeRunFunc(nodeID), numPreds)
+	}
+	for nodeIndex, item := range items {
+		info := rs.NodeInfoByIndex(nodeIndex)
+		for i, predOffset := range info.predecessorEpochOffsets {
+			if predOffset != 0 {
+				continue
+			}
+			predIndex := rs.nodeIndexMap[info.predecessors[i]]
+			predItem := items[predIndex]
+			predItem.AddSuccessor(item)
+		}
+	}
+
+	// for i := 0; i < numWorkers; i++ {
+	// 	id := i
+	// 	go func() {
+	// 		defer wg.Done()
+	// 		g.runWorker(ctx, cfg, rs, id)
+	// 	}()
+	// }
+
+	//wg.Wait()
 }
 
 func (g *Graph) newRunState() *runState {
@@ -585,8 +614,7 @@ func (g *Graph) prepCyclesDFS(rs *runState, nodeID NodeID, visited map[NodeID]st
 	defer delete(visited, nodeID)
 
 	info := rs.NodeInfoByID(nodeID)
-	for i, e := range info.incomingEdges {
-		from := e.From
+	for i, from := range info.predecessors {
 		if _, ok := visited[from]; ok {
 			info.predecessorEpochOffsets[i] = -1
 			continue
