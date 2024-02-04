@@ -585,8 +585,7 @@ func (g *Graph) prepCyclesDFS(rs *runState, nodeID NodeID, visited map[NodeID]st
 	defer delete(visited, nodeID)
 
 	info := rs.NodeInfoByID(nodeID)
-	for i, e := range info.incomingEdges {
-		from := e.From
+	for i, from := range info.predecessors {
 		if _, ok := visited[from]; ok {
 			info.predecessorEpochOffsets[i] = -1
 			continue
