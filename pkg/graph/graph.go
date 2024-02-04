@@ -370,8 +370,9 @@ func (g *Graph) Run(ctx context.Context, cfg ugen.SampleConfig) {
 		}
 	}()
 
-	makeRunFunc := func(nodeID NodeID) func() {
-		return func() {
+	makeRunFunc := func(nodeID NodeID) Job {
+		return func(ctx context.Context) {
+			g.runNode(ctx, cfg, rs, nodeID)
 		}
 	}
 
@@ -398,6 +399,16 @@ func (g *Graph) Run(ctx context.Context, cfg ugen.SampleConfig) {
 			predItem := items[predIndex]
 			predItem.AddSuccessor(item)
 		}
+	}
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		default:
+		}
+
+		q.Run(ctx)
 	}
 
 	// for i := 0; i < numWorkers; i++ {
@@ -599,6 +610,37 @@ Outer:
 		}
 
 		minEpoch = nextMinEpoch
+	}
+}
+
+func (g *Graph) runNode(ctx context.Context, cfg ugen.SampleConfig, rs *runState, nodeID NodeID) {
+	inputSampleMap := make(map[string][]float64)
+
+	info := rs.NodeInfoByID(nodeID)
+	node := g.Node(nodeID)
+
+	// collect the inputs
+	for _, e := range info.incomingEdges {
+		inputSampleMap[e.ToPort] = rs.NodeInfoByID(e.From).value
+	}
+
+	// process the node
+	cfg.InputSamples = inputSampleMap
+	switch n := node.(type) {
+	case *GeneratorNode:
+		clear(info.value)
+		n.GenerateSamples(ctx, cfg, info.value)
+	case *OutNode:
+		for _, smps := range inputSampleMap { // TODO: disallow sinks with multiple inputs
+			out := bufferpool.Get(len(smps))
+			copy(*out, smps)
+			select {
+			case n.output <- *out:
+			case <-ctx.Done():
+				return
+			}
+			break
+		}
 	}
 }
 

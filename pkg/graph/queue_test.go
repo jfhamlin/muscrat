@@ -40,8 +40,8 @@ func TestQueueBasic(t *testing.T) {
 	numJobs := 5
 	done := make([]atomic.Bool, numJobs)
 
-	makeJob := func(i int) func() {
-		return func() {
+	makeJob := func(i int) Job {
+		return func(ctx context.Context) {
 			// ensure all predecessors are done
 			for _, pred := range predecessors[i] {
 				if !done[pred].Load() {

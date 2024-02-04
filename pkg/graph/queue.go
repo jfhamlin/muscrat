@@ -7,6 +7,8 @@ import (
 )
 
 type (
+	Job func(ctx context.Context)
+
 	Queue struct {
 		numWorkers int
 		wg         sync.WaitGroup
@@ -19,7 +21,7 @@ type (
 	}
 
 	QueueItem struct {
-		job             func()
+		job             Job
 		successors      []*QueueItem
 		activationCount atomic.Int32
 		activationLimit int32
@@ -35,7 +37,7 @@ func NewQueue(numWorkers int) *Queue {
 	}
 }
 
-func (q *Queue) AddItem(job func(), activationLimit int) *QueueItem {
+func (q *Queue) AddItem(job Job, activationLimit int) *QueueItem {
 	q.numItems++
 	item := &QueueItem{
 		job:             job,
@@ -53,6 +55,8 @@ func (q *Queue) addInitialItem(item *QueueItem) {
 }
 
 func (q *Queue) Run(ctx context.Context) {
+	q.remainingItems.Store(q.numItems)
+
 	// room for all items to be runnable at once, so workers don't
 	// block.
 	q.runChan = make(chan *QueueItem, q.numItems)
@@ -65,7 +69,6 @@ func (q *Queue) Run(ctx context.Context) {
 	}
 
 	q.wg.Wait()
-	q.reset()
 }
 
 func (q *Queue) runWorker(ctx context.Context) {
@@ -79,17 +82,12 @@ func (q *Queue) runWorker(ctx context.Context) {
 			if !ok {
 				return
 			}
-			item.Run(q)
+			item.Run(ctx, q)
 			if newVal := q.remainingItems.Add(-1); newVal == 0 {
 				close(q.runChan)
 			}
 		}
 	}
-}
-
-func (q *Queue) reset() {
-	q.remainingItems.Store(q.numItems)
-	q.runChan = nil
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -99,8 +97,8 @@ func (qi *QueueItem) AddSuccessor(successor *QueueItem) {
 	qi.successors = append(qi.successors, successor)
 }
 
-func (qi *QueueItem) Run(q *Queue) {
-	qi.job()
+func (qi *QueueItem) Run(ctx context.Context, q *Queue) {
+	qi.job(ctx)
 	qi.updateSuccessors(q)
 	qi.resetActivationCount()
 }

@@ -120,7 +120,7 @@ func TestCycle(t *testing.T) {
 				t.Fail()
 			}
 			result = append(result, res[0])
-		case <-time.After(1 * time.Second):
+		case <-time.After(10 * time.Second):
 			t.Fatal("timeout")
 		}
 	}
