@@ -13,10 +13,14 @@ type (
 	Queue struct {
 		numWorkers int
 		wg         sync.WaitGroup
+		stop       func()
 
 		remainingItems atomic.Int32
-		numItems       int32
-		runnable       *lockFreeStack
+		// sent when all jobs are done
+		jobsDone chan struct{}
+
+		numItems int32
+		runnable *lockFreeStack
 
 		initiallyRunnable []*QueueItem
 
@@ -83,6 +87,8 @@ func NewQueue(numWorkers int) *Queue {
 	return &Queue{
 		numWorkers: numWorkers,
 		cond:       sync.NewCond(&sync.Mutex{}),
+		// buffered to avoid blocking if a run is canceled.
+		jobsDone: make(chan struct{}, 1),
 	}
 }
 
@@ -103,48 +109,69 @@ func (q *Queue) addInitialItem(item *QueueItem) {
 	q.initiallyRunnable = append(q.initiallyRunnable, item)
 }
 
-func (q *Queue) Run(ctx context.Context) error {
-	q.remainingItems.Store(q.numItems)
+func (q *Queue) Start(ctx context.Context) {
+	if q.runnable != nil {
+		panic("queue already started")
+	}
+
+	ctx, cancel := context.WithCancel(ctx)
+	q.stop = cancel
 
 	q.runnable = newLockFreeStack()
 	q.wg.Add(q.numWorkers)
 	for i := 0; i < q.numWorkers; i++ {
 		i := i
+		go func() {
+			<-ctx.Done()
+		}()
 		go q.runWorker(ctx, i)
 	}
+}
+
+func (q *Queue) Stop() {
+	if q.stop == nil {
+		return
+	}
+	q.stop()
+	q.stop = nil
+	q.signalAll()
+	q.wg.Wait()
+}
+
+func (q *Queue) RunJobs(ctx context.Context) error {
+	q.remainingItems.Store(q.numItems)
+
 	for _, item := range q.initiallyRunnable {
 		q.runnable.Push(item)
 	}
 	q.signalAll()
 
-	q.wg.Wait()
-
 	select {
 	case <-ctx.Done():
+		// TODO: cancel all jobs
 		return ctx.Err()
-	default:
+	case <-q.jobsDone:
 		return nil
 	}
 }
 
 func (q *Queue) runWorker(ctx context.Context, id int) {
-	defer q.wg.Done()
+	defer func() {
+		q.signalAll() // wake up all other workers
+		q.wg.Done()
+	}()
 
-	const maxBackoff = 2
+	const maxBackoff = 10
 
 	backoff := maxBackoff
 	for {
 		select {
 		case <-ctx.Done():
-			q.signalAll() // wake up all other workers
 			return
 		default:
 		}
 		item := q.runnable.Pop()
 		if item == nil {
-			if q.remainingItems.Load() == 0 {
-				return
-			}
 			if backoff > 0 {
 				runtime.Gosched()
 				backoff--
@@ -158,22 +185,16 @@ func (q *Queue) runWorker(ctx context.Context, id int) {
 				q.cond.L.Unlock()
 				continue
 			}
-			// double check that we're not done
-			if q.remainingItems.Load() == 0 {
-				q.cond.L.Unlock()
-				return
-			}
 			q.cond.Wait()
 			q.cond.L.Unlock()
 			backoff = maxBackoff
+			////////////////////////////////////////////////////////////////////////////////
 			continue
 		}
 		backoff = maxBackoff
 		item.Run(ctx, q)
 		if newVal := q.remainingItems.Add(-1); newVal == 0 {
-			// all done
-			q.signalAll() // wake up all other workers
-			return
+			q.jobsDone <- struct{}{}
 		}
 	}
 }

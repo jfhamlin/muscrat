@@ -394,8 +394,15 @@ func (g *Graph) Run(ctx context.Context, cfg ugen.SampleConfig) {
 		}
 	}
 
+	q.Start(ctx)
+	defer q.Stop()
 	for {
-		if err := q.Run(ctx); err != nil {
+		select {
+		case <-ctx.Done():
+			return
+		default:
+		}
+		if err := q.RunJobs(ctx); err != nil {
 			break
 		}
 	}
@@ -610,7 +617,7 @@ func (g *Graph) runNode(ctx context.Context, cfg ugen.SampleConfig, rs *runState
 		clear(info.value)
 		n.GenerateSamples(ctx, cfg, info.value)
 	case *OutNode:
-		for _, smps := range inputSampleMap { // TODO: disallow sinks with multiple inputs
+		for _, smps := range inputSampleMap { // TODO: disallow sinks with multiple inputs; or sum inputs
 			out := bufferpool.Get(len(smps))
 			copy(*out, smps)
 			select {

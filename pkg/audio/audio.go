@@ -2,6 +2,7 @@ package audio
 
 import (
 	"fmt"
+	"time"
 	"unsafe"
 
 	"github.com/jfhamlin/muscrat/pkg/conf"
@@ -92,6 +93,12 @@ func QueueAudioFloat64(fbuf []float64) error {
 		pubsub.Publish("console.debug", fmt.Sprintf("audio buffer underflow: %d < %d", sz, bufferByteSize))
 	}
 	for numBytesToNumSamples(sdl.GetQueuedAudioSize(1)) > maxQueuedBuffers*bufferByteSize {
+		excessSamples := numBytesToNumSamples(sdl.GetQueuedAudioSize(1)) - maxQueuedBuffers*bufferByteSize
+		if excessSamples < 0 {
+			break
+		}
+		sleepTime := time.Duration(excessSamples) * time.Second / time.Duration(audioSpec.Freq)
+		time.Sleep(sleepTime)
 	}
 
 	for i, f := range fbuf {

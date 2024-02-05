@@ -71,7 +71,9 @@ func TestQueueBasic(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
 	defer cancel()
 
-	q.Run(ctx)
+	q.Start(ctx)
+	q.RunJobs(ctx)
+	q.Stop()
 	// check that all jobs are done
 	for i := range done {
 		if !done[i].Load() {
