@@ -329,13 +329,6 @@ func (g *Graph) Run(ctx context.Context, cfg ugen.SampleConfig) {
 	}
 
 	rs := g.newRunState()
-	if numWorkers > len(rs.nodeOrder) {
-		numWorkers = len(rs.nodeOrder)
-	}
-
-	// var wg sync.WaitGroup
-	// wg.Add(numWorkers)
-
 	g.bootstrapCycles(ctx, rs)
 
 	if debugMode {
@@ -406,16 +399,6 @@ func (g *Graph) Run(ctx context.Context, cfg ugen.SampleConfig) {
 			break
 		}
 	}
-
-	// for i := 0; i < numWorkers; i++ {
-	// 	id := i
-	// 	go func() {
-	// 		defer wg.Done()
-	// 		g.runWorker(ctx, cfg, rs, id)
-	// 	}()
-	// }
-
-	//wg.Wait()
 }
 
 func (g *Graph) newRunState() *runState {

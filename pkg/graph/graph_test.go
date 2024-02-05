@@ -20,10 +20,13 @@ func BenchmarkGraph(b *testing.B) {
 	//	timings := make([]time.Duration, b.N)
 
 	g := benchGraph()
+	done := make(chan struct{})
 	sinks := g.OutputChans()
 	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	go g.Run(ctx, ugen.SampleConfig{SampleRateHz: 44100})
+	go func() {
+		g.Run(ctx, ugen.SampleConfig{SampleRateHz: 44100})
+		close(done)
+	}()
 	for n := 0; n < b.N; n++ {
 		//		start := time.Now()
 		for _, sink := range sinks {
@@ -31,6 +34,8 @@ func BenchmarkGraph(b *testing.B) {
 		}
 		//timings[n] = time.Since(start)
 	}
+	cancel()
+	<-done
 
 	// // print average time and p90 time
 	// sort.Slice(timings, func(i, j int) bool {
@@ -120,8 +125,8 @@ func TestCycle(t *testing.T) {
 				t.Fail()
 			}
 			result = append(result, res[0])
-		case <-time.After(10 * time.Second):
-			t.Fatal("timeout")
+		case <-time.After(1 * time.Second):
+			panic("timeout")
 		}
 	}
 	// it should = [1, 2, ..., 10]
@@ -225,7 +230,7 @@ func FuzzGraphLiveness(f *testing.F) {
 					t.Fail()
 				}
 			case <-time.After(1 * time.Second):
-				t.Fatal("timeout")
+				panic("timeout")
 			}
 		}
 	})
