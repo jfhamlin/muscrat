@@ -426,6 +426,12 @@
                             (cons "" decl))
         arg-pairs (partition 2 args)
         arg-names (mapv (comp keyword first) arg-pairs)
+        ;; noexpands are the arguments that don't support multi-channel expansion
+        ;; they are denoted by names with {:noexpand true} in metadata
+        noexpands (into #{} (->> arg-pairs
+                                (map first)
+                                (filter (comp :noexpand meta))
+                                (map keyword)))
         defaults (into {} (map (fn [[k v]] [(keyword k) v]) arg-pairs))
         allowed-keys (merge (set (keys defaults)) :mul :add)
         assignments-sym (gensym "assignments")]
@@ -445,7 +451,8 @@
              ~assignments-sym (merge defaults# ~assignments-sym)
              ;; duplicate the argument pairs for each argument value
              ;; to handle multiple channels.
-             expand-arg# (fn [[k# v#]] (if (coll? v#)
+             expand-arg# (fn [[k# v#]] (if (and (not (contains? ~noexpands k#))
+                                                (coll? v#))
                                          (map #(vector k# %) v#)
                                          [[k# v#]]))
              arg-lists# (arrange-multi-channel-args (map expand-arg# (seq ~assignments-sym)))
@@ -916,7 +923,7 @@
 
 (defugen play-buf
   "Play a buffer (single-channel) or slice of buffers (multi-channel)."
-  [^:static buf-or-bufs nil
+  [^:noexpand buf-or-bufs nil
    rate 1
    trigger 1
    start-pos 0
@@ -1019,7 +1026,7 @@
 (defugen wavout
   "Save the input to a 32-bit wav file (up to two channels) named by
   the :filename flag (default out.wav)."
-  [chs 1
+  [^:noexpand chs 1
    filename "out.wav"]
   (let [chs (if (coll? chs) chs [chs])
         _ (if (> (count chs) 2) (throw (str "wavout: too many channels supplied: " (count chs))))
