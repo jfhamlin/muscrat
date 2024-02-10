@@ -1,0 +1,21 @@
+(ns examples.fm
+  (:require [mrat.core :refer :all]
+            [mrat.welsh :refer :all]
+            [mrat.scales :refer :all]
+            [mrat.midi :refer :all]
+            [mrat.abc :as abc]))
+
+(defn fm-synth
+  [trig freq]
+  (let [mod-env1 (env trig [0 1 1 0] [0.1 0.04 0.001] :release-node 2)
+        mod1 (sin (* 0.25 freq) :mul (* 200 mod-env1))
+        mod2 (sin (+ mod1 (* 2 freq)) :mul 150)
+        mod-freq (+ freq mod2)]
+    (-> (sin mod-freq)
+        (lores (* 4 freq) 0.9)
+        (* (env trig [0 1 1 0] [0.01 0.03 0.1] :release-node 2)))))
+
+(def trig (sqr 8 :duty 0.4))
+(play (-> (fm-synth trig (choose trig (map midifreq [C3 D3 E3 F3 G3 A3 B3 C4
+                                                     C#3 D#3 F#3 G#3 A#3])))
+          (* 0.25)))
