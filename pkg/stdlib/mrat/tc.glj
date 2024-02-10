@@ -1,0 +1,29 @@
+(ns mrat.tc
+  "A muscrat port of Tidal Cycles.
+
+  The essence of Tidal is a pattern language for music, which can be
+  used to describe patterns of notes, samples, and control data. These
+  patterns can be combined and manipulated in various ways to create
+  complex musical structures.
+
+  Abstractly, a pattern is a function from time to a value. In Tidal,
+  time is represented as a rational number, and a pattern is a
+  function from time to a list of values. The values can be notes,
+  samples, or control data.
+
+  The pattern syntax is mapped to Clojure data structures, and the
+  pattern functions are mapped to Clojure functions. This allows
+  patterns to be manipulated using the full power of Clojure.
+
+  Some examples:
+
+  (pat :bd :hh :bd :sn) ;; a pattern of four values spaced evenly over a cycle
+
+  (pat )
+  "
+  (:require [mrat.core :refer :all]))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; example usage here, to inform implementation below
+
+(tc/s [

@@ -115,6 +115,10 @@
   (as-node [x] (constant-node x)))
 
 (extend-protocol AsNode
+  go/int
+  (as-node [x] (constant-node x)))
+
+(extend-protocol AsNode
   go/bool
   (as-node [x]
     (let [val (if x 1 0)]
