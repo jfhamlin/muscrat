@@ -121,9 +121,6 @@ func (q *Queue) Start(ctx context.Context) {
 	q.wg.Add(q.numWorkers)
 	for i := 0; i < q.numWorkers; i++ {
 		i := i
-		go func() {
-			<-ctx.Done()
-		}()
 		go q.runWorker(ctx, i)
 	}
 }
