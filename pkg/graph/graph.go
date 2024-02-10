@@ -8,7 +8,6 @@ import (
 	"runtime"
 	"runtime/debug"
 	"strconv"
-	"sync/atomic"
 
 	"github.com/jfhamlin/muscrat/pkg/bufferpool"
 	"github.com/jfhamlin/muscrat/pkg/ugen"
@@ -71,10 +70,6 @@ type (
 
 		outputs []*OutNode
 	}
-)
-
-var (
-	debugMode = os.Getenv("MUSCRAT_DEBUG") != "" && os.Getenv("MUSCRAT_DEBUG") != "0"
 )
 
 func (id NodeID) String() string {
@@ -264,9 +259,7 @@ func (g *Graph) OutgoingEdges(id NodeID) []*Edge {
 
 type (
 	runNodeInfo struct {
-		epoch   atomic.Int64 // the _next_ epoch in which this node will be evaluated
-		evaling atomic.Bool
-		value   []float64 // value of the node in the last epoch
+		value []float64 // value of the node in the last epoch
 
 		incomingEdges []*Edge // edges whose destination is this node
 
@@ -328,19 +321,6 @@ func (g *Graph) Run(ctx context.Context, cfg ugen.SampleConfig) {
 
 	rs := g.newRunState()
 	g.bootstrapCycles(ctx, rs)
-
-	if debugMode {
-		// print edges of nodes in the order
-		for _, nodeID := range rs.nodeOrder {
-			node := g.Node(nodeID)
-			info := rs.NodeInfoByID(nodeID)
-			fmt.Printf("node %d (%T) %s\n", nodeID, node, node)
-			for i, pid := range info.predecessors {
-				offset := info.predecessorEpochOffsets[i]
-				fmt.Printf("  - %d <- %d (offset=%d)\n", nodeID, pid, offset)
-			}
-		}
-	}
 
 	// start any generator nodes whose generator is a ugen.Starter
 	for _, node := range g.Nodes {
