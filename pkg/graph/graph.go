@@ -4,13 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"math"
 	"os"
 	"runtime"
 	"runtime/debug"
 	"strconv"
-	"strings"
-	"sync"
 	"sync/atomic"
 
 	"github.com/jfhamlin/muscrat/pkg/bufferpool"
@@ -330,13 +327,6 @@ func (g *Graph) Run(ctx context.Context, cfg ugen.SampleConfig) {
 	}
 
 	rs := g.newRunState()
-	if numWorkers > len(rs.nodeOrder) {
-		numWorkers = len(rs.nodeOrder)
-	}
-
-	var wg sync.WaitGroup
-	wg.Add(numWorkers)
-
 	g.bootstrapCycles(ctx, rs)
 
 	if debugMode {
@@ -371,15 +361,49 @@ func (g *Graph) Run(ctx context.Context, cfg ugen.SampleConfig) {
 		}
 	}()
 
-	for i := 0; i < numWorkers; i++ {
-		id := i
-		go func() {
-			defer wg.Done()
-			g.runWorker(ctx, cfg, rs, id)
-		}()
+	makeRunFunc := func(nodeID NodeID) Job {
+		return func(ctx context.Context) {
+			g.runNode(ctx, cfg, rs, nodeID)
+		}
 	}
 
-	wg.Wait()
+	q := NewQueue(numWorkers)
+	items := make([]*QueueItem, len(rs.nodeOrder))
+	for nodeIndex, nodeID := range rs.nodeOrder {
+		info := rs.NodeInfoByIndex(nodeIndex)
+
+		var numPreds int
+		for _, predOffset := range info.predecessorEpochOffsets {
+			if predOffset == 0 {
+				numPreds++
+			}
+		}
+		items[nodeIndex] = q.AddItem(makeRunFunc(nodeID), numPreds)
+	}
+	for nodeIndex, item := range items {
+		info := rs.NodeInfoByIndex(nodeIndex)
+		for i, predOffset := range info.predecessorEpochOffsets {
+			if predOffset != 0 {
+				continue
+			}
+			predIndex := rs.nodeIndexMap[info.predecessors[i]]
+			predItem := items[predIndex]
+			predItem.AddSuccessor(item)
+		}
+	}
+
+	q.Start(ctx)
+	defer q.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		default:
+		}
+		if err := q.RunJobs(ctx); err != nil {
+			break
+		}
+	}
 }
 
 func (g *Graph) newRunState() *runState {
@@ -449,127 +473,34 @@ func (g *Graph) newRunState() *runState {
 	return rs
 }
 
-func (g *Graph) runWorker(ctx context.Context, cfg ugen.SampleConfig, rs *runState, workerID int) {
-	var epoch int64 = 0 // the epoch being evaluated by this worker
+func (g *Graph) runNode(ctx context.Context, cfg ugen.SampleConfig, rs *runState, nodeID NodeID) {
+	inputSampleMap := make(map[string][]float64)
 
-	// the minimum epoch across all nodes
-	// we can continue once this is > epoch
-	var minEpoch int64 = 0
+	info := rs.NodeInfoByID(nodeID)
+	node := g.Node(nodeID)
 
-	inputSampleMap := make(map[string][]float64) // cleared after every node evaluation
-Outer:
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		default:
+	// collect the inputs
+	for _, e := range info.incomingEdges {
+		inputSampleMap[e.ToPort] = rs.NodeInfoByID(e.From).value
+	}
+
+	// process the node
+	cfg.InputSamples = inputSampleMap
+	switch n := node.(type) {
+	case *GeneratorNode:
+		clear(info.value)
+		n.GenerateSamples(ctx, cfg, info.value)
+	case *OutNode:
+		for _, smps := range inputSampleMap { // TODO: disallow sinks with multiple inputs; or sum inputs
+			out := bufferpool.Get(len(smps))
+			copy(*out, smps)
+			select {
+			case n.output <- *out:
+			case <-ctx.Done():
+				return
+			}
+			break
 		}
-
-		if debugMode {
-			fmt.Println(strings.Repeat("=", 80))
-			fmt.Printf("- [%d] worker epoch %d\n", workerID, epoch)
-			fmt.Printf("  - [%d] epoch:  %d\n", workerID, epoch)
-			fmt.Printf("  - [%d] minEpoch: %d\n", workerID, minEpoch)
-			for _, nodeID := range rs.nodeOrder {
-				i := rs.nodeIndexMap[nodeID]
-				info := rs.NodeInfoByIndex(i)
-				fmt.Printf("  - [%d] node (%d %T) %d:\t%d\n", workerID, nodeID, g.Node(nodeID), i, info.epoch.Load())
-			}
-		}
-
-		nextMinEpoch := int64(math.MaxInt64)
-
-	NodeLoop:
-		for nodeIndex, nodeID := range rs.nodeOrder {
-			if minEpoch > epoch {
-				epoch++
-				continue Outer
-			}
-			node := g.Node(nodeID)
-			info := rs.NodeInfoByIndex(nodeIndex)
-
-			// if the node has already been evaluated for this epoch, skip it
-			{
-				nodeEpoch := info.epoch.Load()
-				if nodeEpoch < nextMinEpoch {
-					nextMinEpoch = nodeEpoch
-				}
-				if nodeEpoch > epoch {
-					continue
-				}
-			}
-
-			// try to lock the node for evaluation
-			if !info.evaling.CompareAndSwap(false, true) {
-				continue
-			}
-
-			//////////////////////////////////////////////////////////////////////
-			// Node locked
-
-			// check again if the node has already been evaluated for this
-			// epoch after we've acquired the lock.
-			if info.epoch.Load() > epoch {
-				info.evaling.Store(false)
-				continue
-			}
-
-			// first, check that all predecessors have been evaluated for
-			// this epoch
-			for i, pid := range info.predecessors {
-				if rs.NodeInfoByID(pid).epoch.Load() <= epoch+info.predecessorEpochOffsets[i] {
-					if debugMode {
-						fmt.Printf("  - skipping eval for node %d, waiting\n", nodeID)
-						fmt.Printf("    - for: %v offset: %v %v\n", pid, info.predecessorEpochOffsets[i], info.predecessorEpochOffsets)
-					}
-					info.evaling.Store(false)
-					continue NodeLoop
-				}
-			}
-
-			///////////////////////
-			// evaluate node nodeID
-
-			// then, collect the inputs
-			for _, e := range info.incomingEdges {
-				inputSampleMap[e.ToPort] = rs.NodeInfoByID(e.From).value
-			}
-
-			// process the node
-			cfg.InputSamples = inputSampleMap
-			switch n := node.(type) {
-			case *GeneratorNode:
-				clear(info.value)
-				n.GenerateSamples(ctx, cfg, info.value)
-				// update the epoch
-				info.epoch.Store(epoch + 1)
-			case *OutNode:
-				for _, smps := range inputSampleMap { // TODO: disallow sinks with multiple inputs
-					out := bufferpool.Get(len(smps))
-					copy(*out, smps)
-					// early epoch increment. we've copied the input samples, so
-					// we can increment the epoch now. this allows the next
-					// epoch to start while we wait on sending the samples to
-					// the sink.
-					info.epoch.Store(epoch + 1)
-					select {
-					case n.output <- *out:
-					case <-ctx.Done():
-						return
-					}
-					break
-				}
-			}
-
-			// release the node
-			info.evaling.Store(false)
-			// Node unlocked
-			//////////////////////////////////////////////////////////////////////
-
-			clear(inputSampleMap)
-		}
-
-		minEpoch = nextMinEpoch
 	}
 }
 
