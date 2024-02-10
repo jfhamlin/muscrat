@@ -2,7 +2,6 @@ package effects
 
 import (
 	"context"
-	"fmt"
 	"math"
 
 	"github.com/jfhamlin/muscrat/pkg/ugen"
@@ -43,8 +42,6 @@ func NewDelay(maxDelay float64, opts ...ugen.Option) ugen.UGen {
 	return ugen.UGenFunc(func(ctx context.Context, cfg ugen.SampleConfig, out []float64) {
 		if buf == nil {
 			sz := ugen.NextPowerOf2(int(math.Ceil(maxDelay*float64(cfg.SampleRateHz) + 1)))
-
-			fmt.Println("sample rate", cfg.SampleRateHz)
 
 			mask = sz - 1
 			buf = make([]float64, sz)

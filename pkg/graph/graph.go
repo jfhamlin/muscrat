@@ -8,9 +8,9 @@ import (
 	"runtime"
 	"runtime/debug"
 	"strconv"
-	"sync/atomic"
 
 	"github.com/jfhamlin/muscrat/pkg/bufferpool"
+	"github.com/jfhamlin/muscrat/pkg/conf"
 	"github.com/jfhamlin/muscrat/pkg/ugen"
 )
 
@@ -47,6 +47,9 @@ type (
 		label     string
 		str       string
 
+		// last output
+		value []float64
+
 		isSink bool
 	}
 
@@ -71,10 +74,6 @@ type (
 
 		outputs []*OutNode
 	}
-)
-
-var (
-	debugMode = os.Getenv("MUSCRAT_DEBUG") != "" && os.Getenv("MUSCRAT_DEBUG") != "0"
 )
 
 func (id NodeID) String() string {
@@ -184,6 +183,7 @@ func (g *Graph) AddGeneratorNode(gen ugen.UGen, opts ...NodeOption) Node {
 		Generator: gen,
 		label:     options.label,
 		isSink:    options.isSink,
+		value:     make([]float64, g.BufferSize),
 	}
 	{
 		str := "[" + node.ID().String() + "]"
@@ -264,27 +264,19 @@ func (g *Graph) OutgoingEdges(id NodeID) []*Edge {
 
 type (
 	runNodeInfo struct {
-		epoch   atomic.Int64 // the _next_ epoch in which this node will be evaluated
-		evaling atomic.Bool
-		value   []float64 // value of the node in the last epoch
+		value []float64
 
-		incomingEdges []*Edge // edges whose destination is this node
+		// edges whose destination is this node
+		incomingEdges []*Edge
 
-		predecessors []NodeID // nodes that must be evaluated before this node
+		// nodes that must be evaluated before this node. not all
+		// predecessors are made dependencies to eliminate dependency
+		// cycles.
+		dependencies map[NodeID]struct{}
 
-		// offset to apply to the epoch of each incoming edge when
-		// checking if the dependency has been satisfied. this is
-		// necessary to handle cycles in the graph.
-		predecessorEpochOffsets []int64
+		node Node
 	}
 
-	// we evaluate the graph in epochs, where each epoch is a buffer
-	// sent to all sinks.
-	//
-	// every epoch, we evaluate the graph in topological order using multiple
-	// goroutines. each node has an atomic value containing the epoch number
-	// of the last time it was evaluated. if the epoch number is less than
-	// the current epoch, we evaluate the node and update the epoch number.
 	runState struct {
 		nodeInfo []runNodeInfo
 
@@ -305,13 +297,9 @@ func (rs *runState) NodeInfoByID(id NodeID) *runNodeInfo {
 	return &rs.nodeInfo[index]
 }
 
-func (rs *runState) NodeInfoByIndex(idx int) *runNodeInfo {
-	return &rs.nodeInfo[idx]
-}
-
 func (g *Graph) Run(ctx context.Context, cfg ugen.SampleConfig) {
 	if g.BufferSize <= 0 {
-		g.BufferSize = 1024
+		g.BufferSize = conf.BufferSize
 	}
 
 	// using 1/2 the number of CPUs gives good performance when
@@ -327,20 +315,6 @@ func (g *Graph) Run(ctx context.Context, cfg ugen.SampleConfig) {
 	}
 
 	rs := g.newRunState()
-	g.bootstrapCycles(ctx, rs)
-
-	if debugMode {
-		// print edges of nodes in the order
-		for _, nodeID := range rs.nodeOrder {
-			node := g.Node(nodeID)
-			info := rs.NodeInfoByID(nodeID)
-			fmt.Printf("node %d (%T) %s\n", nodeID, node, node)
-			for i, pid := range info.predecessors {
-				offset := info.predecessorEpochOffsets[i]
-				fmt.Printf("  - %d <- %d (offset=%d)\n", nodeID, pid, offset)
-			}
-		}
-	}
 
 	// start any generator nodes whose generator is a ugen.Starter
 	for _, node := range g.Nodes {
@@ -363,32 +337,20 @@ func (g *Graph) Run(ctx context.Context, cfg ugen.SampleConfig) {
 
 	makeRunFunc := func(nodeID NodeID) Job {
 		return func(ctx context.Context) {
-			g.runNode(ctx, cfg, rs, nodeID)
+			runNode(ctx, cfg, rs, nodeID)
 		}
 	}
 
 	q := NewQueue(numWorkers)
-	items := make([]*QueueItem, len(rs.nodeOrder))
-	for nodeIndex, nodeID := range rs.nodeOrder {
-		info := rs.NodeInfoByIndex(nodeIndex)
-
-		var numPreds int
-		for _, predOffset := range info.predecessorEpochOffsets {
-			if predOffset == 0 {
-				numPreds++
-			}
-		}
-		items[nodeIndex] = q.AddItem(makeRunFunc(nodeID), numPreds)
+	items := map[NodeID]*QueueItem{}
+	for _, nodeID := range rs.nodeOrder {
+		items[nodeID] = q.AddItem(makeRunFunc(nodeID))
 	}
-	for nodeIndex, item := range items {
-		info := rs.NodeInfoByIndex(nodeIndex)
-		for i, predOffset := range info.predecessorEpochOffsets {
-			if predOffset != 0 {
-				continue
-			}
-			predIndex := rs.nodeIndexMap[info.predecessors[i]]
-			predItem := items[predIndex]
-			predItem.AddSuccessor(item)
+	for nodeID, item := range items {
+		info := rs.NodeInfoByID(nodeID)
+		for depID := range info.dependencies {
+			depItem := items[depID]
+			depItem.AddSuccessor(item)
 		}
 	}
 
@@ -452,32 +414,34 @@ func (g *Graph) newRunState() *runState {
 		rs.nodeIndexMap[i] = -1
 	}
 
-	fullSampleSize := g.BufferSize * len(order)
-	bufSlice := make([]float64, fullSampleSize, fullSampleSize)
 	for i, id := range order {
+		info := &rs.nodeInfo[i]
+
 		predecessorNodes := map[NodeID]struct{}{}
 		incomingEdges := g.IncomingEdges(id)
-		rs.nodeInfo[i].incomingEdges = incomingEdges
+		info.incomingEdges = incomingEdges
 		for _, e := range g.IncomingEdges(id) {
 			predecessorNodes[e.From] = struct{}{}
 		}
-		rs.nodeInfo[i].predecessors = make([]NodeID, 0, len(predecessorNodes))
-		for pid := range predecessorNodes {
-			rs.nodeInfo[i].predecessors = append(rs.nodeInfo[i].predecessors, pid)
+		info.dependencies = predecessorNodes
+		node := g.Node(id)
+		info.node = node
+		if gen, ok := node.(*GeneratorNode); ok {
+			info.value = gen.value
 		}
-		rs.nodeInfo[i].predecessorEpochOffsets = make([]int64, len(predecessorNodes))
-		rs.nodeInfo[i].value = bufSlice[i*g.BufferSize : (i+1)*g.BufferSize]
 		rs.nodeIndexMap[id] = i
 	}
+
+	bootstrapCycles(rs)
 
 	return rs
 }
 
-func (g *Graph) runNode(ctx context.Context, cfg ugen.SampleConfig, rs *runState, nodeID NodeID) {
+func runNode(ctx context.Context, cfg ugen.SampleConfig, rs *runState, nodeID NodeID) {
 	inputSampleMap := make(map[string][]float64)
 
 	info := rs.NodeInfoByID(nodeID)
-	node := g.Node(nodeID)
+	node := info.node
 
 	// collect the inputs
 	for _, e := range info.incomingEdges {
@@ -504,23 +468,27 @@ func (g *Graph) runNode(ctx context.Context, cfg ugen.SampleConfig, rs *runState
 	}
 }
 
-func (g *Graph) bootstrapCycles(ctx context.Context, rs *runState) {
-	for _, sink := range g.Sinks() {
-		visited := make(map[NodeID]struct{})
-		g.prepCyclesDFS(rs, sink.ID(), visited)
+func bootstrapCycles(rs *runState) {
+	for _, info := range rs.nodeInfo {
+		if info.node.IsSink() {
+			visited := make(map[NodeID]struct{})
+			prepCyclesDFS(rs, info.node.ID(), visited)
+		}
 	}
 }
 
-func (g *Graph) prepCyclesDFS(rs *runState, nodeID NodeID, visited map[NodeID]struct{}) {
+func prepCyclesDFS(rs *runState, nodeID NodeID, visited map[NodeID]struct{}) {
 	visited[nodeID] = struct{}{}
 	defer delete(visited, nodeID)
 
 	info := rs.NodeInfoByID(nodeID)
-	for i, from := range info.predecessors {
+	for from := range info.dependencies {
 		if _, ok := visited[from]; ok {
-			info.predecessorEpochOffsets[i] = -1
+			// cycle detected
+			// remove the dependency
+			delete(info.dependencies, from)
 			continue
 		}
-		g.prepCyclesDFS(rs, from, visited)
+		prepCyclesDFS(rs, from, visited)
 	}
 }

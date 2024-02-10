@@ -12,12 +12,19 @@ func NewChoose() ugen.UGen {
 	lastTrig := 0.0
 	return ugen.UGenFunc(func(ctx context.Context, cfg ugen.SampleConfig, out []float64) {
 		trigs := cfg.InputSamples["trigger"]
-		freqs := ugen.CollectIndexedInputs(cfg)
+		vals := ugen.CollectIndexedInputs(cfg)
+		if len(vals) == 0 {
+			return
+		}
+		// if index is out of bounds, resample
+		if index >= len(vals) {
+			index = rand.Intn(len(vals))
+		}
 		for i := range out {
 			if trigs[i] > 0.0 && lastTrig <= 0.0 {
-				index = rand.Intn(len(freqs))
+				index = rand.Intn(len(vals))
 			}
-			out[i] = freqs[index][i]
+			out[i] = vals[index][i]
 			lastTrig = trigs[i]
 		}
 	})

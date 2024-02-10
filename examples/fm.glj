@@ -1,21 +1,75 @@
 (ns examples.fm
   (:require [mrat.core :refer :all]
-            [mrat.welsh :refer :all]
             [mrat.scales :refer :all]
-            [mrat.midi :refer :all]
-            [mrat.abc :as abc]))
+            [mrat.midi :refer :all]))
 
-(defn fm-synth
-  [trig freq]
-  (let [mod-env1 (env trig [0 1 1 0] [0.1 0.04 0.001] :release-node 2)
-        mod1 (sin (* 0.25 freq) :mul (* 200 mod-env1))
-        mod2 (sin (+ mod1 (* 2 freq)) :mul 150)
-        mod-freq (+ freq mod2)]
-    (-> (sin mod-freq)
-        (lores (* 4 freq) 0.9)
-        (* (env trig [0 1 1 0] [0.01 0.03 0.1] :release-node 2)))))
+(defn fm-op
+  "Creates a simple FM 'operator' in the style of the Yamaha DX series."
+  [freq envelope input & {:keys [feedback]}]
+  (let [phase (phasor freq)
+        feedback (or feedback 0)
+        ;; log2 is used to scale the feedback amount
+        ;; todo: add log2 to the core namespace
+        feedback (math.Log2 (+ feedback 1))
+        has-feedback (> feedback 0)
+        fb (if has-feedback (pipe) 0)
+        osc (sin :phase (+ phase input fb)) ;; todo: sync with the trigger so that the phase is reset
+        out (* osc envelope)]
+    (if has-feedback (pipeset! fb (* feedback out)))
+    out))
 
-(def trig (sqr 8 :duty 0.4))
-(play (-> (fm-synth trig (choose trig (map midifreq [C3 D3 E3 F3 G3 A3 B3 C4
-                                                     C#3 D#3 F#3 G#3 A#3])))
-          (* 0.25)))
+(def impulse-rate 6)
+(def gate (lfpulse impulse-rate :duty 0.2))
+
+(def freq
+  (let [octave (choose gate [0 0 0 0 0 0 12 12 12 24])]
+    (sequencer gate
+            (->> mixolydian
+                 (map #(+ D2 % octave))
+                 (map midifreq)))))
+;; (def freq
+;;   (-> (+ (sequencer gate [D3 D2 D3 D3 D2])
+;;          (sequencer gate aeolian))
+;;       midifreq))
+
+(def op-conf
+  ;; freq-ratio    amp  adsr               mod-indexes        feedback carrier
+  [[1              0.8   [0.001 0.15 1   0.15] [1]              0.0       true]
+   [2              0.5   [0.001 0.15 0.1 0.15] [2]              0.0      false]
+   [7  (line 0 0.3 60)   [0.001 0.15 1   0.15] nil              0.6      false]
+   ])
+
+(def fm-out
+  (let [ops (mapv (fn [[r a e m f c]]
+                    (let [input (if-not (empty? m) (pipe) 0)
+                          op (fm-op (* freq r)
+                                    (* a (env-adsr gate e))
+                                    input
+                                    :feedback f)]
+                      {:op op
+                       :mods m
+                       :input input
+                       :carrier c}))
+                  op-conf)]
+    ;; wire up the modulators
+    (doseq [{:keys [op mods input]} ops
+            :when (not (empty? mods))]
+      (let [in-sum (sum (map #(:op (nth ops %)) mods))]
+        (pipeset! input in-sum)))
+    (sum (->> ops
+              (filter :carrier)
+              (map :op)))))
+
+(def sig
+  (-> fm-out
+      (combc 0.5 0.5 4)
+      (* 0.25)
+      (+ (play-buf :bd_ada
+                   :loop false
+                   :trigger (impulse (/ impulse-rate 4))
+                   :rate 0.5))
+      limiter))
+
+;; (wavout sig "fm.wav")
+
+(play sig)

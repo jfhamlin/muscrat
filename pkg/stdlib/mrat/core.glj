@@ -69,41 +69,76 @@
 (def SAMPLE-RATE github.com$jfhamlin$muscrat$pkg$conf.SampleRate)
 (def BUFFER-SIZE github.com$jfhamlin$muscrat$pkg$conf.BufferSize)
 
-(def ^:dynamic *rand-seed* 0)
-(def ^:dynamic *rand-stream* (math$rand.New (math$rand.NewSource *rand-seed*)))
-
 (defmacro doseq-idx
   [[locals seq-expr] & body]
   `(let [s# ~seq-expr]
      (doseq [~locals (map vector s# (range (count s#)))]
        ~@body)))
 
+(def ^:private next-id (atom 0))
+(defn- gen-id
+  "Generate a new unique id."
+  []
+  (str (swap! next-id inc)))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Graph
 
-(def ^:dynamic *graph* nil)
+;;; I am rewriting this file to produce an intermediate representation
+;;; of the graph, which can then be used to generate the actual
+;;; graph. This will allow us to do some optimizations and also to
+;;; generate the graph in a more flexible way.
+
+(def ^:dynamic *graph* (atom {:nodes [] :edges []}))
+
+(defn- sinks
+  "Return the sink nodes of the graph."
+  [graph]
+  (->> graph
+       :nodes
+       (filter :sink)
+       (map :id)))
+
+(defn- outputs
+  "Return the output nodes of the graph. Outputs are sinks whose :ug type is :out."
+  [graph]
+  (->> graph
+       :nodes
+       (filter (fn [{:keys [sink type]}] (or sink (= type :out))))
+       (map :id)))
 
 (defprotocol AsNode
   "Protocol for types that can be converted to generator nodes."
   (as-node [ug]))
 
+(defn is-node?
+  [x]
+  (boolean (and (map? x) (:id x))))
+
 (declare add-edge!)
 (declare constant-node)
 
 (defn add-node!
-  [ug label & {:keys [sink in-edges]}]
-  (let [node (if sink
-               (.AddGeneratorNode *graph* ug (WithLabel (str label)) (WithSink))
-               (.AddGeneratorNode *graph* ug (WithLabel (str label))))]
+  [type ctor & {:keys [key args sink in-edges]}]
+  (let [node {:id (gen-id)
+              :type type
+              :ctor ctor
+              :args args
+              :key key
+              :sink sink}]
+    (swap! *graph* update-in [:nodes] conj node)
     (doseq [[port val] in-edges]
       (add-edge! (as-node val) node (name port)))
     node))
 
 (defn add-edge!
-  [x y port] (.AddEdge *graph* (.ID x) (.ID y) port))
+  [{x-id :id} {y-id :id} port]
+  (let [edge {:from x-id :to y-id :port port}]
+    (swap! *graph* update-in [:edges] conj edge)
+    edge))
 
 (extend-protocol AsNode
-  Node
+  github.com$glojurelang$glojure$pkg$lang.IPersistentMap
   (as-node [n] n))
 
 (extend-protocol AsNode
@@ -134,36 +169,21 @@
 
 (defn play
   [channels]
-  (let [channels (if-not (coll? channels) [channels channels] channels)
+  (let [channels (if-not (or (seq? channels)
+                             (vector? channels)) [channels channels] channels)
         channels (if (= (count channels) 0) [0 0] channels)
         channels (if (= (count channels) 1) [(first channels) (first channels)] channels)
-        num-sinks (count (. *graph* outputs))
+        num-sinks (count (outputs *graph*))
         ch-inds (map vector channels (range (count channels)))]
     (doseq [[ch i] ch-inds]
       (let [gen (as-node ch)
             chan-id (+ num-sinks i)
-            sink (.AddOutNode *graph* (WithLabel (fmt.Sprintf "out%d" chan-id)))]
+            sink (add-node! :out nil :args [chan-id] :sink true)]
         (add-edge! gen sink "in"))))) ;; port name doesn't matter for out nodes
-
-(def ^:private constant-cache
-  "Cache of constant nodes for the latest graph."
-  (atom {:graph *graph*
-         :nodes {}}))
 
 (defn- constant-node
   [x]
-  (let [x (double x)
-        cache @constant-cache]
-    (if (and (= (:graph cache) *graph*)
-             (contains? (:nodes cache) x))
-      (get-in cache [:nodes x])
-      (let [update-cache (fn [cache]
-                           (let [cache (if (= (:graph cache) *graph*) cache {:graph *graph*, :nodes {}})
-                                 node (or (get-in cache [:nodes x])
-                                          (add-node! (NewConstant x) x))]
-                             (assoc-in cache [:nodes x] node)))
-            cache (swap! constant-cache update-cache)]
-        (get-in cache [:nodes x])))))
+  (add-node! :const NewConstant :args [(double x)]))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Utilities
@@ -174,8 +194,8 @@
   allow for a negative base with a non-integral exponent, returning
   -((-b)^p) when b is negative."
   [b p]
-  (if (some (partial instance? Node) [b p])
-    (add-node! (NewPow) "pow" :in-edges {"base" b "exp" p})
+  (if (some (partial is-node?) [b p])
+    (add-node! :pow NewPow :in-edges {"base" b "exp" p})
     (if (neg? b)
       (- (math.Pow (- b) p))
       (math.Pow b p))))
@@ -185,8 +205,8 @@
   computes sin(theta). Else, returns the result of sin(theta)
   directly."
   [theta]
-  (if (instance? Node theta)
-    (add-node! (github.com$jfhamlin$muscrat$pkg$ugen.NewSine) "sine" :in-edges {:in theta})
+  (if (is-node? theta)
+    (add-node! :sine github.com$jfhamlin$muscrat$pkg$ugen.NewSine :in-edges {:in theta})
     (math.Sin theta)))
 
 (defn abs
@@ -194,16 +214,16 @@
   that computes the absolute value of x. Else, returns the absolute
   value of x directly."
   [x]
-  (if (instance? Node x)
-    (add-node! (NewAbs) "abs" :in-edges {:in x})
+  (if (is-node? x)
+    (add-node! :abs NewAbs :in-edges {:in x})
     (math.Abs x)))
 
 (defn exp
   "Returns e^x. If x is a node, creates a new node that computes e^x.
   Else, returns e^x directly."
   [x]
-  (if (instance? Node x)
-    (add-node! (NewExp) "exp" :in-edges {:in x})
+  (if (is-node? x)
+    (add-node! :exp NewExp :in-edges {:in x})
     (math.Exp x)))
 
 (defn copy-sign
@@ -211,18 +231,18 @@
   that computes x with the sign of s. Else, returns x with the sign of
   s directly."
   [x s]
-  (if (or (instance? Node x) (instance? Node s))
-    (add-node! (NewCopySign) "copy-sign" :in-edges {"in" x "sign" s})
+  (if (or (is-node? x) (is-node? s))
+    (add-node! :copy-sign NewCopySign :in-edges {"in" x "sign" s})
     (math.Copysign x s)))
 
 (defn- freq-ratio
   [x kind]
-  (add-node! (NewFreqRatio kind) kind :in-edges {"in" x}))
+  (add-node! :freq-ratio NewFreqRatio :args [kind] :in-edges {"in" x}))
 
 (defn decibels
   "Return the amplitude ratio corresponding to the given decibel value."
   [db]
-  (if (instance? Node db)
+  (if (is-node? db)
     (freq-ratio db "decibels")
     (pow 10 (/ db 20.0))))
 
@@ -230,31 +250,31 @@
   "Return the frequency ratio corresponding to the given number of
   cents."
   [x]
-  (if (instance? Node x)
-    (add-node! (NewFreqRatio "cents") "cents" :in-edges {"in" x})
+  (if (is-node? x)
+    (freq-ratio x "cents")
     (pow 2 (/ x 1200.0))))
 
 (defn semitones
   "Return the frequency ratio corresponding to the given number of
   semitones."
   [x]
-  (if (instance? Node x)
-    (add-node! (NewFreqRatio "semitones") "semitones" :in-edges {"in" x})
+  (if (is-node? x)
+    (freq-ratio x "semitones")
     (pow 2 (/ x 12.0))))
 
 (defn octaves
   "Return the frequency ratio corresponding to the given number of
   octaves."
   [x]
-  (if (instance? Node x)
-    (add-node! (NewFreqRatio "octaves") "octaves" :in-edges {"in" x})
+  (if (is-node? x)
+    (freq-ratio x "octaves")
     (pow 2 x)))
 
 (defn midifreq
   "Return the frequency corresponding to the given MIDI note number."
   [note]
-  (if (instance? Node note)
-    (add-node! (NewMIDIFreq) "midifreq" :in-edges {"in" note})
+  (if (is-node? note)
+    (add-node! :midifreq NewMIDIFreq :in-edges {"in" note})
     (* 440.0 (pow 2 (/ (- note 69.0) 12.0)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -274,6 +294,10 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Operators
 
+(defn- seq-or-vec?
+  [x]
+  (or (seq? x) (vector? x)))
+
 (defn- arrange-multi-channel-args
   "Arrange a collection of arguments, some of which may be collections,
   into a sequence of sequences, where the i-th subsequence is an
@@ -286,7 +310,7 @@
   returns:
     ([1 4 6] [2 5 7] [3 4 8] [1 5 9])"
   [args]
-  (let [colls (map #(if (coll? %) % [%]) args)
+  (let [colls (map #(if (seq-or-vec? %) % [%]) args)
         max-len (apply max (map count colls))
         colls (map #(take max-len (cycle %)) colls)]
     (apply map vector colls)))
@@ -294,13 +318,13 @@
 
 (defn- +-internal
   [& xs]
-  (let [groups (group-by #(instance? Node %) xs)
+  (let [groups (group-by #(is-node? %) xs)
         nums (get groups false ())
         ugens (get groups true ())
         num-sum (apply glojure.core/+ nums)]
     (if (empty? ugens)
       num-sum
-      (let [sum-node (add-node! (NewSum) "+")
+      (let [sum-node (add-node! :+ NewSum)
             nodes (if (zero? num-sum)
                     ugens
                     (conj ugens (constant-node num-sum)))]
@@ -320,8 +344,8 @@
   ([x] x)
   ([x & more]
    (let [args (cons x more)]
-     (if (some coll? args)
-       (let [colls (map #(if (coll? %) % [%]) args)
+     (if (some seq-or-vec? args)
+       (let [colls (map #(if (seq-or-vec? %) % [%]) args)
              max-len (apply max (map count colls))
              colls (map #(take max-len (cycle %)) colls)]
          (apply map + colls))
@@ -338,13 +362,13 @@
 
 (defn- *-internal
   [& xs]
-  (let [groups (group-by #(instance? Node %) xs)
+  (let [groups (group-by #(is-node? %) xs)
         nums (get groups false ())
         ugens (get groups true ())
         num-prod (apply glojure.core/* nums)]
     (if (empty? ugens)
       num-prod
-      (let [prod-node (add-node! (NewProduct) "*")
+      (let [prod-node (add-node! :* NewProduct)
             nodes (conj ugens (constant-node num-prod))]
         (doseq [[n i] (map vector nodes (range (count nodes)))]
           (add-edge! n prod-node (str \$ i)))
@@ -357,8 +381,8 @@
   ([x] x)
   ([x & more]
    (let [args (cons x more)]
-     (if (some coll? args)
-       (let [colls (map #(if (coll? %) % [%]) args)
+     (if (some seq-or-vec? args)
+       (let [colls (map #(if (seq-or-vec? %) % [%]) args)
              max-len (apply max (map count colls))
              colls (map #(take max-len (cycle %)) colls)]
          (apply map * colls))
@@ -366,9 +390,9 @@
 
 (defn- div-internal
   [& xs]
-  (if (every? #(not (instance? Node %)) xs)
+  (if (every? #(not (is-node? %)) xs)
     (apply glojure.core// xs)
-    (let [quot-node (add-node! (NewQuotient) "/")
+    (let [quot-node (add-node! :/ NewQuotient)
           nodes (map as-node xs)]
       (doseq [[n i] (map vector nodes (range (count nodes)))]
         (add-edge! n quot-node (str \$ i)))
@@ -380,8 +404,8 @@
   ([x] (/ 1 x))
   ([x & more]
    (let [args (cons x more)]
-     (if (some coll? args)
-       (let [colls (map #(if (coll? %) % [%]) args)
+     (if (some seq-or-vec? args)
+       (let [colls (map #(if (seq-or-vec? %) % [%]) args)
              max-len (apply max (map count colls))
              colls (map #(take max-len (cycle %)) colls)]
          (apply map / colls))
@@ -396,15 +420,15 @@
 (defn fma
   "A fused multiply and add ugen."
   [in mul add]
-  (if (coll? in) ;; handle multiple channels
+  (if (seq-or-vec? in) ;; handle multiple channels
     (map #(fma % mul add) in)
     (if (and (every? number? [mul add])
              (== mul 1)
              (== add 0))
       in ;; no-op
       (let [node (if (every? number? [mul add])
-                   (add-node! (NewFMAStatic mul add) "fma") ;; optimized for static mul and add
-                   (let [n (add-node! (NewFMA) "fma")]
+                   (add-node! :fma NewFMAStatic :args [mul add]) ;; optimized for static mul and add
+                   (let [n (add-node! :fma NewFMA)]
                      (add-edge! (as-node mul) n "mul")
                      (add-edge! (as-node add) n "add")
                      n))]
@@ -456,7 +480,7 @@
              ;; duplicate the argument pairs for each argument value
              ;; to handle multiple channels.
              expand-arg# (fn [[k# v#]] (if (and (not (contains? ~noexpands k#))
-                                                (coll? v#))
+                                                (seq-or-vec? v#))
                                          (map #(vector k# %) v#)
                                          [[k# v#]]))
              arg-lists# (arrange-multi-channel-args (map expand-arg# (seq ~assignments-sym)))
@@ -506,9 +530,8 @@
        [~'freq default-freq
         ~@(mapcat #(vector % nil) opt-args)]
        (let [wt-opts# [(~'WithDefaultDutyCycle ~default-duty)]
-             gen# (apply ~ctor wt-opts#)
-             label# ~(str name)
-             osc-node# (add-node! gen# label#)
+             type# ~(keyword name)
+             osc-node# (add-node! type# ~ctor :args wt-opts#)
              freq-node# (as-node ~'freq)
              extra-args# ~(mapv #(vector (keyword %) %) opt-args)
              extra-args# (into {} (remove (comp nil? second) extra-args#))]
@@ -533,7 +556,7 @@
    iphase nil]
   (let [iphase (if iphase (as-node iphase))
         freq-node (as-node freq)
-        node (add-node! (NewImpulse) "impulse")]
+        node (add-node! :impulse NewImpulse)]
     (if iphase (add-edge! iphase node "iphase"))
     (add-edge! freq-node node "w")
     node))
@@ -546,30 +569,32 @@
   If frequency is zero or not provided, generates white
   noise."
   [freq 0]
-  (add-node! (NewNoise) "noise" :in-edges {:w freq}))
+  (add-node! :noise NewNoise :in-edges {:w freq}))
 
 (defugen pink-noise
   []
-  (add-node! (NewPinkNoise) "pink-noise"))
+  (add-node! :pink-noise NewPinkNoise))
 
 (defugen noise-quad
   "Generates quadratically-interpolated random values between -1 and 1
   at the given frequency. If frequency is zero or not provided,
   generates at 500 hz."
   [freq 500]
-  (add-node! (NewNoiseQuad) "noise-quad" :in-edges {:w freq}))
+  (add-node! :noise-quad NewNoiseQuad :in-edges {:w freq}))
 
 (defugen rrand
   "Generates random values between the given min and max values
   when triggered."
   [min 0
    max 1
-   trig 1]
+   trig 1
+   ^:noexpand seed 0]
   (let [add min
-        mul (- max min)]
-    (if (and (number? trig) (== trig 1))
-      (fma (.Float64 *rand-stream*) mul add)
-      (add-node! (NewRRand *rand-stream*) "rrand" :in-edges {:min min :max max :trig trig}))))
+        mul (- max min)
+        rnd (math$rand.New (math$rand.NewSource seed))]
+    (if (and (number? trig) (> trig 0))
+      (fma (.Float64 rnd) mul add)
+      (add-node! :rrand NewRRand :args [rnd] :in-edges {:min min :max max :trig trig}))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Modulators
@@ -582,16 +607,18 @@
         times (map as-node times)]
     (if (not= (count levels) (inc (count times)))
       (throw (str "env expects the number of levels to be one more than the number of times, got " (count levels) " levels and " (count times) " times.")))
-    (let [env-node (add-node! (NewEnvelope
-                               (WithInterpolation (subs (str (:interp flags)) 1))
-                               (WithReleaseNode (:release-node flags)))
-                              "envelope")]
+    (let [env-node (add-node! :envelope NewEnvelope
+                              :args [(WithInterpolation (subs (str (:interp flags)) 1))
+                                     (WithReleaseNode (:release-node flags))])]
       (add-edge! trigger env-node "trigger")
       (doseq [[n i] (map vector levels (range (count levels)))]
         (add-edge! n env-node (str "level$" i)))
       (doseq [[n i] (map vector times (range (count times)))]
         (add-edge! n env-node (str "time$" i)))
       env-node)))
+
+;; alias for env
+(def envelope env)
 
 (defn env-asr
   [gate [a s r]]
@@ -629,7 +656,7 @@
   [in 0
    attack-time 0.01
    release-time 0.01]
-  (add-node! (NewAmplitude attack-time release-time) "amplitude" :in-edges {:in in}))
+  (add-node! :amplitude NewAmplitude :args [attack-time release-time] :in-edges {:in in}))
 
 (defugen limiter
   "Limits the input amplitude to the given level. Limiter will not
@@ -646,8 +673,9 @@
   [in 0
    level 1
    dur 0.01]
-  (add-node! (NewLimiter dur)
-             "limiter"
+  (add-node! :limiter
+             NewLimiter
+             :args [dur]
              :in-edges {:in in
                         :amp level}))
 
@@ -658,7 +686,7 @@
   (let [f (fn [cfg out]
             (when-let [in (get (:input-samples cfg) "in")]
               (go/copy out in)))]
-    (add-node! (ugen-fn f) "pipe")))
+    (add-node! :pipe ugen-fn :args [f])))
 
 (defn pipeset!
   "Set the input of a pipe."
@@ -671,8 +699,8 @@
    room-size 0.5
    damp 0.5]
   (let [model (NewRevModel)]
-    (add-node! (NewFreeverb model)
-               "freeverb"
+    (add-node! :freeverb
+               #(NewFreeverb model)
                :in-edges {:in in
                           :mix mix
                           :room-size room-size
@@ -684,7 +712,7 @@
   [in 0
    freq 1200
    reson 0]
-  (add-node! (NewLowpassFilter) "lores"
+  (add-node! :lores NewLowpassFilter
              :in-edges {:in in
                         :cutoff freq
                         :resonance reson}))
@@ -694,7 +722,7 @@
   [in 0
    freq 440
    rq 1]
-  (add-node! (NewRLPF) "rlpf"
+  (add-node! :rlpf NewRLPF
              :in-edges {:in in
                         :freq freq
                         :reson rq}))
@@ -704,7 +732,7 @@
   [in 0
    freq 440
    rq 1]
-  (add-node! (NewRHPF) "rhpf"
+  (add-node! :rhpf NewRHPF
              :in-edges {:in in
                         :freq freq
                         :reson rq}))
@@ -717,7 +745,7 @@
   [in 0
    freq 440
    rq 1]
-  (add-node! (NewBPF) "bpf"
+  (add-node! :bpf NewBPF
              :in-edges {:in in
                         :w freq
                         :bw rq}))
@@ -727,7 +755,7 @@
    freq 1200
    rs 1
    db 0]
-  (add-node! (NewLoShelf) "loshelf"
+  (add-node! :loshelf NewLoShelf
              :in-edges {:in in
                         :w freq
                         :rs rs
@@ -738,7 +766,7 @@
    freq 1200
    rs 1
    db 0]
-  (add-node! (NewHiShelf) "hishelf"
+  (add-node! :hishelf NewHiShelf
              :in-edges {:in in
                         :w freq
                         :rs rs
@@ -749,7 +777,7 @@
    freq 1200
    rq 1
    db 0]
-  (add-node! (NewPeakEQ) "peakeq"
+  (add-node! :peakeq NewPeakEQ
              :in-edges {:in in
                         :w freq
                         :rq rq
@@ -757,7 +785,7 @@
 
 (defn- -delay
   [in max-delay-time delay-time interp-opt]
-  (add-node! (NewDelay max-delay-time (WithInterp interp-opt)) "delay"
+  (add-node! :delay NewDelay :args [max-delay-time (WithInterp interp-opt)]
              :in-edges {:in in
                         :delay delay-time}))
 
@@ -789,14 +817,14 @@
   target delay time."
   [in 0
    delay-time 0.2]
-  (add-node! (NewTapeDelay) "tape-delay"
+  (add-node! :tape-delay NewTapeDelay
              :in-edges {:$0 in
                         :delay delay-time}))
 
 (defn- comb-feedback
   [delay-time decay-time]
-  (if (or (and (not (instance? Node delay-time)) (zero? delay-time))
-          (and (not (instance? Node decay-time)) (zero? decay-time)))
+  (if (or (and (not (is-node? delay-time)) (zero? delay-time))
+          (and (not (is-node? decay-time)) (zero? decay-time)))
     0.0
     (let [abs-decay (abs decay-time)
           power (/ (* (math.Log 0.001) delay-time) abs-decay)
@@ -841,8 +869,8 @@
   [in 0
    lo -1
    hi 1]
-  (if (some (partial instance? Node) [in lo hi])
-    (add-node! (NewClip) "clip"
+  (if (some (partial is-node?) [in lo hi])
+    (add-node! :clip NewClip
                :in-edges {:in in
                           :lo lo
                           :hi hi})
@@ -871,7 +899,7 @@
   [in 0
    lo -1
    hi 1]
-  (add-node! (NewWaveFolder) "wfold"
+  (add-node! :wfold NewWaveFolder
              :in-edges {:in in
                         :lo lo
                         :hi hi}))
@@ -881,7 +909,7 @@
   [in 0
    rate 44100
    bits 24]
-  (add-node! (NewBitcrusher) "bitcrush"
+  (add-node! :bitcrush NewBitcrusher
              :in-edges {:in in
                         :rate rate
                         :bits bits}))
@@ -944,7 +972,8 @@
         (let [buf (if (keyword? buf)
                     (load-sample buf)
                     buf)]
-          (add-node! (NewSampler buf) "play-buf"
+          (add-node! :play-buf NewSampler
+                     :args [buf]
                      :in-edges {:trigger trigger
                                 :rate rate
                                 :start-pos start-pos
@@ -955,7 +984,7 @@
 
 (defugen sound-in
   []
-  (add-node! (NewInputDevice) "in"))
+  (add-node! :in NewInputDevice))
 
 (defn qwerty-in
   [name & {:keys [voices]}]
@@ -963,8 +992,8 @@
         opts [(WithVoices num-voices)]
         kb (apply NewSoftwareKeyboard name opts)]
     (map (fn [i]
-           {:note (add-node! (.Note kb i) (str "note-" i))
-            :onoff (add-node! (.Gate kb i) (str "gate-" i))})
+           {:note (add-node! :swkb-note #(.Note %1 %2) :args [kb i])
+            :onoff (add-node! :swkb-gate #(.Gate %1 %2) :args [kb i])})
          (range num-voices))))
 
 (defn midi-in
@@ -1020,10 +1049,10 @@
                opts)
         dev (apply NewMIDIInputDevice name opts)]
     (case typ
-      :note     (map #(do {:note (add-node! (.Note dev %) "midi-note")
-                           :onoff (add-node! (.Gate dev %) "midi-gate")})
+      :note     (map (fn [i] {:note (add-node! :midi-in-note #(.Note %1 %2) :args [dev i])
+                              :onoff (add-node! :midi-in-gate  #(.Gate %1 %2) :args [dev i])})
                      (range num-voices))
-      :cc (add-node! (.Control dev) "midi-cc")
+      :cc (add-node! :midi-in-cc #(.Control %) :args [dev])
       (throw (fmt.Errorf "unsupported midi-in type: %s" typ))
       )))
 
@@ -1032,11 +1061,13 @@
   the :filename flag (default out.wav)."
   [^:noexpand chs 1
    filename "out.wav"]
-  (let [chs (if (coll? chs) chs [chs])
+  (let [chs (if (seq-or-vec? chs) chs [chs])
         _ (if (> (count chs) 2) (throw (str "wavout: too many channels supplied: " (count chs))))
         ch0 (first chs)
         ch1 (second chs)
-        node (add-node! (NewWavOut filename) "wavout" :sink true :in-edges {:$0 ch0})]
+        node (add-node! :wavout NewWavOut :args [filename]
+                        :sink true
+                        :in-edges {:$0 ch0})]
     (when-let [ch1 (second chs)]
       (add-edge! (as-node ch1) node "$1"))
     node))
@@ -1053,7 +1084,7 @@
 
 (defn sequencer
   [gate freqs]
-  (let [node (add-node! (github.com$jfhamlin$muscrat$pkg$pattern.NewSequencer) "sequencer")
+  (let [node (add-node! :sequencer github.com$jfhamlin$muscrat$pkg$pattern.NewSequencer)
         gate (as-node gate)
         freqs (map as-node freqs)]
     (add-edge! gate node "trigger")
@@ -1068,7 +1099,7 @@
 
 (defn choose
   [gate opts]
-  (let [node (add-node! (github.com$jfhamlin$muscrat$pkg$pattern.NewChoose) "choose")
+  (let [node (add-node! :choose github.com$jfhamlin$muscrat$pkg$pattern.NewChoose)
         gate (as-node gate)
         opts (map as-node opts)]
     (add-edge! gate node "trigger")

@@ -13,13 +13,14 @@ import (
 	"github.com/jfhamlin/muscrat/pkg/bufferpool"
 	"github.com/jfhamlin/muscrat/pkg/conf"
 	"github.com/jfhamlin/muscrat/pkg/gen/gljimports"
-	"github.com/jfhamlin/muscrat/pkg/graph"
+	"github.com/jfhamlin/muscrat/pkg/graph2"
 	"github.com/jfhamlin/muscrat/pkg/pubsub"
 	"github.com/jfhamlin/muscrat/pkg/stdlib"
 	"github.com/jfhamlin/muscrat/pkg/ugen"
 
 	"github.com/jfhamlin/muscrat/pkg/audio"
 
+	"github.com/glojurelang/glojure/pkg/glj"
 	"github.com/glojurelang/glojure/pkg/pkgmap"
 	"github.com/glojurelang/glojure/pkg/runtime"
 )
@@ -52,13 +53,13 @@ type (
 		gain       float64
 		targetGain float64
 
+		runner *graph2.Runner
+
 		// channel for raw, unprocessed output samples.
 		// one []float64 per audio channel.
 		outputChannel chan [][]float64
 
 		vizSamplesBuffer []float64
-
-		graphRunner *graphRunner
 
 		lastFileHash [32]byte
 
@@ -76,11 +77,15 @@ type (
 )
 
 func NewServer(msgChan chan<- *ServerMessage) *Server {
+	out := make(chan [][]float64, 1)
 	return &Server{
 		gain:          1,
 		targetGain:    1,
-		outputChannel: make(chan [][]float64, 1),
+		outputChannel: out,
 		msgChan:       msgChan,
+		runner: graph2.NewRunner(ugen.SampleConfig{
+			SampleRateHz: conf.SampleRate,
+		}, out),
 	}
 }
 
@@ -99,6 +104,7 @@ func (s *Server) Start(ctx context.Context) error {
 	}
 	s.sampleRate = audio.SampleRate()
 
+	go s.runner.Run(ctx)
 	go s.sendSamples()
 
 	s.playGraph(zeroGraph())
@@ -139,67 +145,8 @@ func (s *Server) SetGain(gain float64) {
 
 ////////////////////////////////////////////////////////////////////////////////
 
-func (s *Server) playGraph(g *graph.Graph) {
-	gr := s.newGraphRunner(s.ctx, g)
-	go gr.run()
-
-	if s.graphRunner != nil {
-		s.graphRunner.outputTo(nil)
-		s.fadeTo(gr)
-		s.graphRunner.stop()
-	}
-	s.graphRunner = gr
-	gr.outputTo(s.outputChannel)
-}
-
-func (s *Server) fadeTo(gr *graphRunner) {
-	if s.graphRunner == nil {
-		return
-	}
-
-	ogr := s.graphRunner
-	ngr := gr
-
-	const fadeTimeMS = 100
-	fadeSamples := fadeTimeMS * s.sampleRate / 1000
-
-	sampleIndex := 0
-	for sampleIndex < fadeSamples {
-		oldSmps := <-ogr.graphOutputCh
-		newSmps := <-ngr.graphOutputCh
-
-		// mixed samples
-		mixSmps := make([][]float64, int(math.Max(float64(len(oldSmps)), float64(len(newSmps)))))
-		zeros := make([]float64, len(oldSmps[0]))
-
-		for chIdx := 0; chIdx < len(mixSmps); chIdx++ {
-			var os []float64
-			var ns []float64
-			if chIdx < len(oldSmps) {
-				os = oldSmps[chIdx]
-			} else {
-				os = zeros
-			}
-			if chIdx < len(newSmps) {
-				ns = newSmps[chIdx]
-			} else {
-				ns = zeros
-			}
-
-			mixSmps[chIdx] = make([]float64, len(os))
-			for i := range os {
-				oldS := os[i]
-				newS := ns[i]
-				t := float64(sampleIndex) / float64(fadeSamples)
-				if t > 1 {
-					t = 1
-				}
-				mixSmps[chIdx][i] = oldS*(1-t) + newS*t
-				sampleIndex++
-			}
-		}
-		s.outputChannel <- mixSmps
-	}
+func (s *Server) playGraph(g *graph2.Graph) {
+	s.runner.SetGraph(g)
 }
 
 func (s *Server) sendSamples() {
@@ -264,104 +211,11 @@ func (s *Server) sendSamples() {
 
 ////////////////////////////////////////////////////////////////////////////////
 
-type (
-	graphRunner struct {
-		ctx context.Context
-
-		sampleRate    int
-		graph         *graph.Graph
-		graphOutputCh chan [][]float64
-
-		cancel context.CancelFunc
-
-		cancelOutputTo func()
-
-		stopped chan struct{}
-	}
-)
-
-func (s *Server) newGraphRunner(ctx context.Context, g *graph.Graph) *graphRunner {
-	return &graphRunner{
-		ctx:           ctx,
-		sampleRate:    s.sampleRate,
-		graph:         g,
-		graphOutputCh: make(chan [][]float64),
-		stopped:       make(chan struct{}),
-	}
-}
-
-func (gr *graphRunner) run() {
-	ctx, cancel := context.WithCancel(gr.ctx)
-	gr.cancel = cancel
-
-	go func() {
-		defer close(gr.stopped)
-		gr.graph.Run(ctx, ugen.SampleConfig{SampleRateHz: gr.sampleRate})
-	}()
-
-	defer close(gr.graphOutputCh)
-
-	for {
-		output := make([][]float64, 0, 2)
-		for _, outChan := range gr.graph.OutputChans() {
-			select {
-			case samps := <-outChan:
-				output = append(output, samps)
-			case <-ctx.Done():
-				return
-			}
-		}
-		gr.graphOutputCh <- output
-	}
-}
-
-func (gr *graphRunner) stop() {
-	gr.cancel()
-	<-gr.stopped
-}
-
-func (gr *graphRunner) outputTo(output chan<- [][]float64) {
-	if output == nil {
-		if gr.cancelOutputTo != nil {
-			gr.cancelOutputTo()
-		}
-		gr.cancelOutputTo = nil
-		return
-	}
-	stopChan := make(chan struct{})
-
-	ctx, cancel := context.WithCancel(context.Background())
-
-	go func() {
-		defer close(stopChan)
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			case sampleChannels, ok := <-gr.graphOutputCh:
-				if !ok {
-					return
-				}
-				output <- sampleChannels
-			}
-		}
-	}()
-	gr.cancelOutputTo = func() {
-		cancel()
-		<-stopChan
-	}
-}
-
-////////////////////////////////////////////////////////////////////////////////
-
-func zeroGraph() *graph.Graph {
-	g := &graph.Graph{BufferSize: conf.BufferSize}
-	s0 := g.AddOutNode()
-	s1 := g.AddOutNode()
-	zero := g.AddGeneratorNode(ugen.NewConstant(0))
-	g.AddEdge(zero.ID(), s0.ID(), "in")
-	g.AddEdge(zero.ID(), s1.ID(), "in")
-	return g
+func zeroGraph() *graph2.Graph {
+	return graph2.SExprToGraph(glj.Read(`
+		{:nodes ({:id "3", :type :out, :ctor nil, :args [0], :key nil, :sink true}
+             {:id "4", :type :out, :ctor nil, :args [1], :key nil, :sink true})}
+`))
 }
 
 // averageBuffers returns the average of the N buffers. If the buffers

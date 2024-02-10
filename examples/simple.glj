@@ -1,4 +1,8 @@
 (ns examples.simple
-  (:require [mrat.core :refer :all]))
+  (:require [mrat.core :refer :all]
+            [mrat.welsh :refer :all]
+            [mrat.scales :refer :all]
+            [mrat.midi :refer :all]
+            [mrat.abc :as abc]))
 
-(play (sin 440))
+(play (sin 200))
