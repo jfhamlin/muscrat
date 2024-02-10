@@ -75,9 +75,11 @@
      (doseq [~locals (map vector s# (range (count s#)))]
        ~@body)))
 
+(def ^:private next-id (atom 0))
 (defn- gen-id
+  "Generate a new unique id."
   []
-  (str (math$rand.Int63) (math$rand.Int63)))
+  (str (swap! next-id inc)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Graph
@@ -102,8 +104,39 @@
   [graph]
   (->> graph
        :nodes
-       (filter (fn [{:keys [sink ug]}] (and sink (= (:type ug) :out))))
+       (filter (fn [{:keys [sink type]}] (or sink (= type :out))))
        (map :id)))
+
+(defn simplify-graph
+  "Simplify the graph.
+  - Deduplicate constant nodes."
+  [g]
+  (let [nodes (:nodes g)
+        const-nodes (filter #(= (:type %) :const) nodes)
+        replacements (loop [nodes const-nodes
+                            value-nodes {}
+                            replacements {}]
+                       (if (empty? nodes)
+                         replacements
+                         (let [{id :id [val] :args} (first nodes)
+                               val (double val)
+                               val-node (get value-nodes val)]
+                           (if val-node
+                             (recur (rest nodes)
+                                    value-nodes
+                                    (assoc replacements id val-node))
+                             (recur (rest nodes)
+                                    (assoc value-nodes val id)
+                                    replacements)))))
+        new-nodes (filter #(not (contains? replacements (:id %))) nodes)
+        fix-edge (fn [edge]
+                   (let [from (:from edge)
+                         to (:to edge)]
+                     (merge edge
+                            {:from (get replacements from from)
+                             :to (get replacements to to)})))
+        new-edges (map fix-edge (:edges g))]
+    (merge g {:nodes new-nodes :edges new-edges})))
 
 (defprotocol AsNode
   "Protocol for types that can be converted to generator nodes."
@@ -111,7 +144,7 @@
 
 (defn is-node?
   [x]
-  (and (map? x) (:id x)))
+  (boolean (and (map? x) (:id x))))
 
 (declare add-edge!)
 (declare constant-node)
@@ -133,7 +166,7 @@
   [{x-id :id} {y-id :id} port]
   (let [edge {:from x-id :to y-id :port port}]
     (swap! *graph* update-in [:edges] conj edge)
-    edge)
+    edge))
 
 (extend-protocol AsNode
   github.com$glojurelang$glojure$pkg$lang.IPersistentMap
@@ -181,7 +214,7 @@
 
 (defn- constant-node
   [x]
-  (add-node! {:type :const :ctor identity :args [x]}))
+  (add-node! :const NewConstant :args [x]))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Utilities
@@ -292,6 +325,10 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Operators
 
+(defn- seq-or-vec?
+  [x]
+  (or (seq? x) (vector? x)))
+
 (defn- arrange-multi-channel-args
   "Arrange a collection of arguments, some of which may be collections,
   into a sequence of sequences, where the i-th subsequence is an
@@ -304,7 +341,7 @@
   returns:
     ([1 4 6] [2 5 7] [3 4 8] [1 5 9])"
   [args]
-  (let [colls (map #(if (coll? %) % [%]) args)
+  (let [colls (map #(if (seq-or-vec? %) % [%]) args)
         max-len (apply max (map count colls))
         colls (map #(take max-len (cycle %)) colls)]
     (apply map vector colls)))
@@ -338,8 +375,8 @@
   ([x] x)
   ([x & more]
    (let [args (cons x more)]
-     (if (some coll? args)
-       (let [colls (map #(if (coll? %) % [%]) args)
+     (if (some seq-or-vec? args)
+       (let [colls (map #(if (seq-or-vec? %) % [%]) args)
              max-len (apply max (map count colls))
              colls (map #(take max-len (cycle %)) colls)]
          (apply map + colls))
@@ -375,8 +412,8 @@
   ([x] x)
   ([x & more]
    (let [args (cons x more)]
-     (if (some coll? args)
-       (let [colls (map #(if (coll? %) % [%]) args)
+     (if (some seq-or-vec? args)
+       (let [colls (map #(if (seq-or-vec? %) % [%]) args)
              max-len (apply max (map count colls))
              colls (map #(take max-len (cycle %)) colls)]
          (apply map * colls))
@@ -398,8 +435,8 @@
   ([x] (/ 1 x))
   ([x & more]
    (let [args (cons x more)]
-     (if (some coll? args)
-       (let [colls (map #(if (coll? %) % [%]) args)
+     (if (some seq-or-vec? args)
+       (let [colls (map #(if (seq-or-vec? %) % [%]) args)
              max-len (apply max (map count colls))
              colls (map #(take max-len (cycle %)) colls)]
          (apply map / colls))
@@ -414,15 +451,15 @@
 (defn fma
   "A fused multiply and add ugen."
   [in mul add]
-  (if (coll? in) ;; handle multiple channels
+  (if (seq-or-vec? in) ;; handle multiple channels
     (map #(fma % mul add) in)
     (if (and (every? number? [mul add])
              (== mul 1)
              (== add 0))
       in ;; no-op
       (let [node (if (every? number? [mul add])
-                   (add-node :fma NewFMAStatic :args [mul add]) ;; optimized for static mul and add
-                   (let [n (add-node :fma NewFMA)]
+                   (add-node! :fma NewFMAStatic :args [mul add]) ;; optimized for static mul and add
+                   (let [n (add-node! :fma NewFMA)]
                      (add-edge! (as-node mul) n "mul")
                      (add-edge! (as-node add) n "add")
                      n))]
@@ -474,7 +511,7 @@
              ;; duplicate the argument pairs for each argument value
              ;; to handle multiple channels.
              expand-arg# (fn [[k# v#]] (if (and (not (contains? ~noexpands k#))
-                                                (coll? v#))
+                                                (seq-or-vec? v#))
                                          (map #(vector k# %) v#)
                                          [[k# v#]]))
              arg-lists# (arrange-multi-channel-args (map expand-arg# (seq ~assignments-sym)))
@@ -647,7 +684,7 @@
   [in 0
    attack-time 0.01
    release-time 0.01]
-  (add-node :amplitude NewAmplitude :args [attack-time release-time] :in-edges {:in in}))
+  (add-node! :amplitude NewAmplitude :args [attack-time release-time] :in-edges {:in in}))
 
 (defugen limiter
   "Limits the input amplitude to the given level. Limiter will not
@@ -1052,7 +1089,7 @@
   the :filename flag (default out.wav)."
   [^:noexpand chs 1
    filename "out.wav"]
-  (let [chs (if (coll? chs) chs [chs])
+  (let [chs (if (seq-or-vec? chs) chs [chs])
         _ (if (> (count chs) 2) (throw (str "wavout: too many channels supplied: " (count chs))))
         ch0 (first chs)
         ch1 (second chs)
