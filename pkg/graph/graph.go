@@ -297,10 +297,6 @@ func (rs *runState) NodeInfoByID(id NodeID) *runNodeInfo {
 	return &rs.nodeInfo[index]
 }
 
-func (rs *runState) NodeInfoByIndex(idx int) *runNodeInfo {
-	return &rs.nodeInfo[idx]
-}
-
 func (g *Graph) Run(ctx context.Context, cfg ugen.SampleConfig) {
 	if g.BufferSize <= 0 {
 		g.BufferSize = conf.BufferSize
@@ -445,7 +441,7 @@ func (g *Graph) runNode(ctx context.Context, cfg ugen.SampleConfig, rs *runState
 	inputSampleMap := make(map[string][]float64)
 
 	info := rs.NodeInfoByID(nodeID)
-	node := g.Node(nodeID)
+	node := info.node
 
 	// collect the inputs
 	for _, e := range info.incomingEdges {
