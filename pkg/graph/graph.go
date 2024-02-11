@@ -264,9 +264,6 @@ type (
 		// edges whose destination is this node
 		incomingEdges []*Edge
 
-		// nodes with edges to this node
-		predecessors []NodeID
-
 		// nodes that must be evaluated before this node. not all
 		// predecessors are made dependencies to eliminate dependency
 		// cycles.
@@ -426,12 +423,7 @@ func (g *Graph) newRunState() *runState {
 		for _, e := range g.IncomingEdges(id) {
 			predecessorNodes[e.From] = struct{}{}
 		}
-		rs.nodeInfo[i].predecessors = make([]NodeID, 0, len(predecessorNodes))
-		rs.nodeInfo[i].dependencies = map[NodeID]struct{}{}
-		for pid := range predecessorNodes {
-			rs.nodeInfo[i].predecessors = append(rs.nodeInfo[i].predecessors, pid)
-			rs.nodeInfo[i].dependencies[pid] = struct{}{}
-		}
+		rs.nodeInfo[i].dependencies = predecessorNodes
 		rs.nodeInfo[i].value = bufSlice[i*g.BufferSize : (i+1)*g.BufferSize]
 		rs.nodeIndexMap[id] = i
 	}
@@ -482,7 +474,7 @@ func (g *Graph) prepCyclesDFS(rs *runState, nodeID NodeID, visited map[NodeID]st
 	defer delete(visited, nodeID)
 
 	info := rs.NodeInfoByID(nodeID)
-	for _, from := range info.predecessors {
+	for from := range info.dependencies {
 		if _, ok := visited[from]; ok {
 			// cycle detected
 			// remove the dependency

@@ -110,7 +110,7 @@ func EvalScript(filename string) (res *graph.Graph, err error) {
 
 	// fmt.Println(nodeMap)
 
-	fmt.Println("nodes:", lang.Count(nodes))
+	// fmt.Println("nodes:", lang.Count(nodes))
 	// fmt.Println("edges:", lang.Count(edges))
 	// fmt.Println("edges:", edges)
 	//	panic("done")
