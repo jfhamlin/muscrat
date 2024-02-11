@@ -46,6 +46,9 @@ type (
 		label     string
 		str       string
 
+		// last output
+		value []float64
+
 		isSink bool
 	}
 
@@ -179,6 +182,7 @@ func (g *Graph) AddGeneratorNode(gen ugen.UGen, opts ...NodeOption) Node {
 		Generator: gen,
 		label:     options.label,
 		isSink:    options.isSink,
+		value:     make([]float64, g.BufferSize),
 	}
 	{
 		str := "[" + node.ID().String() + "]"
@@ -259,7 +263,7 @@ func (g *Graph) OutgoingEdges(id NodeID) []*Edge {
 
 type (
 	runNodeInfo struct {
-		value []float64 // value of the node
+		value []float64
 
 		// edges whose destination is this node
 		incomingEdges []*Edge
@@ -414,8 +418,6 @@ func (g *Graph) newRunState() *runState {
 		rs.nodeIndexMap[i] = -1
 	}
 
-	fullSampleSize := g.BufferSize * len(order)
-	bufSlice := make([]float64, fullSampleSize, fullSampleSize)
 	for i, id := range order {
 		predecessorNodes := map[NodeID]struct{}{}
 		incomingEdges := g.IncomingEdges(id)
@@ -424,7 +426,10 @@ func (g *Graph) newRunState() *runState {
 			predecessorNodes[e.From] = struct{}{}
 		}
 		rs.nodeInfo[i].dependencies = predecessorNodes
-		rs.nodeInfo[i].value = bufSlice[i*g.BufferSize : (i+1)*g.BufferSize]
+		node := g.Node(id)
+		if gen, ok := node.(*GeneratorNode); ok {
+			rs.nodeInfo[i].value = gen.value
+		}
 		rs.nodeIndexMap[id] = i
 	}
 
