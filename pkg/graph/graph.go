@@ -10,6 +10,7 @@ import (
 	"strconv"
 
 	"github.com/jfhamlin/muscrat/pkg/bufferpool"
+	"github.com/jfhamlin/muscrat/pkg/conf"
 	"github.com/jfhamlin/muscrat/pkg/ugen"
 )
 
@@ -272,6 +273,8 @@ type (
 		// predecessors are made dependencies to eliminate dependency
 		// cycles.
 		dependencies map[NodeID]struct{}
+
+		node Node
 	}
 
 	runState struct {
@@ -300,7 +303,7 @@ func (rs *runState) NodeInfoByIndex(idx int) *runNodeInfo {
 
 func (g *Graph) Run(ctx context.Context, cfg ugen.SampleConfig) {
 	if g.BufferSize <= 0 {
-		g.BufferSize = 1024
+		g.BufferSize = conf.BufferSize
 	}
 
 	// using 1/2 the number of CPUs gives good performance when
@@ -316,7 +319,6 @@ func (g *Graph) Run(ctx context.Context, cfg ugen.SampleConfig) {
 	}
 
 	rs := g.newRunState()
-	g.bootstrapCycles(ctx, rs)
 
 	// start any generator nodes whose generator is a ugen.Starter
 	for _, node := range g.Nodes {
@@ -417,19 +419,24 @@ func (g *Graph) newRunState() *runState {
 	}
 
 	for i, id := range order {
+		info := &rs.nodeInfo[i]
+
 		predecessorNodes := map[NodeID]struct{}{}
 		incomingEdges := g.IncomingEdges(id)
-		rs.nodeInfo[i].incomingEdges = incomingEdges
+		info.incomingEdges = incomingEdges
 		for _, e := range g.IncomingEdges(id) {
 			predecessorNodes[e.From] = struct{}{}
 		}
-		rs.nodeInfo[i].dependencies = predecessorNodes
+		info.dependencies = predecessorNodes
 		node := g.Node(id)
+		info.node = node
 		if gen, ok := node.(*GeneratorNode); ok {
-			rs.nodeInfo[i].value = gen.value
+			info.value = gen.value
 		}
 		rs.nodeIndexMap[id] = i
 	}
+
+	bootstrapCycles(rs)
 
 	return rs
 }
@@ -465,14 +472,16 @@ func (g *Graph) runNode(ctx context.Context, cfg ugen.SampleConfig, rs *runState
 	}
 }
 
-func (g *Graph) bootstrapCycles(ctx context.Context, rs *runState) {
-	for _, sink := range g.Sinks() {
-		visited := make(map[NodeID]struct{})
-		g.prepCyclesDFS(rs, sink.ID(), visited)
+func bootstrapCycles(rs *runState) {
+	for _, info := range rs.nodeInfo {
+		if info.node.IsSink() {
+			visited := make(map[NodeID]struct{})
+			prepCyclesDFS(rs, info.node.ID(), visited)
+		}
 	}
 }
 
-func (g *Graph) prepCyclesDFS(rs *runState, nodeID NodeID, visited map[NodeID]struct{}) {
+func prepCyclesDFS(rs *runState, nodeID NodeID, visited map[NodeID]struct{}) {
 	visited[nodeID] = struct{}{}
 	defer delete(visited, nodeID)
 
@@ -484,6 +493,6 @@ func (g *Graph) prepCyclesDFS(rs *runState, nodeID NodeID, visited map[NodeID]st
 			delete(info.dependencies, from)
 			continue
 		}
-		g.prepCyclesDFS(rs, from, visited)
+		prepCyclesDFS(rs, from, visited)
 	}
 }
