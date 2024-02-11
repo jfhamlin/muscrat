@@ -259,25 +259,20 @@ func (g *Graph) OutgoingEdges(id NodeID) []*Edge {
 
 type (
 	runNodeInfo struct {
-		value []float64 // value of the node in the last epoch
+		value []float64 // value of the node
 
-		incomingEdges []*Edge // edges whose destination is this node
+		// edges whose destination is this node
+		incomingEdges []*Edge
 
-		predecessors []NodeID // nodes that must be evaluated before this node
+		// nodes with edges to this node
+		predecessors []NodeID
 
-		// offset to apply to the epoch of each incoming edge when
-		// checking if the dependency has been satisfied. this is
-		// necessary to handle cycles in the graph.
-		predecessorEpochOffsets []int64
+		// nodes that must be evaluated before this node. not all
+		// predecessors are made dependencies to eliminate dependency
+		// cycles.
+		dependencies map[NodeID]struct{}
 	}
 
-	// we evaluate the graph in epochs, where each epoch is a buffer
-	// sent to all sinks.
-	//
-	// every epoch, we evaluate the graph in topological order using multiple
-	// goroutines. each node has an atomic value containing the epoch number
-	// of the last time it was evaluated. if the epoch number is less than
-	// the current epoch, we evaluate the node and update the epoch number.
 	runState struct {
 		nodeInfo []runNodeInfo
 
@@ -348,27 +343,17 @@ func (g *Graph) Run(ctx context.Context, cfg ugen.SampleConfig) {
 	}
 
 	q := NewQueue(numWorkers)
-	items := make([]*QueueItem, len(rs.nodeOrder))
+	items := map[NodeID]*QueueItem{}
 	for nodeIndex, nodeID := range rs.nodeOrder {
 		info := rs.NodeInfoByIndex(nodeIndex)
 
-		var numPreds int
-		for _, predOffset := range info.predecessorEpochOffsets {
-			if predOffset == 0 {
-				numPreds++
-			}
-		}
-		items[nodeIndex] = q.AddItem(makeRunFunc(nodeID), numPreds)
+		items[nodeID] = q.AddItem(makeRunFunc(nodeID), len(info.dependencies))
 	}
-	for nodeIndex, item := range items {
-		info := rs.NodeInfoByIndex(nodeIndex)
-		for i, predOffset := range info.predecessorEpochOffsets {
-			if predOffset != 0 {
-				continue
-			}
-			predIndex := rs.nodeIndexMap[info.predecessors[i]]
-			predItem := items[predIndex]
-			predItem.AddSuccessor(item)
+	for nodeID, item := range items {
+		info := rs.NodeInfoByID(nodeID)
+		for depID := range info.dependencies {
+			depItem := items[depID]
+			depItem.AddSuccessor(item)
 		}
 	}
 
@@ -442,10 +427,11 @@ func (g *Graph) newRunState() *runState {
 			predecessorNodes[e.From] = struct{}{}
 		}
 		rs.nodeInfo[i].predecessors = make([]NodeID, 0, len(predecessorNodes))
+		rs.nodeInfo[i].dependencies = map[NodeID]struct{}{}
 		for pid := range predecessorNodes {
 			rs.nodeInfo[i].predecessors = append(rs.nodeInfo[i].predecessors, pid)
+			rs.nodeInfo[i].dependencies[pid] = struct{}{}
 		}
-		rs.nodeInfo[i].predecessorEpochOffsets = make([]int64, len(predecessorNodes))
 		rs.nodeInfo[i].value = bufSlice[i*g.BufferSize : (i+1)*g.BufferSize]
 		rs.nodeIndexMap[id] = i
 	}
@@ -496,9 +482,11 @@ func (g *Graph) prepCyclesDFS(rs *runState, nodeID NodeID, visited map[NodeID]st
 	defer delete(visited, nodeID)
 
 	info := rs.NodeInfoByID(nodeID)
-	for i, from := range info.predecessors {
+	for _, from := range info.predecessors {
 		if _, ok := visited[from]; ok {
-			info.predecessorEpochOffsets[i] = -1
+			// cycle detected
+			// remove the dependency
+			delete(info.dependencies, from)
 			continue
 		}
 		g.prepCyclesDFS(rs, from, visited)
