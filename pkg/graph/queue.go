@@ -19,7 +19,7 @@ type (
 		// sent when all jobs are done
 		jobsDone chan struct{}
 
-		numItems int32
+		items    []*QueueItem
 		runnable *lockFreeStack
 
 		initiallyRunnable []*QueueItem
@@ -92,16 +92,11 @@ func NewQueue(numWorkers int) *Queue {
 	}
 }
 
-func (q *Queue) AddItem(job Job, activationLimit int) *QueueItem {
-	q.numItems++
+func (q *Queue) AddItem(job Job) *QueueItem {
 	item := &QueueItem{
-		job:             job,
-		activationLimit: int32(activationLimit),
+		job: job,
 	}
-	item.activationCount.Store(item.activationLimit)
-	if activationLimit == 0 {
-		q.addInitialItem(item)
-	}
+	q.items = append(q.items, item)
 	return item
 }
 
@@ -112,6 +107,14 @@ func (q *Queue) addInitialItem(item *QueueItem) {
 func (q *Queue) Start(ctx context.Context) {
 	if q.runnable != nil {
 		panic("queue already started")
+	}
+
+	// set initially runnable items, reset nodes
+	for _, item := range q.items {
+		if item.activationLimit == 0 {
+			q.addInitialItem(item)
+		}
+		item.activationCount.Store(item.activationLimit)
 	}
 
 	ctx, cancel := context.WithCancel(ctx)
@@ -136,7 +139,7 @@ func (q *Queue) Stop() {
 }
 
 func (q *Queue) RunJobs(ctx context.Context) error {
-	q.remainingItems.Store(q.numItems)
+	q.remainingItems.Store(int32(len(q.items)))
 
 	for _, item := range q.initiallyRunnable {
 		q.runnable.Push(item)
@@ -213,6 +216,7 @@ func (q *Queue) signalAll() {
 
 func (qi *QueueItem) AddSuccessor(successor *QueueItem) {
 	qi.successors = append(qi.successors, successor)
+	successor.activationLimit++
 }
 
 func (qi *QueueItem) Run(ctx context.Context, q *Queue) {

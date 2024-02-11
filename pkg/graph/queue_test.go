@@ -59,7 +59,7 @@ func TestQueueBasic(t *testing.T) {
 	q := NewQueue(numWorkers)
 	items := make([]*QueueItem, numJobs)
 	for i := range items {
-		items[i] = q.AddItem(makeJob(i), len(predecessors[i]))
+		items[i] = q.AddItem(makeJob(i))
 	}
 	for i := range items {
 		// add successor dependencies

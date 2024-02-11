@@ -345,10 +345,8 @@ func (g *Graph) Run(ctx context.Context, cfg ugen.SampleConfig) {
 
 	q := NewQueue(numWorkers)
 	items := map[NodeID]*QueueItem{}
-	for nodeIndex, nodeID := range rs.nodeOrder {
-		info := rs.NodeInfoByIndex(nodeIndex)
-
-		items[nodeID] = q.AddItem(makeRunFunc(nodeID), len(info.dependencies))
+	for _, nodeID := range rs.nodeOrder {
+		items[nodeID] = q.AddItem(makeRunFunc(nodeID))
 	}
 	for nodeID, item := range items {
 		info := rs.NodeInfoByID(nodeID)
