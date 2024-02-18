@@ -337,7 +337,7 @@ func (g *Graph) Run(ctx context.Context, cfg ugen.SampleConfig) {
 
 	makeRunFunc := func(nodeID NodeID) Job {
 		return func(ctx context.Context) {
-			g.runNode(ctx, cfg, rs, nodeID)
+			runNode(ctx, cfg, rs, nodeID)
 		}
 	}
 
@@ -437,7 +437,7 @@ func (g *Graph) newRunState() *runState {
 	return rs
 }
 
-func (g *Graph) runNode(ctx context.Context, cfg ugen.SampleConfig, rs *runState, nodeID NodeID) {
+func runNode(ctx context.Context, cfg ugen.SampleConfig, rs *runState, nodeID NodeID) {
 	inputSampleMap := make(map[string][]float64)
 
 	info := rs.NodeInfoByID(nodeID)

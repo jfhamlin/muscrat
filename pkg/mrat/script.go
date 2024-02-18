@@ -71,7 +71,8 @@ func EvalScript(filename string) (res *graph.Graph, err error) {
 	res = &graph.Graph{BufferSize: conf.BufferSize}
 	nodeMap := map[string]graph.NodeID{}
 
-	simplifyGraph := glj.Var("mrat.core", "simplify-graph")
+	require.Invoke(glj.Read("mrat.graph"))
+	simplifyGraph := glj.Var("mrat.graph", "simplify-graph")
 	g := simplifyGraph.Invoke(graphAtom.Deref())
 
 	nodes := lang.Get(g, nodesKW)

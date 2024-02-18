@@ -107,37 +107,6 @@
        (filter (fn [{:keys [sink type]}] (or sink (= type :out))))
        (map :id)))
 
-(defn simplify-graph
-  "Simplify the graph.
-  - Deduplicate constant nodes."
-  [g]
-  (let [nodes (:nodes g)
-        const-nodes (filter #(= (:type %) :const) nodes)
-        replacements (loop [nodes const-nodes
-                            value-nodes {}
-                            replacements {}]
-                       (if (empty? nodes)
-                         replacements
-                         (let [{id :id [val] :args} (first nodes)
-                               val (double val)
-                               val-node (get value-nodes val)]
-                           (if val-node
-                             (recur (rest nodes)
-                                    value-nodes
-                                    (assoc replacements id val-node))
-                             (recur (rest nodes)
-                                    (assoc value-nodes val id)
-                                    replacements)))))
-        new-nodes (filter #(not (contains? replacements (:id %))) nodes)
-        fix-edge (fn [edge]
-                   (let [from (:from edge)
-                         to (:to edge)]
-                     (merge edge
-                            {:from (get replacements from from)
-                             :to (get replacements to to)})))
-        new-edges (map fix-edge (:edges g))]
-    (merge g {:nodes new-nodes :edges new-edges})))
-
 (defprotocol AsNode
   "Protocol for types that can be converted to generator nodes."
   (as-node [ug]))
@@ -214,7 +183,7 @@
 
 (defn- constant-node
   [x]
-  (add-node! :const NewConstant :args [x]))
+  (add-node! :const NewConstant :args [(double x)]))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Utilities
@@ -226,7 +195,7 @@
   -((-b)^p) when b is negative."
   [b p]
   (if (some (partial is-node?) [b p])
-    (add-node! :pow :ctor NewPow :in-edges {"base" b "exp" p})
+    (add-node! :pow NewPow :in-edges {"base" b "exp" p})
     (if (neg? b)
       (- (math.Pow (- b) p))
       (math.Pow b p))))
@@ -246,7 +215,7 @@
   value of x directly."
   [x]
   (if (is-node? x)
-    (add-node! :abs :ctor NewAbs :in-edges {:in x})
+    (add-node! :abs NewAbs :in-edges {:in x})
     (math.Abs x)))
 
 (defn exp
@@ -268,7 +237,7 @@
 
 (defn- freq-ratio
   [x kind]
-  (add-node! :freq-ratio :ctor NewFreqRatio :args [kind] :in-edges {"in" x}))
+  (add-node! :freq-ratio NewFreqRatio :args [kind] :in-edges {"in" x}))
 
 (defn decibels
   "Return the amplitude ratio corresponding to the given decibel value."
@@ -648,6 +617,9 @@
         (add-edge! n env-node (str "time$" i)))
       env-node)))
 
+;; alias for env
+(def envelope env)
+
 (defn env-asr
   [gate [a s r]]
   (env gate [0 s 0] [a r] :release-node 1))
@@ -714,7 +686,7 @@
   (let [f (fn [cfg out]
             (when-let [in (get (:input-samples cfg) "in")]
               (go/copy out in)))]
-    (add-node! :pipe :ctor ugen-fn :args [f] "pipe")))
+    (add-node! :pipe ugen-fn :args [f])))
 
 (defn pipeset!
   "Set the input of a pipe."

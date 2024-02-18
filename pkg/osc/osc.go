@@ -75,6 +75,8 @@ func (o *Osc) Gen(ctx context.Context, cfg ugen.SampleConfig, out []float64) {
 	sampler := o.sampler
 	lastSync := o.lastSync
 
+	// TODO: pull all the conditional logic out of the loop
+
 	for i := range out {
 		dc := o.options.DefaultDutyCycle
 		if len(dcs) > 0 {
@@ -90,6 +92,8 @@ func (o *Osc) Gen(ctx context.Context, cfg ugen.SampleConfig, out []float64) {
 			dPhase = (phases[i] - phase)
 			w = dPhase * float64(cfg.SampleRateHz)
 			phase = phases[i]
+			// keep in [0, 1)
+			phase -= math.Floor(phase)
 		}
 
 		out[i] = sampler.Sample(phase, dPhase, dc)
