@@ -144,8 +144,8 @@ func (s *Server) playGraph(g *graph.Graph) {
 	go gr.run()
 
 	if s.graphRunner != nil {
-		s.graphRunner.outputTo(nil)
-		s.fadeTo(gr)
+		// s.graphRunner.outputTo(nil)
+		// s.fadeTo(gr)
 		s.graphRunner.stop()
 	}
 	s.graphRunner = gr

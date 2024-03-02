@@ -1,0 +1,170 @@
+package mrat
+
+import (
+	"github.com/glojurelang/glojure/pkg/lang"
+)
+
+type (
+	Graph struct {
+		Nodes []Node
+		Edges []Edge
+	}
+
+	Node struct {
+		ID   string
+		Type string
+		Args any
+		Key  string
+		Sink bool
+	}
+
+	Edge struct {
+		From string
+		To   string
+		Port string
+	}
+
+	// GraphAlignment is a struct that represents the alignment of two
+	// graphs.
+	GraphAlignment struct {
+		NodeIdentities map[any]any
+	}
+)
+
+func SExprToGraph(sexpr any) *Graph {
+	g := &Graph{}
+	nodes := lang.Get(sexpr, nodesKW)
+	edges := lang.Get(sexpr, edgesKW)
+
+	for s := lang.Seq(nodes); s != nil; s = lang.Next(s) {
+		node := lang.First(s)
+		id, _ := lang.Get(node, idKW).(string)
+		typ, _ := lang.Get(node, typeKW).(lang.Keyword)
+		args := lang.Get(node, argsKW)
+		key, _ := lang.Get(node, keyKW).(string)
+		sink, _ := lang.Get(node, sinkKW).(bool)
+		g.Nodes = append(g.Nodes, Node{
+			ID:   id,
+			Type: typ.Name(),
+			Args: args,
+			Key:  key,
+			Sink: sink,
+		})
+	}
+
+	for s := lang.Seq(edges); s != nil; s = lang.Next(s) {
+	}
+
+	return g
+}
+
+func AlignGraphs(a, b *Graph) GraphAlignment {
+	identities := map[any]any{}
+
+	// these are the nodes not yet matched
+	aNodes := make([]Node, 0, len(a.Nodes))
+	bNodes := make([]Node, 0, len(b.Nodes))
+
+	// all constants are identical
+	aConstIDs := map[float64]any{}
+	for _, n := range a.Nodes {
+		if n.Type == "const" {
+			aConstIDs[lang.First(n.Args).(float64)] = n.ID
+		} else {
+			aNodes = append(aNodes, n)
+		}
+	}
+	// map constant nodes in b to constant nodes in a
+	for _, n := range b.Nodes {
+		if n.Type == "const" {
+			if id, ok := aConstIDs[lang.First(n.Args).(float64)]; ok {
+				identities[n.ID] = id
+			} // else no possible match, so don't add to bNodes
+		} else {
+			bNodes = append(bNodes, n)
+		}
+	}
+
+	// todo: match by key
+
+	// now, use the levenshtein distance algorithm to match the remaining nodes
+	// nodes are identical if their type and args are equal
+	type dist struct {
+		dist int
+		eq   bool
+	}
+	// create a grid of distances
+	//
+	// the distance between two nodes is the minimum number of
+	// insertions, deletions, and substitutions to transform one
+	// sequence of nodes into the other.
+	//
+	// the rows of the grid are the nodes of a, and the columns are the
+	// nodes of b.
+	//
+	// dist(a[:i], b[:j]) is in grid[i][j]
+	grid := make([][]dist, len(aNodes)+1)
+	for i := range grid {
+		grid[i] = make([]dist, len(bNodes)+1)
+	}
+	for i := range grid {
+		grid[i][0] = dist{dist: i}
+	}
+	for i := range grid[0] {
+		grid[0][i] = dist{dist: i}
+	}
+	for i := 1; i <= len(aNodes); i++ {
+		for j := 1; j <= len(bNodes); j++ {
+			if aNodes[i-1].Type == bNodes[j-1].Type && lang.Equals(aNodes[i-1].Args, bNodes[j-1].Args) {
+				grid[i][j] = grid[i-1][j-1]
+				grid[i][j].eq = true
+			} else {
+				grid[i][j] = dist{dist: 1 + min3(
+					grid[i-1][j].dist,
+					grid[i][j-1].dist,
+					grid[i-1][j-1].dist,
+				)}
+			}
+		}
+	}
+	// now collect the matches
+	for i, j := len(aNodes), len(bNodes); i > 0 && j > 0; {
+		if grid[i][j].eq {
+			identities[bNodes[j-1].ID] = aNodes[i-1].ID
+			i--
+			j--
+		} else if grid[i][j].dist == grid[i-1][j].dist+1 {
+			i--
+		} else if grid[i][j].dist == grid[i][j-1].dist+1 {
+			j--
+		} else {
+			i--
+			j--
+		}
+	}
+
+	return GraphAlignment{
+		NodeIdentities: identities,
+	}
+}
+
+func seqToSlice(s any) []any {
+	var res []any
+	for s := lang.Seq(s); s != nil; s = lang.Next(s) {
+		res = append(res, lang.First(s))
+	}
+	return res
+}
+
+func min3(a, b, c int) int {
+	if a < b {
+		if a < c {
+			return a
+		}
+		return c
+	}
+	if b < c {
+		return b
+	}
+	return c
+}

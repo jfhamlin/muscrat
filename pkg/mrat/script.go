@@ -32,6 +32,7 @@ var (
 	fromKW  = lang.NewKeyword("from")
 	toKW    = lang.NewKeyword("to")
 	portKW  = lang.NewKeyword("port")
+	keyKW   = lang.NewKeyword("key")
 )
 
 func EvalScript(filename string) (res *graph.Graph, err error) {
@@ -75,6 +76,9 @@ func EvalScript(filename string) (res *graph.Graph, err error) {
 	simplifyGraph := glj.Var("mrat.graph", "simplify-graph")
 	g := simplifyGraph.Invoke(graphAtom.Deref())
 
+	// fmt.Println("graph")
+	// fmt.Println(g)
+
 	nodes := lang.Get(g, nodesKW)
 	for s := lang.Seq(nodes); s != nil; s = lang.Next(s) {
 		node := lang.First(s)
@@ -108,13 +112,6 @@ func EvalScript(filename string) (res *graph.Graph, err error) {
 
 		res.AddEdge(nodeMap[from], nodeMap[to], port)
 	}
-
-	// fmt.Println(nodeMap)
-
-	// fmt.Println("nodes:", lang.Count(nodes))
-	// fmt.Println("edges:", lang.Count(edges))
-	// fmt.Println("edges:", edges)
-	//	panic("done")
 
 	return res, nil
 }
