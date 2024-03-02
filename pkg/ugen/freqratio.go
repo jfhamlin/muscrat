@@ -27,6 +27,8 @@ func NewFreqRatio(typ string) UGen {
 			out[i] = 1
 		}
 		for _, s := range cfg.InputSamples {
+			// index the last element of s to lift the bounds check
+			_ = s[len(out)-1]
 			for i := range out {
 				out[i] *= math.Pow(base, s[i]/divisor)
 			}
