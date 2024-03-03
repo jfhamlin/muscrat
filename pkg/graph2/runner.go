@@ -2,22 +2,27 @@ package graph2
 
 import (
 	"context"
-	"fmt"
 	"os"
 	"runtime"
 	"strconv"
 	"sync"
 
+	"github.com/glojurelang/glojure/pkg/lang"
 	"github.com/jfhamlin/muscrat/pkg/conf"
+	"github.com/jfhamlin/muscrat/pkg/ugen"
 )
 
 type (
 	Runner struct {
+		sampleConfig ugen.SampleConfig
+
 		g *Graph
 
 		nextID runNodeID
 
 		epochChan chan runEpoch
+
+		nextOut [][]float64
 
 		out chan [][]float64
 
@@ -33,6 +38,10 @@ type (
 	runNode struct {
 		id runNodeID
 
+		gen ugen.UGen
+
+		inputSampleMap map[string][]float64
+
 		// edges whose destination is this node
 		incomingEdges []*Edge
 
@@ -42,10 +51,12 @@ type (
 		dependencies map[runNodeID]struct{}
 
 		node *Node
+
+		value []float64
 	}
 
 	runState struct {
-		nodeInfo []runNode
+		nodes []runNode
 
 		// nodeOrder is a topological-ish ordering of the nodes in the
 		// graph, excluding nodes that are not ancestors of any
@@ -71,10 +82,16 @@ var (
 	}()
 )
 
-func NewRunner(out chan [][]float64) *Runner {
+func NewRunner(cfg ugen.SampleConfig, out chan [][]float64) *Runner {
+	nextOut := make([][]float64, 2)
+	for i := range nextOut {
+		nextOut[i] = make([]float64, conf.BufferSize)
+	}
 	return &Runner{
-		epochChan: make(chan runEpoch),
-		out:       out,
+		sampleConfig: cfg,
+		epochChan:    make(chan runEpoch),
+		nextOut:      nextOut,
+		out:          out,
 	}
 }
 
@@ -90,9 +107,9 @@ func (r *Runner) SetGraph(g *Graph) {
 	rs := r.newRunState(g)
 
 	makeRunFunc := func(nid runNodeID) Job {
+		node := rs.NodeByID(nid)
 		return func(ctx context.Context) {
-			node := rs.NodeByID(nid)
-			node.run(ctx)
+			node.run(ctx, r.sampleConfig)
 		}
 	}
 
@@ -102,8 +119,8 @@ func (r *Runner) SetGraph(g *Graph) {
 		items[nid] = q.AddItem(makeRunFunc(nid))
 	}
 	for nid, item := range items {
-		info := rs.NodeByID(nid)
-		for depID := range info.dependencies {
+		node := rs.NodeByID(nid)
+		for depID := range node.dependencies {
 			depItem := items[depID]
 			depItem.AddSuccessor(item)
 		}
@@ -124,7 +141,6 @@ func (r *Runner) Run(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case nxt := <-r.epochChan:
-			fmt.Println("running new epoch")
 			go q.Stop()
 			q = nxt.q
 		default:
@@ -134,11 +150,14 @@ func (r *Runner) Run(ctx context.Context) {
 			break
 		}
 
-		zero := make([][]float64, 2)
-		for i := range zero {
-			zero[i] = make([]float64, conf.BufferSize)
+		// copy the output buffer to the output channel
+		outputBuffer := make([][]float64, len(r.nextOut))
+		for i, out := range r.nextOut {
+			outputBuffer[i] = make([]float64, len(out))
+			copy(outputBuffer[i], out)
 		}
-		r.out <- zero
+
+		r.out <- outputBuffer
 	}
 }
 
@@ -198,7 +217,7 @@ func (r *Runner) newRunState(g *Graph) *runState {
 	}
 
 	rs := &runState{
-		nodeInfo:     make([]runNode, len(order)),
+		nodes:        make([]runNode, len(order)),
 		nodeOrder:    order,
 		nodeIndexMap: make(map[runNodeID]int),
 	}
@@ -209,19 +228,47 @@ func (r *Runner) newRunState(g *Graph) *runState {
 	}
 
 	for i, id := range order {
-		info := &rs.nodeInfo[i]
+		node := &rs.nodes[i]
 
-		info.id = id
+		node.id = id
+
+		graphNode := nodeMap[id]
+		node.node = graphNode
+		// if a node of type out, we don't need to construct a UGen
+		if graphNode.Type == "out" {
+			// get the index of the out node
+			idx := lang.First(graphNode.Args).(int64)
+			node.gen = ugen.UGenFunc(func(ctx context.Context, cfg ugen.SampleConfig, _ []float64) {
+				out := r.nextOut[int(idx)]
+				clear(out)
+				for _, in := range cfg.InputSamples {
+					_ = in[len(out)-1]
+					for i := range out {
+						out[i] += in[i]
+					}
+				}
+			})
+		} else {
+			node.gen = graphNode.Construct()
+		}
+		node.value = make([]float64, conf.BufferSize)
 		predecessorNodes := map[runNodeID]struct{}{}
 		incoming := incomingEdges[id]
-		info.incomingEdges = incoming
+		node.incomingEdges = incoming
 		for _, e := range incoming {
 			predecessorNodes[getID(e.From)] = struct{}{}
 		}
-		info.dependencies = predecessorNodes
-		node := nodeMap[id]
-		info.node = node
+		node.dependencies = predecessorNodes
 		rs.nodeIndexMap[id] = i
+	}
+	// initialize the inputSampleMap
+	for i := range rs.nodes {
+		n := &rs.nodes[i]
+		n.inputSampleMap = make(map[string][]float64)
+		for _, e := range n.incomingEdges {
+			inNode := rs.NodeByID(getID(e.From))
+			n.inputSampleMap[e.Port] = inNode.value
+		}
 	}
 
 	bootstrapCycles(rs)
@@ -234,11 +281,11 @@ func (rs *runState) NodeByID(id runNodeID) *runNode {
 	if index < 0 {
 		return nil
 	}
-	return &rs.nodeInfo[index]
+	return &rs.nodes[index]
 }
 
 func bootstrapCycles(rs *runState) {
-	for _, info := range rs.nodeInfo {
+	for _, info := range rs.nodes {
 		if info.node.Sink {
 			visited := make(map[runNodeID]struct{})
 			prepCyclesDFS(rs, info.id, visited)
@@ -262,6 +309,12 @@ func prepCyclesDFS(rs *runState, nodeID runNodeID, visited map[runNodeID]struct{
 	}
 }
 
-func (rn *runNode) run(ctx context.Context) {
-	return
+func (rn *runNode) run(ctx context.Context, cfg ugen.SampleConfig) {
+	if rn.gen == nil {
+		return
+	}
+
+	clear(rn.value)
+	cfg.InputSamples = rn.inputSampleMap
+	rn.gen.Gen(ctx, cfg, rn.value)
 }

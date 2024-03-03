@@ -73,42 +73,6 @@ func EvalScript(filename string) (res *graph2.Graph, err error) {
 	simplifyGraph := glj.Var("mrat.graph", "simplify-graph")
 	g := simplifyGraph.Invoke(graphAtom.Deref())
 	return graph2.SExprToGraph(g), nil
-
-	// nodes := lang.Get(g, nodesKW)
-	// for s := lang.Seq(nodes); s != nil; s = lang.Next(s) {
-	// 	node := lang.First(s)
-	// 	id, nodeID, err := addNode(res, node)
-	// 	if err != nil {
-	// 		return nil, err
-	// 	}
-	// 	nodeMap[id] = nodeID
-	// }
-
-	// edges := lang.Get(g, edgesKW)
-	// for s := lang.Seq(edges); s != nil; s = lang.Next(s) {
-	// 	edge := lang.First(s)
-	// 	fromVal := lang.Get(edge, fromKW)
-	// 	from, ok := fromVal.(string)
-	// 	if !ok {
-	// 		return nil, fmt.Errorf("edge 'from' must be a string, got %T", fromVal)
-	// 	}
-	// 	toVal := lang.Get(edge, toKW)
-	// 	to, ok := toVal.(string)
-	// 	if !ok {
-	// 		return nil, fmt.Errorf("edge 'to' must be a string, got %T", toVal)
-	// 	}
-	// 	portVal := lang.Get(edge, portKW)
-	// 	port, ok := portVal.(string)
-	// 	if !ok {
-	// 		return nil, fmt.Errorf("edge 'port' must be a string, got %T", portVal)
-	// 	}
-
-	// 	//fmt.Printf("from: %s, to: %s, port: %s\n", from, to, port)
-
-	// 	res.AddEdge(nodeMap[from], nodeMap[to], port)
-	// }
-
-	// return res, nil
 }
 
 func addNode(g *graph.Graph, node any) (string, graph.NodeID, error) {

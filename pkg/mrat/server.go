@@ -16,6 +16,7 @@ import (
 	"github.com/jfhamlin/muscrat/pkg/graph2"
 	"github.com/jfhamlin/muscrat/pkg/pubsub"
 	"github.com/jfhamlin/muscrat/pkg/stdlib"
+	"github.com/jfhamlin/muscrat/pkg/ugen"
 
 	"github.com/jfhamlin/muscrat/pkg/audio"
 
@@ -82,7 +83,9 @@ func NewServer(msgChan chan<- *ServerMessage) *Server {
 		targetGain:    1,
 		outputChannel: out,
 		msgChan:       msgChan,
-		runner:        graph2.NewRunner(out),
+		runner: graph2.NewRunner(ugen.SampleConfig{
+			SampleRateHz: conf.SampleRate,
+		}, out),
 	}
 }
 
@@ -144,17 +147,6 @@ func (s *Server) SetGain(gain float64) {
 
 func (s *Server) playGraph(g *graph2.Graph) {
 	s.runner.SetGraph(g)
-
-	// gr := s.newGraphRunner(s.ctx, g)
-	// go gr.run()
-
-	// if s.graphRunner != nil {
-	// 	// s.graphRunner.outputTo(nil)
-	// 	// s.fadeTo(gr)
-	// 	s.graphRunner.stop()
-	// }
-	// s.graphRunner = gr
-	// gr.outputTo(s.outputChannel)
 }
 
 func (s *Server) sendSamples() {
