@@ -1,6 +1,10 @@
 package graph2
 
-import "github.com/glojurelang/glojure/pkg/lang"
+import (
+	"reflect"
+
+	"github.com/glojurelang/glojure/pkg/lang"
+)
 
 type (
 	// GraphAlignment is a struct that represents the alignment of two
@@ -67,7 +71,7 @@ func AlignGraphs(a, b *Graph) GraphAlignment {
 	}
 	for i := 1; i <= len(aNodes); i++ {
 		for j := 1; j <= len(bNodes); j++ {
-			if aNodes[i-1].Type == bNodes[j-1].Type && lang.Equals(aNodes[i-1].Args, bNodes[j-1].Args) {
+			if aNodes[i-1].Type == bNodes[j-1].Type && seqsEqual(aNodes[i-1].Args, bNodes[j-1].Args) {
 				grid[i][j] = grid[i-1][j-1]
 				grid[i][j].eq = true
 			} else {
@@ -119,4 +123,40 @@ func min3(a, b, c int) int {
 		return b
 	}
 	return c
+}
+
+// seqsEqual returns true if the two sequences are equal.
+// We wrap lang.Equals to add support for comparing slices, which
+// are not comparable in Glojure.
+func seqsEqual(a, b any) bool {
+	seqA := lang.Seq(a)
+	seqB := lang.Seq(b)
+	for {
+		if seqA == nil {
+			return seqB == nil
+		}
+		if seqB == nil {
+			return false
+		}
+		firstA := lang.First(seqA)
+		firstB := lang.First(seqB)
+		kindA := reflect.TypeOf(firstA).Kind()
+		kindB := reflect.TypeOf(firstB).Kind()
+		if kindA == reflect.Slice || kindB == reflect.Slice {
+			if kindA != kindB {
+				return false
+			}
+			if !reflect.DeepEqual(firstA, firstB) {
+				return false
+			}
+		} else {
+			if !lang.Equals(firstA, firstB) {
+				return false
+			}
+		}
+
+		seqA = lang.Next(seqA)
+		seqB = lang.Next(seqB)
+	}
+	return true
 }
