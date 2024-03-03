@@ -1,72 +1,16 @@
-package mrat
+package graph2
 
-import (
-	"github.com/glojurelang/glojure/pkg/lang"
-)
-
-type (
-	Graph struct {
-		Nodes []Node
-		Edges []Edge
-	}
-
-	Node struct {
-		ID   string
-		Type string
-		Args any
-		Key  string
-		Sink bool
-	}
-
-	Edge struct {
-		From string
-		To   string
-		Port string
-	}
-
-	// GraphAlignment is a struct that represents the alignment of two
-	// graphs.
-	GraphAlignment struct {
-		NodeIdentities map[any]any
-	}
-)
-
-func SExprToGraph(sexpr any) *Graph {
-	g := &Graph{}
-	nodes := lang.Get(sexpr, nodesKW)
-	edges := lang.Get(sexpr, edgesKW)
-
-	for s := lang.Seq(nodes); s != nil; s = lang.Next(s) {
-		node := lang.First(s)
-		id, _ := lang.Get(node, idKW).(string)
-		typ, _ := lang.Get(node, typeKW).(lang.Keyword)
-		args := lang.Get(node, argsKW)
-		key, _ := lang.Get(node, keyKW).(string)
-		sink, _ := lang.Get(node, sinkKW).(bool)
-		g.Nodes = append(g.Nodes, Node{
-			ID:   id,
-			Type: typ.Name(),
-			Args: args,
-			Key:  key,
-			Sink: sink,
-		})
-	}
-
-	for s := lang.Seq(edges); s != nil; s = lang.Next(s) {
-	}
-
-	return g
-}
+import "github.com/glojurelang/glojure/pkg/lang"
 
 func AlignGraphs(a, b *Graph) GraphAlignment {
-	identities := map[any]any{}
+	identities := map[NodeID]NodeID{}
 
 	// these are the nodes not yet matched
-	aNodes := make([]Node, 0, len(a.Nodes))
-	bNodes := make([]Node, 0, len(b.Nodes))
+	aNodes := make([]*Node, 0, len(a.Nodes))
+	bNodes := make([]*Node, 0, len(b.Nodes))
 
 	// all constants are identical
-	aConstIDs := map[float64]any{}
+	aConstIDs := map[float64]NodeID{}
 	for _, n := range a.Nodes {
 		if n.Type == "const" {
 			aConstIDs[lang.First(n.Args).(float64)] = n.ID

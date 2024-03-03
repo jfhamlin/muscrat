@@ -1,0 +1,267 @@
+package graph2
+
+import (
+	"context"
+	"fmt"
+	"os"
+	"runtime"
+	"strconv"
+	"sync"
+
+	"github.com/jfhamlin/muscrat/pkg/conf"
+)
+
+type (
+	Runner struct {
+		g *Graph
+
+		nextID runNodeID
+
+		epochChan chan runEpoch
+
+		out chan [][]float64
+
+		mtx sync.Mutex
+	}
+
+	runEpoch struct {
+		q *Queue
+	}
+
+	runNodeID int64
+
+	runNode struct {
+		id runNodeID
+
+		// edges whose destination is this node
+		incomingEdges []*Edge
+
+		// nodes that must be evaluated before this node. not all
+		// predecessors are made dependencies to eliminate dependency
+		// cycles.
+		dependencies map[runNodeID]struct{}
+
+		node *Node
+	}
+
+	runState struct {
+		nodeInfo []runNode
+
+		// nodeOrder is a topological-ish ordering of the nodes in the
+		// graph, excluding nodes that are not ancestors of any
+		// sink. Because the graphs can contain cycles, this ordering is
+		// not guaranteed to be a topological ordering.
+		nodeOrder    []runNodeID
+		nodeIndexMap map[runNodeID]int
+	}
+)
+
+var (
+	numWorkers = func() int {
+		nw := runtime.NumCPU() / 2
+		if workerEnvVar := os.Getenv("MUSCRAT_WORKERS"); workerEnvVar != "" {
+			if n, err := strconv.Atoi(workerEnvVar); err == nil {
+				nw = n
+			}
+		}
+		if nw < 1 {
+			nw = 1
+		}
+		return nw
+	}()
+)
+
+func NewRunner(out chan [][]float64) *Runner {
+	return &Runner{
+		epochChan: make(chan runEpoch),
+		out:       out,
+	}
+}
+
+func (r *Runner) getNextID() runNodeID {
+	r.nextID++
+	return r.nextID
+}
+
+func (r *Runner) SetGraph(g *Graph) {
+	r.mtx.Lock()
+	defer r.mtx.Unlock()
+
+	rs := r.newRunState(g)
+
+	makeRunFunc := func(nid runNodeID) Job {
+		return func(ctx context.Context) {
+			node := rs.NodeByID(nid)
+			node.run(ctx)
+		}
+	}
+
+	q := NewQueue(numWorkers)
+	items := map[runNodeID]*QueueItem{}
+	for _, nid := range rs.nodeOrder {
+		items[nid] = q.AddItem(makeRunFunc(nid))
+	}
+	for nid, item := range items {
+		info := rs.NodeByID(nid)
+		for depID := range info.dependencies {
+			depItem := items[depID]
+			depItem.AddSuccessor(item)
+		}
+	}
+
+	q.Start(context.Background())
+
+	r.g = g
+	r.epochChan <- runEpoch{q: q}
+}
+
+func (r *Runner) Run(ctx context.Context) {
+	q := NewQueue(1)
+	q.Start(ctx)
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case nxt := <-r.epochChan:
+			fmt.Println("running new epoch")
+			go q.Stop()
+			q = nxt.q
+		default:
+		}
+
+		if err := q.RunJobs(ctx); err != nil {
+			break
+		}
+
+		zero := make([][]float64, 2)
+		for i := range zero {
+			zero[i] = make([]float64, conf.BufferSize)
+		}
+		r.out <- zero
+	}
+}
+
+func (r *Runner) newRunState(g *Graph) *runState {
+	// build a topological-ish ordering of the nodes in the graph
+	// (excluding nodes that are not ancestors of any sink). Because
+	// the graphs can contain cycles, this ordering is not guaranteed
+	// to be a topological ordering.
+	//
+	// we do this by starting with the sinks and working backwards
+	// through the graph.
+	var (
+		visited       = make(map[runNodeID]bool)
+		order         []runNodeID
+		idMap         = map[NodeID]runNodeID{}
+		nodeMap       = map[runNodeID]*Node{}
+		incomingEdges = map[runNodeID][]*Edge{}
+	)
+	getID := func(id NodeID) runNodeID {
+		if n, ok := idMap[id]; ok {
+			return n
+		}
+		n := r.getNextID()
+		idMap[id] = n
+		return n
+	}
+	for _, n := range g.Nodes {
+		id := getID(n.ID)
+		nodeMap[id] = n
+	}
+	// initialize incomingEdges
+	for _, e := range g.Edges {
+		to := getID(e.To)
+		incomingEdges[to] = append(incomingEdges[to], e)
+	}
+
+	var q []runNodeID
+	for _, sink := range g.Sinks() {
+		q = append(q, getID(sink.ID))
+	}
+	for len(q) > 0 {
+		n := q[0]
+		q = q[1:]
+		if visited[n] {
+			continue
+		}
+		visited[n] = true
+		order = append(order, n)
+		for _, e := range incomingEdges[n] {
+			q = append(q, getID(e.From))
+		}
+	}
+	// reverse the order
+	for i := 0; i < len(order)/2; i++ {
+		j := len(order) - i - 1
+		order[i], order[j] = order[j], order[i]
+	}
+
+	rs := &runState{
+		nodeInfo:     make([]runNode, len(order)),
+		nodeOrder:    order,
+		nodeIndexMap: make(map[runNodeID]int),
+	}
+	for i := range rs.nodeIndexMap {
+		// initialize to -1 so that we can detect nodes that are not
+		// ancestors of any sink.
+		rs.nodeIndexMap[i] = -1
+	}
+
+	for i, id := range order {
+		info := &rs.nodeInfo[i]
+
+		info.id = id
+		predecessorNodes := map[runNodeID]struct{}{}
+		incoming := incomingEdges[id]
+		info.incomingEdges = incoming
+		for _, e := range incoming {
+			predecessorNodes[getID(e.From)] = struct{}{}
+		}
+		info.dependencies = predecessorNodes
+		node := nodeMap[id]
+		info.node = node
+		rs.nodeIndexMap[id] = i
+	}
+
+	bootstrapCycles(rs)
+
+	return rs
+}
+
+func (rs *runState) NodeByID(id runNodeID) *runNode {
+	index := rs.nodeIndexMap[id]
+	if index < 0 {
+		return nil
+	}
+	return &rs.nodeInfo[index]
+}
+
+func bootstrapCycles(rs *runState) {
+	for _, info := range rs.nodeInfo {
+		if info.node.Sink {
+			visited := make(map[runNodeID]struct{})
+			prepCyclesDFS(rs, info.id, visited)
+		}
+	}
+}
+
+func prepCyclesDFS(rs *runState, nodeID runNodeID, visited map[runNodeID]struct{}) {
+	visited[nodeID] = struct{}{}
+	defer delete(visited, nodeID)
+
+	info := rs.NodeByID(nodeID)
+	for from := range info.dependencies {
+		if _, ok := visited[from]; ok {
+			// cycle detected
+			// remove the dependency
+			delete(info.dependencies, from)
+			continue
+		}
+		prepCyclesDFS(rs, from, visited)
+	}
+}
+
+func (rn *runNode) run(ctx context.Context) {
+	return
+}

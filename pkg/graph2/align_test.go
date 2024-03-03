@@ -1,4 +1,4 @@
-package mrat
+package graph2
 
 import (
 	"reflect"
@@ -42,7 +42,7 @@ func TestAlignGraphs(t *testing.T) {
 `),
 			},
 			want: GraphAlignment{
-				NodeIdentities: map[any]any{
+				NodeIdentities: map[NodeID]NodeID{
 					"10": "1",
 					"20": "2",
 					"30": "3",
