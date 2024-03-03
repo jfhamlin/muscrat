@@ -2,6 +2,7 @@ package graph2
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"runtime"
 	"strconv"
@@ -16,7 +17,8 @@ type (
 	Runner struct {
 		sampleConfig ugen.SampleConfig
 
-		g *Graph
+		g  *Graph
+		rs *runState
 
 		nextID runNodeID
 
@@ -129,6 +131,7 @@ func (r *Runner) SetGraph(g *Graph) {
 	q.Start(context.Background())
 
 	r.g = g
+	r.rs = rs
 	r.epochChan <- runEpoch{q: q}
 }
 
@@ -234,24 +237,49 @@ func (r *Runner) newRunState(g *Graph) *runState {
 
 		graphNode := nodeMap[id]
 		node.node = graphNode
-		// if a node of type out, we don't need to construct a UGen
-		if graphNode.Type == "out" {
-			// get the index of the out node
-			idx := lang.First(graphNode.Args).(int64)
-			node.gen = ugen.UGenFunc(func(ctx context.Context, cfg ugen.SampleConfig, _ []float64) {
-				out := r.nextOut[int(idx)]
-				clear(out)
-				for _, in := range cfg.InputSamples {
-					_ = in[len(out)-1]
-					for i := range out {
-						out[i] += in[i]
-					}
-				}
-			})
-		} else {
-			node.gen = graphNode.Construct()
+
+		var alignment GraphAlignment
+		if r.g != nil {
+			alignment = AlignGraphs(r.g, g)
 		}
-		node.value = make([]float64, conf.BufferSize)
+		if targetID, ok := alignment.NodeIdentities[graphNode.ID]; ok {
+			// find the target node in previous run state, and
+			// copy the UGen and value
+			var tgt *runNode
+			for i := range r.rs.nodes {
+				n := &r.rs.nodes[i]
+				if n.node.ID != targetID {
+					continue
+				}
+				tgt = &r.rs.nodes[i]
+				break
+			}
+			if tgt == nil {
+				panic(fmt.Sprintf("target node not found: %v", targetID))
+			}
+			node.gen = tgt.gen
+			node.value = tgt.value
+		} else {
+			// if a node of type out, we don't need to construct a UGen
+			if graphNode.Type == "out" {
+				// get the index of the out node
+				idx := lang.First(graphNode.Args).(int64)
+				node.gen = ugen.UGenFunc(func(ctx context.Context, cfg ugen.SampleConfig, _ []float64) {
+					out := r.nextOut[int(idx)]
+					clear(out)
+					for _, in := range cfg.InputSamples {
+						_ = in[len(out)-1]
+						for i := range out {
+							out[i] += in[i]
+						}
+					}
+				})
+			} else {
+				node.gen = graphNode.Construct()
+			}
+			node.value = make([]float64, conf.BufferSize)
+		}
+
 		predecessorNodes := map[runNodeID]struct{}{}
 		incoming := incomingEdges[id]
 		node.incomingEdges = incoming

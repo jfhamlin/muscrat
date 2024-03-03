@@ -2,6 +2,14 @@ package graph2
 
 import "github.com/glojurelang/glojure/pkg/lang"
 
+type (
+	// GraphAlignment is a struct that represents the alignment of two
+	// graphs.
+	GraphAlignment struct {
+		NodeIdentities map[NodeID]NodeID
+	}
+)
+
 func AlignGraphs(a, b *Graph) GraphAlignment {
 	identities := map[NodeID]NodeID{}
 

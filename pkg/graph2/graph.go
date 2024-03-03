@@ -27,12 +27,6 @@ type (
 		To   NodeID
 		Port string
 	}
-
-	// GraphAlignment is a struct that represents the alignment of two
-	// graphs.
-	GraphAlignment struct {
-		NodeIdentities map[NodeID]NodeID
-	}
 )
 
 var (
