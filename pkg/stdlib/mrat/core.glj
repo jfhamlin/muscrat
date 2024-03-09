@@ -1049,10 +1049,10 @@
                opts)
         dev (apply NewMIDIInputDevice name opts)]
     (case typ
-      :note     (map #(do {:note (add-node! (.Note dev %) "midi-note")
-                           :onoff (add-node! (.Gate dev %) "midi-gate")})
+      :note     (map (fn [i] {:note (add-node! :midi-in-note #(.Note %1 %2) :args [dev i])
+                              :onoff (add-node! :midi-in-gate  #(.Gate %1 %2) :args [dev i])})
                      (range num-voices))
-      :cc (add-node! (.Control dev) "midi-cc")
+      :cc (add-node! :midi-in-cc #(.Control %) :args [dev])
       (throw (fmt.Errorf "unsupported midi-in type: %s" typ))
       )))
 

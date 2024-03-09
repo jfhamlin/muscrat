@@ -31,7 +31,8 @@ type (
 	}
 
 	runEpoch struct {
-		q *Queue
+		q      *Queue
+		prevRS *runState
 	}
 
 	runNodeID int64
@@ -54,6 +55,8 @@ type (
 		node *Node
 
 		value []float64
+
+		retained bool
 	}
 
 	runState struct {
@@ -130,8 +133,12 @@ func (r *Runner) SetGraph(g *Graph) {
 	q.Start(context.Background())
 
 	r.g = g
+	prevRS := r.rs
 	r.rs = rs
-	r.epochChan <- runEpoch{q: q}
+	r.epochChan <- runEpoch{
+		q:      q,
+		prevRS: prevRS,
+	}
 }
 
 func (r *Runner) Run(ctx context.Context) {
@@ -144,6 +151,21 @@ func (r *Runner) Run(ctx context.Context) {
 			return
 		case nxt := <-r.epochChan:
 			go q.Stop()
+			prevRS := nxt.prevRS
+			if prevRS != nil {
+				go func() {
+					// stop nodes that are no longer in the graph
+					for i := range prevRS.nodes {
+						n := &prevRS.nodes[i]
+						if n.retained {
+							continue
+						}
+						if s, ok := n.gen.(ugen.Stopper); ok {
+							s.Stop(ctx)
+						}
+					}
+				}()
+			}
 			q = nxt.q
 		default:
 		}
@@ -257,6 +279,7 @@ func (r *Runner) newRunState(g *Graph) *runState {
 			if tgt != nil {
 				node.gen = tgt.gen
 				node.value = tgt.value
+				tgt.retained = true
 				nodeFound = true
 			}
 		}
@@ -277,6 +300,9 @@ func (r *Runner) newRunState(g *Graph) *runState {
 				})
 			} else {
 				node.gen = graphNode.Construct()
+				if s, ok := node.gen.(ugen.Starter); ok {
+					s.Start(context.Background())
+				}
 			}
 			node.value = make([]float64, conf.BufferSize)
 		}
