@@ -2,7 +2,6 @@ package graph2
 
 import (
 	"context"
-	"fmt"
 	"os"
 	"runtime"
 	"strconv"
@@ -242,6 +241,7 @@ func (r *Runner) newRunState(g *Graph) *runState {
 		if r.g != nil {
 			alignment = AlignGraphs(r.g, g)
 		}
+		var nodeFound bool
 		if targetID, ok := alignment.NodeIdentities[graphNode.ID]; ok {
 			// find the target node in previous run state, and
 			// copy the UGen and value
@@ -254,12 +254,13 @@ func (r *Runner) newRunState(g *Graph) *runState {
 				tgt = &r.rs.nodes[i]
 				break
 			}
-			if tgt == nil {
-				panic(fmt.Sprintf("target node not found: %v", targetID))
+			if tgt != nil {
+				node.gen = tgt.gen
+				node.value = tgt.value
+				nodeFound = true
 			}
-			node.gen = tgt.gen
-			node.value = tgt.value
-		} else {
+		}
+		if !nodeFound {
 			// if a node of type out, we don't need to construct a UGen
 			if graphNode.Type == "out" {
 				// get the index of the out node

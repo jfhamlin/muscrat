@@ -11,12 +11,18 @@ func NewSequencer() ugen.UGen {
 	lastTrig := 1.0
 	return ugen.UGenFunc(func(ctx context.Context, cfg ugen.SampleConfig, out []float64) {
 		trigs := cfg.InputSamples["trigger"]
-		freqs := ugen.CollectIndexedInputs(cfg)
+		vals := ugen.CollectIndexedInputs(cfg)
+		if len(vals) == 0 {
+			return
+		}
+		if index >= len(vals) {
+			index = 0
+		}
 		for i := range out {
 			if trigs[i] > 0.0 && lastTrig <= 0.0 {
-				index = (index + 1) % len(freqs)
+				index = (index + 1) % len(vals)
 			}
-			out[i] = freqs[index][i]
+			out[i] = vals[index][i]
 			lastTrig = trigs[i]
 		}
 	})
