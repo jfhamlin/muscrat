@@ -1,8 +1,5 @@
 (ns mrat.core
   (:import (github.com$glojurelang$glojure$pkg$lang *Ratio *BigInt)
-           (github.com$jfhamlin$muscrat$pkg$graph Node
-                                                  WithLabel
-                                                  WithSink)
            (github.com$jfhamlin$muscrat$pkg$ugen NewConstant
                                                  NewSum
                                                  NewProduct

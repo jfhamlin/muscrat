@@ -1,2 +1,0 @@
-go test fuzz v1
-[]byte("{\n       \"nodeCount\": 4,\n       \"edges\": [{\"from\": 0, \"to\": 1}, {\"from\": 1, \"\x9b\x9b\x9b\x9b\x9bto\": 2}, {\"Urom\": 2, \"to\": 1}, {\"rom\": 2, \"to\": 3}],\n       \"outNode\": 3\n     }")

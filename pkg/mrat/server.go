@@ -13,7 +13,7 @@ import (
 	"github.com/jfhamlin/muscrat/pkg/bufferpool"
 	"github.com/jfhamlin/muscrat/pkg/conf"
 	"github.com/jfhamlin/muscrat/pkg/gen/gljimports"
-	"github.com/jfhamlin/muscrat/pkg/graph2"
+	"github.com/jfhamlin/muscrat/pkg/graph"
 	"github.com/jfhamlin/muscrat/pkg/pubsub"
 	"github.com/jfhamlin/muscrat/pkg/stdlib"
 	"github.com/jfhamlin/muscrat/pkg/ugen"
@@ -53,7 +53,7 @@ type (
 		gain       float64
 		targetGain float64
 
-		runner *graph2.Runner
+		runner *graph.Runner
 
 		// channel for raw, unprocessed output samples.
 		// one []float64 per audio channel.
@@ -83,7 +83,7 @@ func NewServer(msgChan chan<- *ServerMessage) *Server {
 		targetGain:    1,
 		outputChannel: out,
 		msgChan:       msgChan,
-		runner: graph2.NewRunner(ugen.SampleConfig{
+		runner: graph.NewRunner(ugen.SampleConfig{
 			SampleRateHz: conf.SampleRate,
 		}, out),
 	}
@@ -145,7 +145,7 @@ func (s *Server) SetGain(gain float64) {
 
 ////////////////////////////////////////////////////////////////////////////////
 
-func (s *Server) playGraph(g *graph2.Graph) {
+func (s *Server) playGraph(g *graph.Graph) {
 	s.runner.SetGraph(g)
 }
 
@@ -211,8 +211,8 @@ func (s *Server) sendSamples() {
 
 ////////////////////////////////////////////////////////////////////////////////
 
-func zeroGraph() *graph2.Graph {
-	return graph2.SExprToGraph(glj.Read(`
+func zeroGraph() *graph.Graph {
+	return graph.SExprToGraph(glj.Read(`
 		{:nodes ({:id "3", :type :out, :ctor nil, :args [0], :key nil, :sink true}
              {:id "4", :type :out, :ctor nil, :args [1], :key nil, :sink true})}
 `))

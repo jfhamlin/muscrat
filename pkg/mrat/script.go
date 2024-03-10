@@ -13,8 +13,6 @@ import (
 	"github.com/glojurelang/glojure/pkg/runtime"
 
 	"github.com/jfhamlin/muscrat/pkg/graph"
-	"github.com/jfhamlin/muscrat/pkg/graph2"
-	"github.com/jfhamlin/muscrat/pkg/ugen"
 )
 
 var (
@@ -35,7 +33,7 @@ var (
 	keyKW   = lang.NewKeyword("key")
 )
 
-func EvalScript(filename string) (res *graph2.Graph, err error) {
+func EvalScript(filename string) (res *graph.Graph, err error) {
 	defer func() {
 		if r := recover(); r != nil {
 			err = fmt.Errorf("%v\n%s", r, debug.Stack())
@@ -72,39 +70,5 @@ func EvalScript(filename string) (res *graph2.Graph, err error) {
 	require.Invoke(glj.Read("mrat.graph"))
 	simplifyGraph := glj.Var("mrat.graph", "simplify-graph")
 	g := simplifyGraph.Invoke(graphAtom.Deref())
-	return graph2.SExprToGraph(g), nil
-}
-
-func addNode(g *graph.Graph, node any) (string, graph.NodeID, error) {
-	id := lang.Get(node, idKW)
-	typ := lang.Get(node, typeKW)
-	args := lang.Get(node, argsKW)
-	ctor := lang.Get(node, ctorKW)
-	sink := lang.Get(node, sinkKW)
-
-	//fmt.Printf("id: %s, type: %s, args: %d\n", id, typ, lang.Count(args))
-
-	var nodeID graph.NodeID
-	switch typ {
-	case outKW:
-		outNode := g.AddOutNode(graph.WithLabel(fmt.Sprintf("out %s", lang.First(args))))
-		nodeID = outNode.ID()
-	default:
-		var argsSlice []any
-		for s := lang.Seq(args); s != nil; s = lang.Next(s) {
-			argsSlice = append(argsSlice, lang.First(s))
-		}
-		gen, ok := lang.Apply(ctor, argsSlice).(ugen.UGen)
-		if !ok {
-			return "", nodeID, fmt.Errorf("no ugen provided for %s", typ)
-		}
-		opts := []graph.NodeOption{graph.WithLabel(fmt.Sprintf("%s", typ))}
-		if s, _ := sink.(bool); s {
-			opts = append(opts, graph.WithSink())
-		}
-
-		node := g.AddGeneratorNode(gen, opts...)
-		nodeID = node.ID()
-	}
-	return fmt.Sprintf("%s", id), nodeID, nil
+	return graph.SExprToGraph(g), nil
 }

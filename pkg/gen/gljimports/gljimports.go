@@ -93,26 +93,26 @@ func RegisterImports(_register func(string, interface{})) {
 
 	// package github.com/jfhamlin/muscrat/pkg/graph
 	////////////////////////////////////////
+	_register("github.com/jfhamlin/muscrat/pkg/graph.AlignGraphs", github_com_jfhamlin_muscrat_pkg_graph.AlignGraphs)
 	_register("github.com/jfhamlin/muscrat/pkg/graph.Edge", reflect.TypeOf((*github_com_jfhamlin_muscrat_pkg_graph.Edge)(nil)).Elem())
 	_register("github.com/jfhamlin/muscrat/pkg/graph.*Edge", reflect.TypeOf((*github_com_jfhamlin_muscrat_pkg_graph.Edge)(nil)))
-	_register("github.com/jfhamlin/muscrat/pkg/graph.GeneratorNode", reflect.TypeOf((*github_com_jfhamlin_muscrat_pkg_graph.GeneratorNode)(nil)).Elem())
-	_register("github.com/jfhamlin/muscrat/pkg/graph.*GeneratorNode", reflect.TypeOf((*github_com_jfhamlin_muscrat_pkg_graph.GeneratorNode)(nil)))
 	_register("github.com/jfhamlin/muscrat/pkg/graph.Graph", reflect.TypeOf((*github_com_jfhamlin_muscrat_pkg_graph.Graph)(nil)).Elem())
 	_register("github.com/jfhamlin/muscrat/pkg/graph.*Graph", reflect.TypeOf((*github_com_jfhamlin_muscrat_pkg_graph.Graph)(nil)))
+	_register("github.com/jfhamlin/muscrat/pkg/graph.GraphAlignment", reflect.TypeOf((*github_com_jfhamlin_muscrat_pkg_graph.GraphAlignment)(nil)).Elem())
+	_register("github.com/jfhamlin/muscrat/pkg/graph.*GraphAlignment", reflect.TypeOf((*github_com_jfhamlin_muscrat_pkg_graph.GraphAlignment)(nil)))
 	_register("github.com/jfhamlin/muscrat/pkg/graph.Job", reflect.TypeOf((*github_com_jfhamlin_muscrat_pkg_graph.Job)(nil)).Elem())
 	_register("github.com/jfhamlin/muscrat/pkg/graph.NewQueue", github_com_jfhamlin_muscrat_pkg_graph.NewQueue)
+	_register("github.com/jfhamlin/muscrat/pkg/graph.NewRunner", github_com_jfhamlin_muscrat_pkg_graph.NewRunner)
 	_register("github.com/jfhamlin/muscrat/pkg/graph.Node", reflect.TypeOf((*github_com_jfhamlin_muscrat_pkg_graph.Node)(nil)).Elem())
+	_register("github.com/jfhamlin/muscrat/pkg/graph.*Node", reflect.TypeOf((*github_com_jfhamlin_muscrat_pkg_graph.Node)(nil)))
 	_register("github.com/jfhamlin/muscrat/pkg/graph.NodeID", reflect.TypeOf((*github_com_jfhamlin_muscrat_pkg_graph.NodeID)(nil)).Elem())
-	_register("github.com/jfhamlin/muscrat/pkg/graph.NodeOption", reflect.TypeOf((*github_com_jfhamlin_muscrat_pkg_graph.NodeOption)(nil)).Elem())
-	_register("github.com/jfhamlin/muscrat/pkg/graph.OutNode", reflect.TypeOf((*github_com_jfhamlin_muscrat_pkg_graph.OutNode)(nil)).Elem())
-	_register("github.com/jfhamlin/muscrat/pkg/graph.*OutNode", reflect.TypeOf((*github_com_jfhamlin_muscrat_pkg_graph.OutNode)(nil)))
 	_register("github.com/jfhamlin/muscrat/pkg/graph.Queue", reflect.TypeOf((*github_com_jfhamlin_muscrat_pkg_graph.Queue)(nil)).Elem())
 	_register("github.com/jfhamlin/muscrat/pkg/graph.*Queue", reflect.TypeOf((*github_com_jfhamlin_muscrat_pkg_graph.Queue)(nil)))
 	_register("github.com/jfhamlin/muscrat/pkg/graph.QueueItem", reflect.TypeOf((*github_com_jfhamlin_muscrat_pkg_graph.QueueItem)(nil)).Elem())
 	_register("github.com/jfhamlin/muscrat/pkg/graph.*QueueItem", reflect.TypeOf((*github_com_jfhamlin_muscrat_pkg_graph.QueueItem)(nil)))
-	_register("github.com/jfhamlin/muscrat/pkg/graph.SinkChan", reflect.TypeOf((*github_com_jfhamlin_muscrat_pkg_graph.SinkChan)(nil)).Elem())
-	_register("github.com/jfhamlin/muscrat/pkg/graph.WithLabel", github_com_jfhamlin_muscrat_pkg_graph.WithLabel)
-	_register("github.com/jfhamlin/muscrat/pkg/graph.WithSink", github_com_jfhamlin_muscrat_pkg_graph.WithSink)
+	_register("github.com/jfhamlin/muscrat/pkg/graph.Runner", reflect.TypeOf((*github_com_jfhamlin_muscrat_pkg_graph.Runner)(nil)).Elem())
+	_register("github.com/jfhamlin/muscrat/pkg/graph.*Runner", reflect.TypeOf((*github_com_jfhamlin_muscrat_pkg_graph.Runner)(nil)))
+	_register("github.com/jfhamlin/muscrat/pkg/graph.SExprToGraph", github_com_jfhamlin_muscrat_pkg_graph.SExprToGraph)
 
 	// package github.com/jfhamlin/muscrat/pkg/mod
 	////////////////////////////////////////

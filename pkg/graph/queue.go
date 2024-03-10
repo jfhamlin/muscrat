@@ -139,6 +139,11 @@ func (q *Queue) Stop() {
 }
 
 func (q *Queue) RunJobs(ctx context.Context) error {
+	numItems := len(q.items)
+	if numItems == 0 {
+		return nil
+	}
+
 	q.remainingItems.Store(int32(len(q.items)))
 
 	for _, item := range q.initiallyRunnable {
