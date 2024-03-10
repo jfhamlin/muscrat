@@ -13,6 +13,9 @@ pkgs.mkShell {
 
     pkgs.pkgconfig
 
+    # for icon generation
+    pkgs.imagemagick
+
     frameworks.Security
     frameworks.Cocoa
     frameworks.WebKit

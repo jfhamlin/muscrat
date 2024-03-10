@@ -922,10 +922,10 @@
   Supports the following file extensions: .wav, .aiff, .aif, .flac,"
   [kw]
   (letfn [(file-exists? [file] (some? (first (os.Stat file))))]
-    (let [supported-suffixes [".wav" ".aiff" ".aif" ".flac"]
-          sample-path (os.Getenv "MUSCRAT_SAMPLE_PATH")
-          sample-path (if sample-path
-                        (strings.Split sample-path ":"))
+    (let [supported-suffixes [".wav" ".aiff" ".aif" ".flac" ".mp3"]
+          sample-path (os.Getenv "MUSCRAT_SAMPLE_PATH") ;; TODO: get from config
+          sample-path (if (empty? sample-path) "../Resources/samples")
+          sample-path (strings.Split sample-path ":")
           sample-path (if (empty? sample-path)
                         (throw (errors.New "MUSCRAT_SAMPLE_PATH not set"))
                         sample-path)
