@@ -14,7 +14,7 @@ const (
 )
 
 var (
-	//go:embed assets/*
+	//go:embed assets
 	assetsFS embed.FS
 )
 
