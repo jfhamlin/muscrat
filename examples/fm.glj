@@ -27,10 +27,6 @@
             (->> mixolydian
                  (map #(+ D2 % octave))
                  (map midifreq)))))
-;; (def freq
-;;   (-> (+ (sequencer gate [D3 D2 D3 D3 D2])
-;;          (sequencer gate aeolian))
-;;       midifreq))
 
 (def op-conf
   ;; freq-ratio    amp  adsr               mod-indexes        feedback carrier
@@ -62,7 +58,7 @@
 
 (def sig
   (-> fm-out
-      (combc 0.5 0.5 4)
+      (combc 0.5 0.5 6)
       (* 0.25)
       (+ (play-buf :bd_ada
                    :loop false
