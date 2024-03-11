@@ -308,10 +308,12 @@
     ([1 4 6] [2 5 7] [3 4 8] [1 5 9])"
   [args]
   (let [colls (map #(if (seq-or-vec? %) % [%]) args)
-        max-len (apply max (map count colls))
+        colls-counts (map count colls)
+        max-len (apply max 0 colls-counts)
         colls (map #(take max-len (cycle %)) colls)]
-    (apply map vector colls)))
-
+    (if (empty? colls)
+      '([])
+      (apply map vector colls))))
 
 (defn- +-internal
   [& xs]
