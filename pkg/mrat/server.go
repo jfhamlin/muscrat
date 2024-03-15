@@ -63,9 +63,6 @@ type (
 
 		lastFileHash [32]byte
 
-		// output channel for server messages
-		msgChan chan<- *ServerMessage
-
 		started bool
 
 		mtx sync.RWMutex
@@ -76,13 +73,12 @@ type (
 	}
 )
 
-func NewServer(msgChan chan<- *ServerMessage) *Server {
+func NewServer() *Server {
 	out := make(chan [][]float64, 1)
 	return &Server{
 		gain:          1,
 		targetGain:    1,
 		outputChannel: out,
-		msgChan:       msgChan,
 		runner: graph.NewRunner(ugen.SampleConfig{
 			SampleRateHz: conf.SampleRate,
 		}, out),

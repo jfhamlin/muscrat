@@ -7,11 +7,13 @@ import {
 } from "./contexts/buffers";
 
 import Editor from "./components/Editor";
+import Toolbar from "./components/Toolbar";
 
 function App() {
     return (
       <BuffersProvider createStore={createBuffersStore}>
         <div id="App">
+          <Toolbar />
           <Editor />
         </div>
       </BuffersProvider>

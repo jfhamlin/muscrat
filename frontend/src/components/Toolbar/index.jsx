@@ -1,5 +1,6 @@
 import {
   OpenFileDialog,
+  PlayFile,
 } from "../../../wailsjs/go/main/App";
 
 import {
@@ -10,7 +11,7 @@ const Button = (props) => {
   const title = props.title;
   const onClick = props.onClick;
   return (
-    <button onClick={onClick}>{title}</button>
+    <button {...props}>{title}</button>
   );
 };
 
@@ -19,7 +20,6 @@ export default (props) => {
 
   const handleLoadClick = () => {
     OpenFileDialog().then((response) => {
-      console.log(response);
       const buffer = {
         fileName: response.FileName,
         content: response.Content,
@@ -30,9 +30,18 @@ export default (props) => {
     });
   };
 
+  const handlePlayClick = () => {
+    const selectedBufferName = buffersStore.selectedBufferName;
+    const buffer = buffersStore.buffers[selectedBufferName];
+    PlayFile(buffer.fileName);
+  };
+
   return (
     <div>
       <Button title="Load" onClick={handleLoadClick} />
+      <Button title="Play"
+              disabled={!buffersStore.selectedBufferName}
+              onClick={handlePlayClick} />
     </div>
   );
 };

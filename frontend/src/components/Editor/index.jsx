@@ -21,24 +21,6 @@ const DEFAULT_CODE = `(ns user
 (play (sin 200))
 `;
 
-const Button = (props) => {
-  const title = props.title;
-  const onClick = props.onClick;
-  return (
-    <button onClick={onClick}>{title}</button>
-  );
-};
-
-const Toolbar = (props) => {
-  const buffersStore = useBuffersStore();
-
-  return (
-    <div>
-      <Button title="Load" onClick={props.onLoad} />
-    </div>
-  );
-};
-
 export default (props) => {
   const buffersStore = useBuffersStore();
 
@@ -68,21 +50,8 @@ export default (props) => {
     buffersStore.updateBuffer(selectedBufferName, value);
   };
 
-  const handleLoadClick = () => {
-    OpenFileDialog().then((response) => {
-      const buffer = {
-        fileName: response.FileName,
-        content: response.Content,
-      };
-      buffersStore.addBuffer(buffer);
-    }).catch((err) => {
-      console.log(err);
-    });
-  };
-
   return (
     <div>
-      <Toolbar onLoad={handleLoadClick} />
       <Editor height="90vh"
               defaultLanguage="clojure"
               path={selectedBufferName}

@@ -44,14 +44,7 @@ func main() {
 		defer term.Restore(int(os.Stdin.Fd()), oldState)
 	}
 
-	msgs := make(chan *mrat.ServerMessage, 1)
-	go func() {
-		for msg := range msgs {
-			fmt.Println("[SERVER]", msg.Text)
-		}
-	}()
-
-	srv := mrat.NewServer(msgs)
+	srv := mrat.NewServer()
 	srv.Start(context.Background())
 
 	if err := srv.EvalScript(scriptFile); err != nil {

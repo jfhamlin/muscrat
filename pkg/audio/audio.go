@@ -79,6 +79,8 @@ func numBytesToNumSamples(numBytes uint32) int {
 // )
 
 func QueueAudioFloat64(fbuf []float64) error {
+	// TODO: just use the callback version
+
 	// if dur := time.Since(timeOfLastQueuedAudio); dur > time.Millisecond {
 	// 	fmt.Printf("time since last queued audio: %v\n", dur)
 	// }
