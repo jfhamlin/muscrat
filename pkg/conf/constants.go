@@ -14,7 +14,7 @@ var (
 	// BufferSize is the size of the buffer used for processing one
 	// block of samples.
 	BufferSize = func() int {
-		val := getValueInt("MUSCRAT_BUFFER_SIZE", 128)
+		val := getValueInt("MUSCRAT_BUFFER_SIZE", 512)
 		// if not a power of 2, round up to the next power of 2
 		if val&(val-1) != 0 {
 			leadingZeros := bits.LeadingZeros(uint(val))

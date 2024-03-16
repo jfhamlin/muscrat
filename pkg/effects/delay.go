@@ -40,6 +40,9 @@ func NewDelay(maxDelay float64, opts ...ugen.Option) ugen.UGen {
 	}
 
 	return ugen.UGenFunc(func(ctx context.Context, cfg ugen.SampleConfig, out []float64) {
+		// delay offset (i.e. min delay) is buffer size / sample rate
+		delayOffset := float64(len(out)) / float64(cfg.SampleRateHz)
+
 		if buf == nil {
 			sz := ugen.NextPowerOf2(int(math.Ceil(maxDelay*float64(cfg.SampleRateHz) + 1)))
 
@@ -51,7 +54,7 @@ func NewDelay(maxDelay float64, opts ...ugen.Option) ugen.UGen {
 		delays := cfg.InputSamples["delay"]
 
 		for i := range out {
-			delaySeconds := delays[i]
+			delaySeconds := delays[i] - delayOffset
 			if delaySeconds > maxDelay {
 				delaySeconds = maxDelay
 			}
