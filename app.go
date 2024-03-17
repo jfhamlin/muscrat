@@ -6,7 +6,9 @@ import (
 	"os"
 	"sync"
 
+	"github.com/jfhamlin/muscrat/pkg/conf"
 	"github.com/jfhamlin/muscrat/pkg/mrat"
+	"github.com/jfhamlin/muscrat/pkg/pubsub"
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
@@ -18,6 +20,8 @@ type (
 		srv            *mrat.Server
 		cancelPlayFile func()
 		playFileStop   chan struct{}
+
+		channelBuffers [][]float64
 
 		mtx sync.Mutex
 	}
@@ -42,6 +46,35 @@ func (a *App) startup(ctx context.Context) {
 	a.ctx = ctx
 
 	a.srv.Start(context.Background())
+
+	// send at ~15 times per second, in multiples of conf.BufferSize
+	maxBuffersSamples := conf.SampleRate / 15
+	// round to nearest multiple of conf.BufferSize
+	maxBuffersSamples = (maxBuffersSamples/conf.BufferSize + 1) * conf.BufferSize
+
+	pubsub.Subscribe("samples", func(event string, data any) {
+		if samples, ok := data.([][]float64); ok {
+			a.mtx.Lock()
+			if len(a.channelBuffers) != len(samples) {
+				a.channelBuffers = make([][]float64, len(samples))
+			}
+			for i := range samples {
+				a.channelBuffers[i] = append(a.channelBuffers[i], samples[i]...)
+			}
+			if len(a.channelBuffers[0]) >= maxBuffersSamples {
+				cpy := make([][]float64, len(a.channelBuffers))
+				for i := range a.channelBuffers {
+					cpy[i] = make([]float64, len(a.channelBuffers[i]))
+					copy(cpy[i], a.channelBuffers[i])
+				}
+				go runtime.EventsEmit(ctx, "samples", cpy)
+				for i := range a.channelBuffers {
+					a.channelBuffers[i] = a.channelBuffers[i][:0]
+				}
+			}
+			a.mtx.Unlock()
+		}
+	})
 }
 
 // OpenFileDialog opens a file dialog.

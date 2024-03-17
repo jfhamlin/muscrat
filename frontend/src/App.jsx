@@ -1,5 +1,8 @@
 import {useState} from 'react';
-import './App.css';
+
+import { EventsOn } from '../wailsjs/runtime';
+
+import logo from './assets/images/muscrat.svg';
 
 import {
   BuffersProvider,
@@ -8,16 +11,34 @@ import {
 
 import Editor from "./components/Editor";
 import Toolbar from "./components/Toolbar";
+import VolumeMeter from "./components/VolumeMeter";
 
 function App() {
-    return (
-      <BuffersProvider createStore={createBuffersStore}>
-        <div id="App">
+  const subscribeToSampleBuffer = (fn) => {
+    // subscribe to "sampels" with wails EventsOn
+    const unsubscribe = EventsOn("samples", (samples) => {
+      fn(samples);
+    });
+
+    return () => {
+      unsubscribe();
+    };
+  }
+
+  return (
+    <BuffersProvider createStore={createBuffersStore}>
+      <div className="flex flex-row">
+        <div className="flex flex-col items-center">
+          <img src={logo} className="w-32 max-w-32"/>
+          <VolumeMeter subscribeToSampleBuffer={subscribeToSampleBuffer} />
+        </div>
+        <div className="flex flex-col w-full">
           <Toolbar />
           <Editor />
         </div>
-      </BuffersProvider>
-    )
+      </div>
+    </BuffersProvider>
+  )
 }
 
 export default App;

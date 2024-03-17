@@ -59,8 +59,6 @@ type (
 		// one []float64 per audio channel.
 		outputChannel chan [][]float64
 
-		vizSamplesBuffer []float64
-
 		lastFileHash [32]byte
 
 		started bool
@@ -182,21 +180,8 @@ func (s *Server) sendSamples() {
 			bufferpool.Put(out)
 		}
 
-		// send samples to viewer
-		{
-			avgSamples := bufferpool.Get(len(channelSamples[0]))
-			averageBuffers(*avgSamples, channelSamples)
-			s.vizSamplesBuffer = append(s.vizSamplesBuffer, (*avgSamples)...)
-			if len(s.vizSamplesBuffer) > vizBufferFlushSize {
-				vizEmitBuffer := bufferpool.Get(vizBufferFlushSize)
-				copy(*vizEmitBuffer, s.vizSamplesBuffer[:vizBufferFlushSize])
-				s.vizSamplesBuffer = s.vizSamplesBuffer[vizBufferFlushSize:]
-				go func() {
-					defer bufferpool.Put(vizEmitBuffer)
-					pubsub.Publish("samples", *vizEmitBuffer)
-				}()
-			}
-		}
+		// publish samples
+		pubsub.Publish("samples", channelSamples)
 
 		for _, smps := range channelSamples {
 			smps := smps
@@ -212,22 +197,4 @@ func zeroGraph() *graph.Graph {
 		{:nodes ({:id "3", :type :out, :ctor nil, :args [0], :key nil, :sink true}
              {:id "4", :type :out, :ctor nil, :args [1], :key nil, :sink true})}
 `))
-}
-
-// averageBuffers returns the average of the N buffers. If the buffers
-// are not the same length, the result is undefined, and may panic.
-func averageBuffers(out []float64, bufs [][]float64) {
-	if len(bufs) == 1 {
-		copy(out, bufs[0])
-		return
-	}
-
-	for i := 0; i < len(bufs); i++ {
-		for j := 0; j < len(bufs[0]); j++ {
-			out[j] += bufs[i][j]
-		}
-	}
-	for i := 0; i < len(out); i++ {
-		out[i] /= float64(len(bufs))
-	}
 }
