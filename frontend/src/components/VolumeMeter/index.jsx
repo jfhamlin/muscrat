@@ -1,22 +1,18 @@
 import React, {
   useState,
   useEffect,
-  useRef,
   createRef,
 } from 'react';
 
-const VolumeMeter = ({ subscribeToSampleBuffer }) => {
+const VolumeMeter = ({ analyser }) => {
   const meterRef = createRef();
 
-  const audioContextRef = useRef();
-  const analyserRef = useRef();
-
   useEffect(() => {
-    const audioContext = new AudioContext();
-    audioContextRef.current = audioContext;
-    analyserRef.current = audioContext.createAnalyser();
+    if (!analyser) {
+      return;
+    }
 
-    const dataArray = new Uint8Array(analyserRef.current.frequencyBinCount);
+    const dataArray = new Uint8Array(analyser.frequencyBinCount);
 
     let stop = false;
 
@@ -25,7 +21,7 @@ const VolumeMeter = ({ subscribeToSampleBuffer }) => {
       if (stop) {
         return;
       }
-      analyserRef.current.getByteFrequencyData(dataArray);
+      analyser.getByteFrequencyData(dataArray);
 
       const sum = dataArray.reduce((acc, value) => acc + value * value, 0);
       const average = Math.sqrt(sum / dataArray.length);
@@ -44,30 +40,8 @@ const VolumeMeter = ({ subscribeToSampleBuffer }) => {
 
     return () => {
       stop = true;
-      // free resources
-      audioContextRef.current.close();
     };
-  }, [])
-
-  useEffect(() => {
-    const updateStream = (samples) => {
-      const samplesChannel0 = Float32Array.from(samples[0]);
-      const samplesChannel1 = Float32Array.from(samples[1]);
-
-      const buffer = audioContextRef.current.createBuffer(2, samples.length, 44100);
-      buffer.copyToChannel(samplesChannel0, 0);
-      buffer.copyToChannel(samplesChannel1, 1);
-
-      const source = audioContextRef.current.createBufferSource();
-      source.buffer = buffer;
-      source.connect(analyserRef.current);
-      source.start();
-    };
-
-    const unsubscribe = subscribeToSampleBuffer(updateStream);
-
-    return () => unsubscribe();
-  }, [subscribeToSampleBuffer]);
+  }, [analyser])
 
   const barColor = 'green';
 
