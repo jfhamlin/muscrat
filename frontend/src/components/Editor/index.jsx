@@ -40,6 +40,7 @@ export default (props) => {
       const name = selectedBufferNameRef.current;
       SaveFile(name, editorRef.current.getValue()).then(() => {
         buffersStore.cleanBuffer(name, editorRef.current.getValue());
+        // TODO: also set the buffer as the selected buffer
       }).catch((err) => {
         console.log(err);
       });

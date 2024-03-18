@@ -12,7 +12,7 @@ const VolumeMeter = ({ analyser }) => {
       return;
     }
 
-    const dataArray = new Uint8Array(analyser.frequencyBinCount);
+    const dataArray = new Float32Array(analyser.frequencyBinCount);
 
     let stop = false;
 
@@ -21,7 +21,8 @@ const VolumeMeter = ({ analyser }) => {
       if (stop) {
         return;
       }
-      analyser.getByteFrequencyData(dataArray);
+      analyser.getFloatFrequencyData(dataArray);
+      const maxIndex = dataArray.indexOf(Math.max(...dataArray));
 
       const sum = dataArray.reduce((acc, value) => acc + value * value, 0);
       const average = Math.sqrt(sum / dataArray.length);
