@@ -77,6 +77,10 @@ func (a *App) startup(ctx context.Context) {
 	})
 }
 
+func (a *App) GetSampleRate() int {
+	return conf.SampleRate
+}
+
 // OpenFileDialog opens a file dialog.
 func (a *App) OpenFileDialog() (*OpenFileDialogResponse, error) {
 	fileName, err := runtime.OpenFileDialog(a.ctx, runtime.OpenDialogOptions{
