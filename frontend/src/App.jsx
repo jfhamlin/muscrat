@@ -82,7 +82,7 @@ function App() {
         <div className="flex flex-col items-center">
           <img src={logo} className="w-32 max-w-32"/>
           <div className="flex flex-row">
-            <VolumeMeter analyser={audioResources?.analyser} />
+            {/* <VolumeMeter analyser={audioResources?.analyser} /> */}
             <div>
               <div className="h-40 w-60">
                 <Oscilloscope analyser={audioResources?.analyser} />
@@ -94,7 +94,7 @@ function App() {
           </div>
         </div>
         <div className="flex flex-col w-full">
-          <HydraView />
+          {/* <HydraView /> */}
           <Toolbar />
           <Editor />
         </div>

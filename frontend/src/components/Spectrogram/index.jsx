@@ -46,7 +46,7 @@ const GRADIENT_COOL = new Gradient([
   { r: 64, g: 224, b: 208 }, // Lighter Turquoise
 ]);
 
-const gradient = GRADIENT_COOL;
+const gradient = GRADIENT_INFRARED;
 
 export default ({ analyser, sampleRate }) => {
   const canvasRef = createRef();
@@ -59,8 +59,16 @@ export default ({ analyser, sampleRate }) => {
     const bufferLength = analyser.frequencyBinCount
     const dataArray = new Uint8Array(bufferLength);
 
-    // Calculate frequency resolution
-    const frequencyResolution = sampleRate / 2 / bufferLength;
+    const nyquist = sampleRate / 2;
+    const frequencyResolution = nyquist / bufferLength;
+    const binCenterFrequencies = Array.from({ length: bufferLength }, (_, i) => i * frequencyResolution + frequencyResolution / 2);
+
+    // in log2 scale, the normalized [0, 1] x positions of the frequency bins,
+    // with 20hz to 20khz mapped to [0, 1]
+    const logNyquist = Math.log2(nyquist);
+    // minLogFrequency is the log2 of the smallest bin > 20hz
+    const minLogFrequency = Math.log2(binCenterFrequencies.filter(frequency => frequency > 20)[0]);
+    const logBinPositions = binCenterFrequencies.map(frequency => (Math.log2(frequency) - minLogFrequency) / (logNyquist - minLogFrequency));
 
     let scrollY = 0;
 
@@ -78,7 +86,7 @@ export default ({ analyser, sampleRate }) => {
         canvas.height = rect.height;
       }
       const width = canvas.width;
-      const height = canvas.height - 20;
+      const height = canvas.height;
 
       // Get the frequency data
       analyser.getByteFrequencyData(dataArray);
@@ -87,33 +95,25 @@ export default ({ analyser, sampleRate }) => {
       const imageData = ctx.getImageData(0, 0, width, height);
       ctx.putImageData(imageData, 0, -1);
 
-      // Draw the new line at the bottom
+      // Draw the new line at the bottom, in log2 scale
       dataArray.forEach((value, i) => {
         const percent = value / 255;
         const y = height - 1 - Math.floor((height - 1) * percent); // Draw from bottom
-        const x = i * (width / bufferLength);
+        const x = logBinPositions[i] * width;
+        let x2 = width;
+        if (i < bufferLength - 1) {
+          x2 = logBinPositions[i + 1] * width;
+        }
 
         ctx.fillStyle = '#000';
         ctx.fillStyle = gradient.getColor(percent)
-        ctx.fillRect(x, height - 1, width / bufferLength, 1); // Draw single pixel line
+        ctx.fillRect(x, height - 1, x2, 1); // Draw single pixel line
       });
 
       // Update scroll position and eventually reset
       let newScrollY = scrollY + 1;
       if (newScrollY >= height) {
         newScrollY = 0;
-      }
-
-      // Draw frequency labels at the bottom
-      if (scrollY % 20 === 0) { // Update frequency labels less frequently to make them readable
-        ctx.fillStyle = '#000';
-        ctx.fillRect(0, height, width, 20); // Cover old labels
-        ctx.fillStyle = '#fff';
-        ctx.font = '10px Arial';
-        for (let i = 0; i < bufferLength; i += Math.round(bufferLength / 5)) {
-          const frequency = (i * frequencyResolution).toFixed(0);
-          ctx.fillText(`${frequency}Hz`, i * (width / bufferLength), height + 15);
-        }
       }
 
       // Update scroll position

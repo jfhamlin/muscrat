@@ -10,8 +10,13 @@ import {
 const Button = (props) => {
   const title = props.title;
   const onClick = props.onClick;
+  let className = "bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded m-1"
+  if (props.disabled) {
+    className += " bg-gray-500 cursor-not-allowed";
+  }
   return (
-    <button {...props}>{title}</button>
+    <button className={className}
+      {...props}>{title}</button>
   );
 };
 
