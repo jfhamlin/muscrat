@@ -21,6 +21,7 @@ import Toolbar from "./components/Toolbar";
 import VolumeMeter from "./components/VolumeMeter";
 import Spectrogram from "./components/Spectrogram";
 import Oscilloscope from "./components/Oscilloscope";
+import HydraView from "./components/HydraView";
 
 const createAudioResources = () => {
   const audioContext = new AudioContext();
@@ -93,6 +94,7 @@ function App() {
           </div>
         </div>
         <div className="flex flex-col w-full">
+          <HydraView />
           <Toolbar />
           <Editor />
         </div>
