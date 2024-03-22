@@ -79,7 +79,7 @@ function App() {
   return (
     <BuffersProvider createStore={createBuffersStore}>
       <div className="flex flex-row">
-        <div className="flex flex-col items-center w-60">
+        <div className="flex flex-col items-center">
           <img src={logo} className="w-32 max-w-32"/>
           <div className="flex flex-row">
             <VolumeMeter analyser={audioResources?.analyser} />
