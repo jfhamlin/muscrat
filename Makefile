@@ -1,4 +1,11 @@
 
+# environment variables
+MUSCRAT_SAMPLE_PATH ?= ./data/samples
+
+.PHONY: dev
+dev:
+	@MUSCRAT_SAMPLE_PATH=$(MUSCRAT_SAMPLE_PATH) wails dev
+
 .PHONY: build/bin/mrat # force rebuild
 build/bin/mrat:
 	@CGO_ENABLED=1 go build -o build/bin/mrat cmd/mrat/main.go

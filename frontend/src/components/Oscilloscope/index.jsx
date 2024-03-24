@@ -14,7 +14,7 @@ export default ({ analyser }) => {
     const bufferLength = analyser.fftSize;
     const dataArray = new Float32Array(bufferLength);
 
-    const TARGET_FPS = 15;
+    const TARGET_FPS = 10;
     let lastTime = performance.now();
 
     let stop = false;
@@ -40,11 +40,11 @@ export default ({ analyser }) => {
       const height = canvas.height;
 
       // Clear the canvas
-      ctx.fillStyle = 'rgb(255, 255, 255)';
+      ctx.fillStyle = 'rgb(0, 0, 0)';
       ctx.fillRect(0, 0, width, height);
 
       // draw horizontal line
-      ctx.strokeStyle = 'rgb(0, 0, 0)';
+      ctx.strokeStyle = 'rgb(128, 128, 128)';
       ctx.lineWidth = 0.5;
       ctx.beginPath();
       ctx.moveTo(0, height/2);
@@ -52,8 +52,8 @@ export default ({ analyser }) => {
       ctx.stroke();
 
       // Begin drawing the waveform
-      ctx.lineWidth = 1;
-      ctx.strokeStyle = 'rgb(0, 100, 200)';
+      ctx.lineWidth = 0.75;
+      ctx.strokeStyle = 'rgb(255, 255, 255)';
       ctx.beginPath();
 
       const sliceWidth = width * 1.0 / (bufferLength - 1);
@@ -87,7 +87,7 @@ export default ({ analyser }) => {
 
   return (
     <div className="w-full h-full">
-      <canvas className="w-full h-full"
+      <canvas className="w-full h-full rounded-lg"
               ref={canvasRef} />
     </div>
   );

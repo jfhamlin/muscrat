@@ -11,7 +11,7 @@ class Gradient {
   getColor(fraction) {
     const index = Math.floor(fraction * (this.colors.length - 1));
     if (index === this.colors.length - 1) {
-      return this.colors[index];
+      return this.mixColors(this.colors[index], this.colors[index], 0);
     }
     const startColor = this.colors[index];
     const endColor = this.colors[index + 1];
@@ -46,7 +46,7 @@ const GRADIENT_COOL = new Gradient([
   { r: 64, g: 224, b: 208 }, // Lighter Turquoise
 ]);
 
-const gradient = GRADIENT_INFRARED;
+const gradient = GRADIENT_COOL;
 
 export default ({ analyser, sampleRate }) => {
   const canvasRef = createRef();
@@ -56,6 +56,10 @@ export default ({ analyser, sampleRate }) => {
 
     const canvas = canvasRef.current;
     const ctx = canvas.getContext('2d');
+    // clear the canvas with gradient 0 value
+    ctx.fillStyle = gradient.getColor(0);
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
     const bufferLength = analyser.frequencyBinCount
     const dataArray = new Uint8Array(bufferLength);
 
@@ -70,8 +74,6 @@ export default ({ analyser, sampleRate }) => {
     const minLogFrequency = Math.log2(binCenterFrequencies.filter(frequency => frequency > 20)[0]);
     const logBinPositions = binCenterFrequencies.map(frequency => (Math.log2(frequency) - minLogFrequency) / (logNyquist - minLogFrequency));
 
-    let scrollY = 0;
-
     let stop = false;
 
     const renderFrame = () => {
@@ -84,6 +86,9 @@ export default ({ analyser, sampleRate }) => {
       if (canvas.width !== rect.width || canvas.height !== rect.height) {
         canvas.width = rect.width;
         canvas.height = rect.height;
+        // clear the canvas with gradient 0 value
+        ctx.fillStyle = gradient.getColor(0);
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
       }
       const width = canvas.width;
       const height = canvas.height;
@@ -95,29 +100,47 @@ export default ({ analyser, sampleRate }) => {
       const imageData = ctx.getImageData(0, 0, width, height);
       ctx.putImageData(imageData, 0, -1);
 
-      // Draw the new line at the bottom, in log2 scale
-      dataArray.forEach((value, i) => {
-        const percent = value / 255;
-        const y = height - 1 - Math.floor((height - 1) * percent); // Draw from bottom
-        const x = logBinPositions[i] * width;
-        let x2 = width;
-        if (i < bufferLength - 1) {
-          x2 = logBinPositions[i + 1] * width;
+      if (false) {
+        // Draw the new line at the bottom, in log2 scale
+        dataArray.forEach((value, i) => {
+          const percent = value / 255;
+          const y = height - 1 - Math.floor((height - 1) * percent); // Draw from bottom
+          const x = logBinPositions[i] * width;
+          let x2 = width;
+          if (i < bufferLength - 1) {
+            x2 = logBinPositions[i + 1] * width;
+          }
+
+          ctx.fillStyle = '#000';
+          ctx.fillStyle = gradient.getColor(percent)
+
+          ctx.fillRect(x, height - 1, x2, 1); // Draw single pixel line
+        });
+      } else {
+        const BLOCK_SIZE = 4;
+        const BLOCK_FRAC = BLOCK_SIZE / width;
+        // Draw four pixels wide at a time in log2 scale, averaging the values
+        // from all bins covered
+        let curBin = 0; // start bin search here
+        for (let x = 0; x < width; x += BLOCK_SIZE) {
+          const logX = x / width;
+          while (curBin < bufferLength - 1 && logBinPositions[curBin + 1] < logX) {
+            ++curBin;
+          }
+          let sum = 0;
+          let count = 0;
+          // A very simple average of the values in the bins covered, not weighted
+          // by the fraction of the bin covered.
+          for (let i = curBin; i < bufferLength && logBinPositions[i] < logX + BLOCK_FRAC; ++i) {
+            sum += dataArray[i];
+            ++count;
+          }
+
+          const avg = count > 0 ? sum / count / 255 : 0;
+          ctx.fillStyle = gradient.getColor(avg);
+          ctx.fillRect(x, height - 1, BLOCK_SIZE, 1); // Draw four pixels wide
         }
-
-        ctx.fillStyle = '#000';
-        ctx.fillStyle = gradient.getColor(percent)
-        ctx.fillRect(x, height - 1, x2, 1); // Draw single pixel line
-      });
-
-      // Update scroll position and eventually reset
-      let newScrollY = scrollY + 1;
-      if (newScrollY >= height) {
-        newScrollY = 0;
       }
-
-      // Update scroll position
-      scrollY = newScrollY;
     };
 
     requestAnimationFrame(renderFrame);
@@ -127,9 +150,11 @@ export default ({ analyser, sampleRate }) => {
     };
   }, [analyser, sampleRate]);
 
+  // round the corners of the canvas
+
   return (
     <div className="w-full h-full">
-      <canvas className="w-full h-full"
+      <canvas className="w-full h-full rounded-lg"
               ref={canvasRef} />
     </div>
   );

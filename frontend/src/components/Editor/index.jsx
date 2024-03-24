@@ -1,5 +1,7 @@
 import {
   useRef,
+  useState,
+  useEffect,
 } from 'react';
 
 import {
@@ -31,15 +33,15 @@ export default (props) => {
   const selectedBufferNameRef = useRef(selectedBufferName);
   selectedBufferNameRef.current = selectedBufferName;
 
-  const editorRef = useRef(null);
+  const [editor, setEditor] = useState(null);
   const handleEditorDidMount = (editor, monaco) => {
-    editorRef.current = editor;
+    setEditor(editor);
 
     // add a key binding for cmd+s
     editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, () => {
       const name = selectedBufferNameRef.current;
-      SaveFile(name, editorRef.current.getValue()).then(() => {
-        buffersStore.cleanBuffer(name, editorRef.current.getValue());
+      SaveFile(name, editor.getValue()).then(() => {
+        buffersStore.cleanBuffer(name, editor.getValue());
         // TODO: also set the buffer as the selected buffer
       }).catch((err) => {
         console.log(err);
@@ -51,15 +53,43 @@ export default (props) => {
     buffersStore.updateBuffer(selectedBufferName, value);
   };
 
+  // resize the editor when the window is resized
+  useEffect(() => {
+    if (!editor) {
+      return;
+    }
+
+    // strategy from
+    // https://berezuzu.medium.com/resizable-monaco-editor-3e922ad54e4
+    const handleResize = () => {
+      editor.layout({ width: 0, height: 0 });
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => {
+      window.removeEventListener('resize', handleResize);
+    };
+  }, [editor]);
+
+  const options = {
+    minimap: {
+      enabled: false,
+    },
+  };
+
+  // monaco editor layout is a pain to manage
   return (
-    <div>
-      <Editor height="90vh"
-              defaultLanguage="clojure"
-              path={selectedBufferName}
-              defaultValue={code}
-              onChange={handleEditorChange}
-              onMount={handleEditorDidMount} />
+    <>
+      <div className="h-full">
+        <Editor options={options}
+                height="85vh"
+                defaultLanguage="clojure"
+                path={selectedBufferName}
+                defaultValue={code}
+                onChange={handleEditorChange}
+                onMount={handleEditorDidMount} />
+      </div>
       <div>{selectedBufferName}{selectedBuffer?.dirty ? "*" : ""}</div>
-    </div>
+    </>
   );
 }
