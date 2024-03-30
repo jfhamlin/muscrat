@@ -15,20 +15,12 @@ import {
   useBuffersStore,
 } from "../../contexts/buffers";
 
-const DEFAULT_CODE = `(ns user
-  (:require [mrat.core :refer :all]
-    [mrat.scales :refer :all]
-    [mrat.midi :refer :all]))
-
-(play (sin 200))
-`;
-
 export default (props) => {
   const buffersStore = useBuffersStore();
 
   const selectedBufferName = buffersStore.selectedBufferName;
   const selectedBuffer = buffersStore.buffers[selectedBufferName];
-  const code = selectedBuffer?.content || DEFAULT_CODE;
+  const code = selectedBuffer?.content;
 
   const selectedBufferNameRef = useRef(selectedBufferName);
   selectedBufferNameRef.current = selectedBufferName;
