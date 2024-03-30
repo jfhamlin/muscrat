@@ -16,6 +16,7 @@ import {
   createBuffersStore,
 } from "./contexts/buffers";
 
+import Console from "./components/Console";
 import Editor from "./components/Editor";
 import Toolbar from "./components/Toolbar";
 import VolumeMeter from "./components/VolumeMeter";
@@ -80,15 +81,18 @@ function App() {
     <BuffersProvider createStore={createBuffersStore}>
       <div className="flex flex-row w-screen h-screen overflow-hidden">
         <div className="flex flex-col items-center">
-          <img src={logo} className="w-32 max-w-32"/>
-          <div className="flex flex-row">
+          <img src={logo} className="w-32 max-w-32 my-4" alt="logo" />
+          <div className="flex flex-col w-96 bg-gray-400 h-full">
             {/* <VolumeMeter analyser={audioResources?.analyser} /> */}
-            <div className="mx-1">
-              <div className="h-40 w-60">
+            <div className="m-1">
+              <div className="h-40 mb-1">
                 <Oscilloscope analyser={audioResources?.analyser} />
               </div>
-              <div className="h-60 w-60">
+              <div className="h-60 mb-1">
                 <Spectrogram analyser={audioResources?.analyser} sampleRate={sampleRate} />
+              </div>
+              <div className="mb-1 h-full">
+                <Console />
               </div>
             </div>
           </div>

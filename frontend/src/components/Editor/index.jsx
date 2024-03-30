@@ -89,7 +89,9 @@ export default (props) => {
                 onChange={handleEditorChange}
                 onMount={handleEditorDidMount} />
       </div>
-      <div>{selectedBufferName}{selectedBuffer?.dirty ? "*" : ""}</div>
+      <div className="text-xs text-gray-500 border-t border-gray-300">
+        {selectedBufferName}{selectedBuffer?.dirty ? "*" : ""}
+      </div>
     </>
   );
 }

@@ -5,8 +5,11 @@ package conf
 import (
 	"math/bits"
 	"os"
+	"path/filepath"
 	"strconv"
+	"strings"
 
+	"github.com/jfhamlin/muscrat/internal/pkg/platform"
 	"github.com/jfhamlin/muscrat/pkg/bufferpool"
 )
 
@@ -29,6 +32,22 @@ var (
 
 	// SampleRate is the sample rate of the audio system.
 	SampleRate = clamp(22050, 192000, getValueInt("MUSCRAT_SAMPLE_RATE", 44100))
+
+	// SampleFilePaths is the list of paths to directories containing
+	// sample files.
+	SampleFilePaths = func() []string {
+		path := os.Getenv("MUSCRAT_SAMPLE_PATH")
+		if path != "" {
+			return strings.Split(path, ":")
+		}
+
+		resourcesPath := platform.ResourcesPath()
+		if resourcesPath == "" {
+			return nil
+		}
+
+		return []string{filepath.Join(resourcesPath, "samples")}
+	}()
 )
 
 func clamp(min, max, value int) int {

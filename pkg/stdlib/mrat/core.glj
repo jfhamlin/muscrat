@@ -65,6 +65,7 @@
 
 (def SAMPLE-RATE github.com$jfhamlin$muscrat$pkg$conf.SampleRate)
 (def BUFFER-SIZE github.com$jfhamlin$muscrat$pkg$conf.BufferSize)
+(def SAMPLE-FILE-PATHS github.com$jfhamlin$muscrat$pkg$conf.SampleFilePaths)
 
 (defmacro doseq-idx
   [[locals seq-expr] & body]
@@ -925,13 +926,9 @@
   [kw]
   (letfn [(file-exists? [file] (some? (first (os.Stat file))))]
     (let [supported-suffixes [".wav" ".aiff" ".aif" ".flac" ".mp3"]
-          sample-path (os.Getenv "MUSCRAT_SAMPLE_PATH") ;; TODO: get from config
+          sample-path SAMPLE-FILE-PATHS
           sample-path (if (empty? sample-path)
-                        "../Resources/samples"
-                        sample-path)
-          sample-path (strings.Split sample-path ":")
-          sample-path (if (empty? sample-path)
-                        (throw (errors.New "MUSCRAT_SAMPLE_PATH not set"))
+                        (throw (errors.New "no sample paths defined"))
                         sample-path)
           sample-path (map #(strings.TrimRight % "/") sample-path)
           matches (for [path sample-path

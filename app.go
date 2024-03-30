@@ -75,6 +75,10 @@ func (a *App) startup(ctx context.Context) {
 			a.mtx.Unlock()
 		}
 	})
+
+	pubsub.Subscribe("console.debug", func(event string, data any) {
+		go runtime.EventsEmit(ctx, "console.debug", data)
+	})
 }
 
 func (a *App) GetSampleRate() int {

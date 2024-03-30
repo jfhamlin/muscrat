@@ -11,10 +11,8 @@ build/bin/mrat:
 	@CGO_ENABLED=1 go build -o build/bin/mrat cmd/mrat/main.go
 
 .PHONY: macos
-macos: build/bin/mrat
-	@./scripts/package-macos.sh
-
-all: gen build/bin/mrat
+app:
+	@wails build
 
 .PHONY: gen
 gen:
