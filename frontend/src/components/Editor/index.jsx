@@ -40,9 +40,10 @@ export default (props) => {
     // add a key binding for cmd+s
     editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, () => {
       const name = selectedBufferNameRef.current;
-      SaveFile(name, editor.getValue()).then(() => {
-        buffersStore.cleanBuffer(name, editor.getValue());
-        // TODO: also set the buffer as the selected buffer
+      const content = editor.getValue();
+      SaveFile(name, content).then((fileName) => {
+        buffersStore.updateBuffer(fileName, content, false);
+        buffersStore.selectBuffer(fileName);
       }).catch((err) => {
         console.log(err);
       });

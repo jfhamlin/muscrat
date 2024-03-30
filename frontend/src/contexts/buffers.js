@@ -6,10 +6,24 @@ const {
   useStore: useBuffersStore,
 } = createContext();
 
+const DEFAULT_CODE = `(ns user
+  (:require [mrat.core :refer :all]
+    [mrat.scales :refer :all]
+    [mrat.midi :refer :all]))
+
+(play (sin 200))
+`;
+
 const createBuffersStore = () =>
   create((set, get) => ({
     selectedBufferName: null,
-    buffers: {},
+    buffers: {
+      null: {
+        fileName: '',
+        content: DEFAULT_CODE,
+        dirty: false,
+      },
+    },
     selectBuffer: (fileName) => set((state) => ({ selectedBufferName: fileName })),
     addBuffer: ({ fileName, content }) =>
       set((state) => ({
@@ -23,14 +37,14 @@ const createBuffersStore = () =>
           },
         },
       })),
-    updateBuffer: (fileName, content) => {
+    updateBuffer: (fileName, content, dirty) => {
       set((state) => ({
         buffers: {
           ...state.buffers,
           [fileName]: {
-            ...state.buffers[fileName],
+            ...(state.buffers[fileName] ?? { fileName }),
             content,
-            dirty: true,
+            dirty: dirty ?? true,
           },
         },
       }));
