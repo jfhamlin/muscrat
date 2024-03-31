@@ -6,6 +6,8 @@ import {
 
 import { EventsOn } from '../../../wailsjs/runtime';
 
+import Heading from '../Heading';
+
 const ErrorIcon = () => {
   return (
     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-6 h-6">
@@ -24,10 +26,8 @@ const WarnIcon = () => {
 }
 
 const COLORS = {
-  debug: 'bg-gray-100',
-  info: 'bg-blue-100',
-  warn: 'bg-yellow-100',
-  error: 'bg-red-100',
+  warn: 'bg-yellow-500',
+  error: 'bg-red-500',
 };
 
 const Event = ({ event, count }) => {
@@ -38,7 +38,7 @@ const Event = ({ event, count }) => {
   const [dataVisible, setDataVisible] = useState(false);
   const toggleData = () => setDataVisible((prev) => !prev);
   const dataElement = data && (
-    <div className="text-gray-500">
+    <div className="text-gray-100 text-xs p-1">
       <pre>{data}</pre>
     </div>
   );
@@ -61,14 +61,18 @@ const Event = ({ event, count }) => {
   let bgColor = COLORS[level] || '';
 
   return (
-    <div className={"text-xs p-2 flex items-center rounded " + bgColor}>
-      {count > 1 && <div className="mr-2 text-gray-500">{count}x</div>}
-      {icon && <div className="mr-2">{icon}</div>}
-      <div className="flex-1">
-        <div>{message}</div>
-        {dataVisible && dataElement}
+    <>
+      <div className={"text-xs text-gray-100 p-1 flex items-center " + bgColor}>
+        {count > 1 && <div className="mr-2 text-gray-100">{count}x</div>}
+        {icon && <div className="mr-2">{icon}</div>}
+        <div className="flex-1 overflow-x-scroll" onClick={toggleData}>
+          <div>{message}</div>
+        </div>
+        {/* horizontal line */}
       </div>
-    </div>
+      {dataVisible && dataElement}
+      <hr className="border-gray-400" />
+    </>
   );
 };
 
@@ -88,11 +92,8 @@ export default () => {
       });
 
       // scroll to bottom if already at bottom
-
       if (ref.current && ref.current.scrollHeight - ref.current.scrollTop === ref.current.clientHeight) {
-        console.log('scrolling to bottom');
         requestAnimationFrame(() => {
-          console.log('scrolling to bottom !!');
           ref.current.scrollTop = ref.current.scrollHeight;
         });
       }
@@ -100,7 +101,13 @@ export default () => {
   }, []);
 
   return (
-    <div ref={ref} className="bg-white rounded-lg flex-grow overflow-auto">
+    <div ref={ref} className="bg-gray-500 rounded-lg flex-grow overflow-auto relative">
+      {/* Position over the console, centered at top */}
+      <Heading>
+        <h1>
+          Console
+        </h1>
+      </Heading>
       {events.map(({ event, count }, i) => (
         <Event key={i} event={event} count={count} />
       ))}

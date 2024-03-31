@@ -3,6 +3,8 @@ import React, {
   createRef,
 } from 'react';
 
+import Heading from '../Heading';
+
 class Gradient {
   constructor(colors) {
     this.colors = colors;
@@ -153,7 +155,10 @@ export default ({ analyser, sampleRate }) => {
   // round the corners of the canvas
 
   return (
-    <div className="w-full h-full">
+    <div className="w-full h-full relative">
+      <Heading>
+        <h1>Frequency Spectrum</h1>
+      </Heading>
       <canvas className="w-full h-full rounded-lg"
               ref={canvasRef} />
     </div>

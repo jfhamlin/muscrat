@@ -3,6 +3,8 @@ import React, {
   createRef,
 } from 'react';
 
+import Heading from '../Heading';
+
 export default ({ analyser }) => {
   const canvasRef = createRef();
 
@@ -86,7 +88,10 @@ export default ({ analyser }) => {
   }, [analyser]);
 
   return (
-    <div className="w-full h-full">
+    <div className="w-full h-full relative">
+      <Heading>
+        <h1>Oscilloscope</h1>
+      </Heading>
       <canvas className="w-full h-full rounded-lg"
               ref={canvasRef} />
     </div>
