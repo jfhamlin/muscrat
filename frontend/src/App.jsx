@@ -82,7 +82,7 @@ function App() {
       <div className="flex flex-row w-screen h-screen overflow-hidden">
         <div className="flex flex-col items-center h-full mx-1">
           <img src={logo} className="w-32 max-w-32 my-4" alt="logo" />
-          <div className="flex flex-col w-96 flex-grow overflow-hidden">
+          <div className="flex flex-col w-96 flex-grow overflow-hidden mb-1">
             <div className="mb-1">
               <div className="h-40 mb-1">
                 <Oscilloscope analyser={audioResources?.analyser} />
