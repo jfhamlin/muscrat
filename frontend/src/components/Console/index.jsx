@@ -76,6 +76,16 @@ const Event = ({ event, count }) => {
   );
 };
 
+const ClearButton = ({ onClick, color = 'currentColor', size = 18 }) => {
+  return (
+    <button className={`text-${color}`} onClick={onClick} title="Clear console" style={{color: color}}>
+      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke={color} width={size} height={size}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="m9.75 9.75 4.5 4.5m0-4.5-4.5 4.5M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+      </svg>
+    </button>
+  );
+};
+
 export default () => {
   const [events, setEvents] = useState([]);
 
@@ -101,16 +111,22 @@ export default () => {
   }, []);
 
   return (
-    <div ref={ref} className="bg-gray-500 rounded-lg flex-grow overflow-auto relative">
+    <div className="bg-gray-500 rounded-lg flex flex-col h-full relative">
       {/* Position over the console, centered at top */}
       <Heading>
-        <h1>
-          Console
-        </h1>
+        {/* flex and center items vertically */}
+        <div className="flex items-center justify-between">
+          <h1 className="mr-1">
+            Console
+          </h1>
+          <ClearButton onClick={() => setEvents([])} />
+        </div>
       </Heading>
-      {events.map(({ event, count }, i) => (
-        <Event key={i} event={event} count={count} />
-      ))}
+      <div ref={ref} className="flex-grow overflow-auto">
+        {events.map(({ event, count }, i) => (
+          <Event key={i} event={event} count={count} />
+        ))}
+      </div>
     </div>
   )
 }
