@@ -60,8 +60,23 @@ export default (props) => {
     Silence();
   };
 
+  const handleNewClick = () => {
+    const DEFAULT_CONTENT = `(ns user
+      (:require [mrat.core :refer :all]
+        [mrat.scales :refer :all]
+        [mrat.midi :refer :all]))`;
+    buffersStore.updateBuffer(null, DEFAULT_CONTENT, true);
+    buffersStore.selectBuffer(null);
+  };
+
   return (
     <div>
+      <Button onClick={handleNewClick}
+              title="New file">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-6 h-6">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+        </svg>
+      </Button>
       <Button onClick={handleLoadClick}
               title="Load file">
         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-6 h-6">

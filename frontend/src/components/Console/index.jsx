@@ -111,7 +111,7 @@ export default () => {
   }, []);
 
   return (
-    <div className="bg-gray-500 rounded-lg flex flex-col h-full relative">
+    <div className="bg-gray-800 rounded-lg flex flex-col h-full relative">
       {/* Position over the console, centered at top */}
       <Heading>
         {/* flex and center items vertically */}
