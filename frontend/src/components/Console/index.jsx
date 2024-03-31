@@ -88,9 +88,8 @@ export default () => {
       });
 
       // scroll to bottom if already at bottom
-      console.log('scrollHeight', ref.current.scrollHeight);
-      console.log('scrollTop', ref.current.scrollTop);
-      if (ref.current && ref.current.scrollTop == ref.current.scrollHeight) {
+
+      if (ref.current && ref.current.scrollHeight - ref.current.scrollTop === ref.current.clientHeight) {
         console.log('scrolling to bottom');
         requestAnimationFrame(() => {
           console.log('scrolling to bottom !!');
@@ -101,7 +100,7 @@ export default () => {
   }, []);
 
   return (
-    <div ref={ref} className="bg-white rounded-lg flex-grow h-full">
+    <div ref={ref} className="bg-white rounded-lg flex-grow overflow-auto">
       {events.map(({ event, count }, i) => (
         <Event key={i} event={event} count={count} />
       ))}

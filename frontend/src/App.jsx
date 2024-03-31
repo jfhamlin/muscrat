@@ -91,10 +91,9 @@ function App() {
                 <Spectrogram analyser={audioResources?.analyser} sampleRate={sampleRate} />
               </div>
             </div>
-            {/* Use flex-grow for the remaining space and overflow-auto for scrolling */}
-            <div className="flex-grow overflow-auto mb-2">
-              <Console />
-            </div>
+            {/* Component uses flex-grow to take the remaining space
+                and overflow-auto for scrolling */}
+            <Console />
           </div>
         </div>
         <div className="flex flex-col flex-1 h-full overflow-auto">
