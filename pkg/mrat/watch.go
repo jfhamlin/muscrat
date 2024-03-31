@@ -19,7 +19,7 @@ func watchFile(ctx context.Context, path string, srv *Server) error {
 
 	defer watcher.Close()
 
-	if err := srv.EvalScript(path); err != nil {
+	if err := srv.EvalScript(path, true); err != nil {
 		fmt.Println("failed to eval script:", err)
 	}
 
@@ -31,7 +31,7 @@ func watchFile(ctx context.Context, path string, srv *Server) error {
 			if !ok {
 				return nil
 			}
-			if err := srv.EvalScript(path); err != nil {
+			if err := srv.EvalScript(path, false); err != nil {
 				pubsub.Publish("console.debug", map[string]interface{}{
 					"message": "failed to eval script",
 					"error":   err.Error(),

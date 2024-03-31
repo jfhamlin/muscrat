@@ -165,10 +165,20 @@ func (a *App) PlayFile(fileName string) error {
 	return nil
 }
 
+func (a *App) Silence() {
+	a.mtx.Lock()
+	defer a.mtx.Unlock()
+
+	a.stopFile()
+
+	go a.srv.PlayGraph(mrat.ZeroGraph())
+}
+
 func (a *App) stopFile() {
 	if a.cancelPlayFile == nil {
 		return
 	}
+
 	a.cancelPlayFile()
 	a.cancelPlayFile = nil
 	<-a.playFileStop

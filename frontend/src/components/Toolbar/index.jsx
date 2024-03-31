@@ -2,6 +2,7 @@ import {
   OpenFileDialog,
   PlayFile,
   SaveFile,
+  Silence,
 } from "../../../wailsjs/go/main/App";
 
 import {
@@ -56,7 +57,7 @@ export default (props) => {
   };
 
   const handleStopClick = () => {
-    // TODO
+    Silence();
   };
 
   return (
