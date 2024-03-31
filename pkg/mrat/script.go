@@ -12,6 +12,7 @@ import (
 	value "github.com/glojurelang/glojure/pkg/lang"
 	"github.com/glojurelang/glojure/pkg/runtime"
 
+	"github.com/jfhamlin/muscrat/pkg/console"
 	"github.com/jfhamlin/muscrat/pkg/graph"
 )
 
@@ -33,7 +34,25 @@ var (
 	keyKW   = lang.NewKeyword("key")
 )
 
+type consoleWriter struct {
+	sb strings.Builder
+}
+
+func (cw *consoleWriter) Write(p []byte) (n int, err error) {
+	// write each line to the console
+	for _, char := range p {
+		if char == '\n' {
+			console.Log(console.Info, cw.sb.String(), nil)
+			cw.sb.Reset()
+		} else {
+			cw.sb.WriteByte(char)
+		}
+	}
+	return len(p), nil
+}
+
 func EvalScript(filename string) (res *graph.Graph, err error) {
+	console.Log(console.Info, fmt.Sprintf("evaluating %s", filename), nil)
 	defer func() {
 		if r := recover(); r != nil {
 			err = fmt.Errorf("%v\n%s", r, debug.Stack())
@@ -46,6 +65,7 @@ func EvalScript(filename string) (res *graph.Graph, err error) {
 	graphAtom := lang.NewAtom(glj.Read(`{:nodes [] :edges []}`))
 	value.PushThreadBindings(value.NewMap(
 		glj.Var("mrat.core", "*graph*"), graphAtom,
+		glj.Var("glojure.core", "*out*"), &consoleWriter{},
 	))
 	defer value.PopThreadBindings()
 

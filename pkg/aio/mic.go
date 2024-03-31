@@ -9,7 +9,7 @@ import (
 
 	"github.com/gordonklaus/portaudio"
 	"github.com/jfhamlin/muscrat/pkg/conf"
-	"github.com/jfhamlin/muscrat/pkg/pubsub"
+	"github.com/jfhamlin/muscrat/pkg/console"
 	"github.com/jfhamlin/muscrat/pkg/ugen"
 	"github.com/oov/audio/resampler"
 
@@ -101,7 +101,7 @@ func publishStream() {
 				select {
 				case ch <- out:
 				default: // don't wait for slow consumers
-					pubsub.Publish("console.debug", "dropping audio sample")
+					console.Log(console.Warn, "dropping input audio samples", nil)
 				}
 			}
 			inStreamMtx.RUnlock()

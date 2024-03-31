@@ -12,6 +12,7 @@ import (
 
 	"github.com/jfhamlin/muscrat/pkg/bufferpool"
 	"github.com/jfhamlin/muscrat/pkg/conf"
+	"github.com/jfhamlin/muscrat/pkg/console"
 	"github.com/jfhamlin/muscrat/pkg/gen/gljimports"
 	"github.com/jfhamlin/muscrat/pkg/graph"
 	"github.com/jfhamlin/muscrat/pkg/pubsub"
@@ -105,7 +106,14 @@ func (s *Server) Start(ctx context.Context) error {
 	return nil
 }
 
-func (s *Server) EvalScript(path string, force bool) error {
+func (s *Server) EvalScript(path string, force bool) (err error) {
+	fmt.Println("s.EvalScript", path)
+	defer func() {
+		if err != nil {
+			console.Log(console.Error, fmt.Sprintf("error evaluating %s", path), err.Error())
+		}
+	}()
+
 	script, err := os.ReadFile(path)
 	if err != nil {
 		return err

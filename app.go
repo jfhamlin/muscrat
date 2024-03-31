@@ -76,8 +76,8 @@ func (a *App) startup(ctx context.Context) {
 		}
 	})
 
-	pubsub.Subscribe("console.debug", func(event string, data any) {
-		go runtime.EventsEmit(ctx, "console.debug", data)
+	pubsub.Subscribe("console.log", func(event string, data any) {
+		go runtime.EventsEmit(ctx, "console.log", data)
 	})
 }
 

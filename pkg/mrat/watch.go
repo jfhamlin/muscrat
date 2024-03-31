@@ -5,7 +5,6 @@ import (
 	"fmt"
 
 	"github.com/fsnotify/fsnotify"
-	"github.com/jfhamlin/muscrat/pkg/pubsub"
 )
 
 func watchFile(ctx context.Context, path string, srv *Server) error {
@@ -27,16 +26,14 @@ func watchFile(ctx context.Context, path string, srv *Server) error {
 		select {
 		case <-ctx.Done():
 			return nil
-		case _, ok := <-watcher.Events:
+		case evt, ok := <-watcher.Events:
 			if !ok {
 				return nil
 			}
-			if err := srv.EvalScript(path, false); err != nil {
-				pubsub.Publish("console.debug", map[string]interface{}{
-					"message": "failed to eval script",
-					"error":   err.Error(),
-				})
-				fmt.Println("failed to eval script:", err)
+			if evt.Has(fsnotify.Write) {
+				if err := srv.EvalScript(path, false); err != nil {
+					fmt.Println("failed to eval script:", err)
+				}
 			}
 		case err, ok := <-watcher.Errors:
 			if !ok {

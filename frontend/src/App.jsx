@@ -80,24 +80,24 @@ function App() {
   return (
     <BuffersProvider createStore={createBuffersStore}>
       <div className="flex flex-row w-screen h-screen overflow-hidden">
-        <div className="flex flex-col items-center">
+        <div className="flex flex-col items-center h-full mx-1">
           <img src={logo} className="w-32 max-w-32 my-4" alt="logo" />
-          <div className="flex flex-col w-96 bg-gray-400 h-full">
-            {/* <VolumeMeter analyser={audioResources?.analyser} /> */}
-            <div className="m-1">
+          <div className="flex flex-col w-96 flex-grow overflow-hidden">
+            <div className="mb-1">
               <div className="h-40 mb-1">
                 <Oscilloscope analyser={audioResources?.analyser} />
               </div>
-              <div className="h-60 mb-1">
+              <div className="h-60">
                 <Spectrogram analyser={audioResources?.analyser} sampleRate={sampleRate} />
               </div>
-              <div className="mb-1 h-full">
-                <Console />
-              </div>
+            </div>
+            {/* Use flex-grow for the remaining space and overflow-auto for scrolling */}
+            <div className="flex-grow overflow-auto mb-2">
+              <Console />
             </div>
           </div>
         </div>
-        <div className="flex flex-col flex-1">
+        <div className="flex flex-col flex-1 h-full overflow-auto">
           {/* <HydraView /> */}
           <Toolbar />
           <Editor />
