@@ -29,13 +29,13 @@ jobs:
           #   platform:  'windows/amd64'
           #   os: 'windows-latest'
           - name: 'App'
-            platform:  'darwin/universal'
+            platform:  'darwin/arm64'
             os: 'macos-latest'
 
     runs-on: ${{ matrix.build.os }}
     steps:
     - uses: actions/checkout@v3
-    - uses: cachix/install-nix-action@v19
+    - uses: cachix/install-nix-action@v22
       with:
         nix_path: nixpkgs=channel:nixos-unstable
     - run: nix-shell --run 'PATH=$(go env GOPATH)/bin:$PATH make app'
