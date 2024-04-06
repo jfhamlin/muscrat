@@ -907,8 +907,8 @@
 (defugen bitcrush
   "Bitcrush an input signal."
   [in 0
-   rate 44100
-   bits 24]
+   bits 24
+   rate 44100]
   (add-node! :bitcrush NewBitcrusher
              :in-edges {:in in
                         :rate rate

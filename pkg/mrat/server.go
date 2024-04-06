@@ -107,7 +107,6 @@ func (s *Server) Start(ctx context.Context) error {
 }
 
 func (s *Server) EvalScript(path string, force bool) (err error) {
-	fmt.Println("s.EvalScript", path)
 	defer func() {
 		if err != nil {
 			console.Log(console.Error, fmt.Sprintf("error evaluating %s", path), err.Error())
