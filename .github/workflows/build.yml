@@ -5,6 +5,7 @@ on:
     tags:
     # Match any new tag
       - '*'
+  workflow_dispatch: {}
 
 env:
   # Necessary for most environments as build failure can occur due to OOM issues
