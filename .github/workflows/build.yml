@@ -5,6 +5,10 @@ on:
     tags:
     # Match any new tag
       - '*'
+
+  pull_request:
+    branches: [main]
+
   workflow_dispatch: {}
 
 env:
