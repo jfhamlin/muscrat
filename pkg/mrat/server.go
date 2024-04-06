@@ -12,6 +12,7 @@ import (
 
 	"github.com/jfhamlin/muscrat/pkg/bufferpool"
 	"github.com/jfhamlin/muscrat/pkg/conf"
+	"github.com/jfhamlin/muscrat/pkg/console"
 	"github.com/jfhamlin/muscrat/pkg/gen/gljimports"
 	"github.com/jfhamlin/muscrat/pkg/graph"
 	"github.com/jfhamlin/muscrat/pkg/pubsub"
@@ -59,12 +60,7 @@ type (
 		// one []float64 per audio channel.
 		outputChannel chan [][]float64
 
-		vizSamplesBuffer []float64
-
 		lastFileHash [32]byte
-
-		// output channel for server messages
-		msgChan chan<- *ServerMessage
 
 		started bool
 
@@ -76,13 +72,12 @@ type (
 	}
 )
 
-func NewServer(msgChan chan<- *ServerMessage) *Server {
+func NewServer() *Server {
 	out := make(chan [][]float64, 1)
 	return &Server{
 		gain:          1,
 		targetGain:    1,
 		outputChannel: out,
-		msgChan:       msgChan,
 		runner: graph.NewRunner(ugen.SampleConfig{
 			SampleRateHz: conf.SampleRate,
 		}, out),
@@ -107,11 +102,17 @@ func (s *Server) Start(ctx context.Context) error {
 	go s.runner.Run(ctx)
 	go s.sendSamples()
 
-	s.playGraph(zeroGraph())
+	s.PlayGraph(ZeroGraph())
 	return nil
 }
 
-func (s *Server) EvalScript(path string) error {
+func (s *Server) EvalScript(path string, force bool) (err error) {
+	defer func() {
+		if err != nil {
+			console.Log(console.Error, fmt.Sprintf("error evaluating %s", path), err.Error())
+		}
+	}()
+
 	script, err := os.ReadFile(path)
 	if err != nil {
 		return err
@@ -119,7 +120,7 @@ func (s *Server) EvalScript(path string) error {
 	hash := sha256.Sum256(script)
 
 	s.mtx.RLock()
-	if bytes.Equal(hash[:], s.lastFileHash[:]) {
+	if !force && bytes.Equal(hash[:], s.lastFileHash[:]) {
 		s.mtx.RUnlock()
 		return nil
 	}
@@ -127,6 +128,7 @@ func (s *Server) EvalScript(path string) error {
 
 	g, err := EvalScript(path)
 	if err != nil {
+		fmt.Println("failed to eval script:", err)
 		return err
 	}
 
@@ -135,7 +137,8 @@ func (s *Server) EvalScript(path string) error {
 
 	s.lastFileHash = hash
 
-	s.playGraph(g)
+	s.PlayGraph(g)
+
 	return nil
 }
 
@@ -145,7 +148,7 @@ func (s *Server) SetGain(gain float64) {
 
 ////////////////////////////////////////////////////////////////////////////////
 
-func (s *Server) playGraph(g *graph.Graph) {
+func (s *Server) PlayGraph(g *graph.Graph) {
 	s.runner.SetGraph(g)
 }
 
@@ -186,21 +189,8 @@ func (s *Server) sendSamples() {
 			bufferpool.Put(out)
 		}
 
-		// send samples to viewer
-		{
-			avgSamples := bufferpool.Get(len(channelSamples[0]))
-			averageBuffers(*avgSamples, channelSamples)
-			s.vizSamplesBuffer = append(s.vizSamplesBuffer, (*avgSamples)...)
-			if len(s.vizSamplesBuffer) > vizBufferFlushSize {
-				vizEmitBuffer := bufferpool.Get(vizBufferFlushSize)
-				copy(*vizEmitBuffer, s.vizSamplesBuffer[:vizBufferFlushSize])
-				s.vizSamplesBuffer = s.vizSamplesBuffer[vizBufferFlushSize:]
-				go func() {
-					defer bufferpool.Put(vizEmitBuffer)
-					pubsub.Publish("samples", *vizEmitBuffer)
-				}()
-			}
-		}
+		// publish samples
+		pubsub.Publish("samples", channelSamples)
 
 		for _, smps := range channelSamples {
 			smps := smps
@@ -211,27 +201,9 @@ func (s *Server) sendSamples() {
 
 ////////////////////////////////////////////////////////////////////////////////
 
-func zeroGraph() *graph.Graph {
+func ZeroGraph() *graph.Graph {
 	return graph.SExprToGraph(glj.Read(`
 		{:nodes ({:id "3", :type :out, :ctor nil, :args [0], :key nil, :sink true}
              {:id "4", :type :out, :ctor nil, :args [1], :key nil, :sink true})}
 `))
-}
-
-// averageBuffers returns the average of the N buffers. If the buffers
-// are not the same length, the result is undefined, and may panic.
-func averageBuffers(out []float64, bufs [][]float64) {
-	if len(bufs) == 1 {
-		copy(out, bufs[0])
-		return
-	}
-
-	for i := 0; i < len(bufs); i++ {
-		for j := 0; j < len(bufs[0]); j++ {
-			out[j] += bufs[i][j]
-		}
-	}
-	for i := 0; i < len(out); i++ {
-		out[i] /= float64(len(bufs))
-	}
 }

@@ -1,0 +1,28 @@
+(ns karplus_strong
+      (:require [mrat.core :refer :all]
+        [mrat.scales :refer :all]
+        [mrat.midi :refer :all]))
+
+(def metro (impulse 5))
+
+(def burst (-> (noise)
+               (* (env-adsr metro [0.001 0.001 1 0.001]))
+               (* 1)))
+
+(def feedback (pipe))
+
+(def delay-filter
+  (-> feedback
+      (delayc 0.5 (sequencer metro [0.002 0.001 0.01 0.0015 0.0019]))
+      (rlpf 300 0.99)
+      (* 0.8)))
+
+(pipeset! feedback (+ burst delay-filter))
+
+(play (-> feedback
+          (* (line 1 50 30))
+          wfold
+          (loshelf 20 :db -20)
+          (rlpf 1000)
+          (hishelf 10000 :db -90)
+          limiter))

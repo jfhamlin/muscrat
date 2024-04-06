@@ -18,7 +18,7 @@ func watchFile(ctx context.Context, path string, srv *Server) error {
 
 	defer watcher.Close()
 
-	if err := srv.EvalScript(path); err != nil {
+	if err := srv.EvalScript(path, true); err != nil {
 		fmt.Println("failed to eval script:", err)
 	}
 
@@ -26,12 +26,14 @@ func watchFile(ctx context.Context, path string, srv *Server) error {
 		select {
 		case <-ctx.Done():
 			return nil
-		case _, ok := <-watcher.Events:
+		case evt, ok := <-watcher.Events:
 			if !ok {
 				return nil
 			}
-			if err := srv.EvalScript(path); err != nil {
-				fmt.Println("failed to eval script:", err)
+			if evt.Has(fsnotify.Write) {
+				if err := srv.EvalScript(path, false); err != nil {
+					fmt.Println("failed to eval script:", err)
+				}
 			}
 		case err, ok := <-watcher.Errors:
 			if !ok {

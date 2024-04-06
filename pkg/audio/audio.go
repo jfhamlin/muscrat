@@ -6,7 +6,7 @@ import (
 	"unsafe"
 
 	"github.com/jfhamlin/muscrat/pkg/conf"
-	"github.com/jfhamlin/muscrat/pkg/pubsub"
+	"github.com/jfhamlin/muscrat/pkg/console"
 	"github.com/veandco/go-sdl2/sdl"
 )
 
@@ -79,6 +79,8 @@ func numBytesToNumSamples(numBytes uint32) int {
 // )
 
 func QueueAudioFloat64(fbuf []float64) error {
+	// TODO: just use the callback version
+
 	// if dur := time.Since(timeOfLastQueuedAudio); dur > time.Millisecond {
 	// 	fmt.Printf("time since last queued audio: %v\n", dur)
 	// }
@@ -90,7 +92,7 @@ func QueueAudioFloat64(fbuf []float64) error {
 	sz := sdl.GetQueuedAudioSize(1)
 	if sz < 1024 {
 		fmt.Println(fmt.Sprintf("audio buffer underflow: %d < %d", sz, bufferByteSize))
-		pubsub.Publish("console.debug", fmt.Sprintf("audio buffer underflow: %d < %d", sz, bufferByteSize))
+		console.Log(console.Warn, "audio buffer underflow", nil)
 	}
 	for numBytesToNumSamples(sdl.GetQueuedAudioSize(1)) > maxQueuedBuffers*bufferByteSize {
 		excessSamples := numBytesToNumSamples(sdl.GetQueuedAudioSize(1)) - maxQueuedBuffers*bufferByteSize

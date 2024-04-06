@@ -2,6 +2,7 @@ package graph
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"runtime"
 	"strconv"
@@ -289,6 +290,10 @@ func (r *Runner) newRunState(g *Graph) *runState {
 				// get the index of the out node
 				idx := lang.First(graphNode.Args).(int64)
 				node.gen = ugen.UGenFunc(func(ctx context.Context, cfg ugen.SampleConfig, _ []float64) {
+					if int(idx) >= len(r.nextOut) {
+						fmt.Printf("out of bounds output index: %d\n", idx)
+						return
+					}
 					out := r.nextOut[int(idx)]
 					clear(out)
 					for _, in := range cfg.InputSamples {
