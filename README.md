@@ -7,6 +7,9 @@
 
 ## Installation
 
+Clone the repository and run:
 ```shell
-go install github.com/jfhamlin/muscrat/cmd/mrat
+make dev
 ```
+
+Pre-built binaries will be available soon.
