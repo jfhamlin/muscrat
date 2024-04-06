@@ -1,0 +1,36 @@
+name: Wails build
+
+on:
+  push:
+    tags:
+    # Match any new tag
+      - '*'
+
+env:
+  # Necessary for most environments as build failure can occur due to OOM issues
+  NODE_OPTIONS: "--max-old-space-size=4096"
+
+jobs:
+  build:
+    strategy:
+    # Failure in one platform build won't impact the others
+      fail-fast: false
+      matrix:
+        build:
+          # - name: 'App'
+          #   platform:  'linux/amd64'
+          #   os: 'ubuntu-latest'
+          # - name: 'App'
+          #   platform:  'windows/amd64'
+          #   os: 'windows-latest'
+          - name: 'App'
+            platform:  'darwin/universal'
+            os: 'macos-latest'
+
+    runs-on: ${{ matrix.build.os }}
+    steps:
+    - uses: actions/checkout@v3
+    - uses: cachix/install-nix-action@v19
+      with:
+        nix_path: nixpkgs=channel:nixos-unstable
+    - run: nix-shell --run 'PATH=$(go env GOPATH)/bin:$PATH make app'

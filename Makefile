@@ -7,7 +7,7 @@ dev: wails
 	@MUSCRAT_SAMPLE_PATH=$(MUSCRAT_SAMPLE_PATH) wails dev
 
 .PHONY: app
-app:
+app: wails
 	@./scripts/make/app.sh
 
 .PHONY: gen
