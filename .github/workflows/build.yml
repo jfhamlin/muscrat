@@ -30,7 +30,7 @@ jobs:
           #   os: 'windows-latest'
           - name: 'App'
             platform:  'darwin/arm64'
-            os: 'macos-latest'
+            os: 'macos-14'
 
     runs-on: ${{ matrix.build.os }}
     steps:
