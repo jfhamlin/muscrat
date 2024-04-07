@@ -28,7 +28,7 @@ jobs:
           # - name: 'App'
           #   platform:  'windows/amd64'
           #   os: 'windows-latest'
-          - name: 'App'
+          - name: 'muscrat'
             platform:  'darwin/arm64'
             os: 'macos-14'
 
@@ -39,8 +39,20 @@ jobs:
       with:
         nix_path: nixpkgs=channel:nixos-unstable
     - run: nix-shell --run 'PATH=$(go env GOPATH)/bin:$PATH make app'
+
+    ## MacOS specific steps
+    - name: Add macOS perms
+      if: runner.os == 'macOS'
+      run: chmod +x build/bin/*/Contents/MacOS/*
+      shell: bash
+    - name: Build .app zip file
+      if: runner.os == 'macOS'
+      shell: bash
+      run: |
+        ditto -c -k ./build/bin/muscrat.app ./build/bin/muscrat.app.zip
+
+    # Upload the build artifacts
     - uses: actions/upload-artifact@v3
-#      if: inputs.package == 'true'
       with:
         name: Wails Build ${{runner.os}} ${{matrix.build.name}}
         path: |
