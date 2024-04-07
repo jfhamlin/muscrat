@@ -31,7 +31,6 @@ jobs:
           - name: 'muscrat'
             platform:  'darwin/arm64'
             os: 'macos-14'
-            sign: 'false'
 
     runs-on: ${{ matrix.build.os }}
     steps:
@@ -50,7 +49,7 @@ jobs:
     ############################################################################
     # Code Signing
     - name: Import Code-Signing Certificates for macOS
-      if: runner.os == 'macOS' && ${{matrix.build.sign}} != 'false' && startsWith(github.ref, 'refs/tags/')
+      if: runner.os == 'macOS' && startsWith(github.ref, 'refs/tags/')
       uses: Apple-Actions/import-codesign-certs@v1
       with:
         keychain-password: ${{ secrets.SIGN_MACOS_APPLE_PASSWORD }}
@@ -58,7 +57,7 @@ jobs:
         p12-password: ${{ secrets.APPLE_DEVELOPER_CERTIFICATE_P12_BASE64_PASSWORD }}
 
     - name: Import Code-Signing Certificates for macOS Installer
-      if: runner.os == 'macOS' && ${{matrix.build.sign}} != 'false' && startsWith(github.ref, 'refs/tags/')
+      if: runner.os == 'macOS' && startsWith(github.ref, 'refs/tags/')
       uses: Apple-Actions/import-codesign-certs@v1
       with:
         keychain-password: ${{ secrets.SIGN_MACOS_APPLE_PASSWORD }}
@@ -66,11 +65,11 @@ jobs:
         p12-password: ${{ secrets.APPLE_INSTALLER_CERTIFICATE_P12_BASE64_PASSWORD }}
         create-keychain: false
     - name: MacOS download gon for code signing and app notarization
-      if: runner.os == 'macOS' && ${{matrix.build.sign}} != 'false' && startsWith(github.ref, 'refs/tags/')
+      if: runner.os == 'macOS' && startsWith(github.ref, 'refs/tags/')
       run: |
         brew install Bearer/tap/gon
     - name: Sign our macOS binary
-      if: runner.os == 'macOS' && ${{matrix.build.sign}} != 'false' && startsWith(github.ref, 'refs/tags/')
+      if: runner.os == 'macOS' && startsWith(github.ref, 'refs/tags/')
       shell: bash
       env:
         APPLE_PASSWORD: ${{ secrets.SIGN_MACOS_APPLE_PASSWORD }}
@@ -89,21 +88,16 @@ jobs:
 
     ############################################################################
     # Build Installer
-    - name: Building Installer (signed)
-      if: runner.os == 'macOS' && ${{matrix.build.sign}} == 'true' && startsWith(github.ref, 'refs/tags/')
+    - name: Building Installer
+      if: runner.os == 'macOS' && startsWith(github.ref, 'refs/tags/')
       shell: bash
       run: |
         productbuild --sign '${{ secrets.MACOS_INSTALLER_ID }}' --component ./build/bin/muscrat.app ./build/bin/muscrat.pkg
-    - name: Building Installer (unsigned)
-      if: runner.os == 'macOS' && ${{matrix.build.sign}} != 'true' && startsWith(github.ref, 'refs/tags/')
-      shell: bash
-      run: |
-        productbuild --component ./build/bin/muscrat.app ./build/bin/muscrat.pkg
 
     # Upload the build artifacts
     - uses: actions/upload-artifact@v3
       with:
-        name: Wails Build ${{runner.os}} ${{matrix.build.name}}
+        name: Wails Build ${{runner.os}} ${{ matrix.build.name }}
         path: |
           */bin/
           *\bin\*
