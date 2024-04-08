@@ -11,6 +11,9 @@ pkgs.mkShell {
     pkgs.SDL2
     pkgs.portaudio
 
+    # Seemingly needed because we're linking statically
+    pkgs.libiconv
+
     pkgs.pkgconfig
 
     frameworks.Security
@@ -19,8 +22,5 @@ pkgs.mkShell {
     frameworks.UniformTypeIdentifiers
     frameworks.ForceFeedback
     frameworks.Kernel
-
-    # for fyne
-    frameworks.UserNotifications
   ];
 }

@@ -13,7 +13,7 @@ require (
 	github.com/mewkiz/flac v1.0.10
 	github.com/oov/audio v0.0.0-20171004131523-88a2be6dbe38
 	github.com/stretchr/testify v1.8.4
-	github.com/veandco/go-sdl2 v0.4.0
+	github.com/veandco/go-sdl2 v0.4.38
 	github.com/wailsapp/wails/v2 v2.8.0
 	gitlab.com/gomidi/midi/v2 v2.0.30
 	gonum.org/v1/gonum v0.14.0
