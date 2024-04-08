@@ -1,6 +1,8 @@
 module github.com/jfhamlin/muscrat
 
-go 1.21
+go 1.21.3
+
+toolchain go1.21.9
 
 require (
 	github.com/fsnotify/fsnotify v1.6.0
@@ -71,3 +73,5 @@ require (
 	gopkg.in/check.v1 v1.0.0-20200227125254-8fa46927fb4f // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
+
+replace github.com/gordonklaus/portaudio => github.com/KarpelesLab/static-portaudio v0.6.190600

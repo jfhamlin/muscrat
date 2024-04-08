@@ -9,7 +9,6 @@ pkgs.mkShell {
     pkgs.nodejs
 
     pkgs.SDL2
-    pkgs.portaudio
 
     # Seemingly needed because we're linking statically
     pkgs.libiconv
