@@ -76,6 +76,7 @@ jobs:
         APPLE_USERNAME: ${{ secrets.SIGN_MACOS_APPLE_USERNAME }}
       run: |
         echo "Signing Package"
+        envsubst < ./build/darwin/gon-sign.json.tmpl > ./build/darwin/gon-sign.json
         gon -log-level=info ./build/darwin/gon-sign.json
 
     ############################################################################
@@ -103,6 +104,8 @@ jobs:
         APPLE_PASSWORD: ${{ secrets.SIGN_MACOS_APPLE_PASSWORD }}
         APPLE_USERNAME: ${{ secrets.SIGN_MACOS_APPLE_USERNAME }}
       run: |
+        echo "Notarizing Package"
+        envsubst < ./build/darwin/gon-notarize.json.tmpl > ./build/darwin/gon-notarize.json
         gon -log-level=info ./build/darwin/gon-notarize.json
 
     # Upload the build artifacts
