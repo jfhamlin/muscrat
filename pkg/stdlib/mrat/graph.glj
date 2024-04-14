@@ -30,33 +30,3 @@
                              :to (get replacements to to)})))
         new-edges (map fix-edge (:edges g))]
     (merge g {:nodes new-nodes :edges new-edges})))
-
-;; (defn align-graphs
-;;   "Align two graphs. Node IDs are aligned by their type, arguments, and
-;;   their relationships with other nodes. Not all nodes need to be aligned."
-;;   [a b]
-;;   (let [a-nodes (:nodes a)
-;;         b-nodes (:nodes b)
-;;         a-edges (:edges a)
-;;         b-edges (:edges b)
-;;         a-const-nodes (filter #(= (:type %) :const) a-nodes)
-;;         b-const-nodes (filter #(= (:type %) :const) b-nodes)
-;;         a-out-nodes (filter #(= (:type %) :out) a-nodes)
-;;         b-out-nodes (filter #(= (:type %) :out) b-nodes)
-
-;;         ;; Replace constant nodes with the same value
-;;         const-mappings (loop [nodes a-const-nodes
-;;                               value-nodes {}
-;;                               replacements {}]
-;;                          (if (empty? nodes)
-;;                            replacements
-;;                            (let [{id :id [val] :args} (first nodes)
-;;                                  val (double val)
-;;                                  val-node (get value-nodes val)]
-;;                              (if val-node
-;;                                (recur (rest nodes)
-;;                                       value-nodes
-;;                                       (assoc replacements id val-node))
-;;                                (recur (rest nodes)
-;;                                       (assoc value-nodes val id)
-;;                                       replacements)))))

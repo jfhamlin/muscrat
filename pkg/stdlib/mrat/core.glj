@@ -268,7 +268,7 @@
     (freq-ratio x "octaves")
     (pow 2 x)))
 
-(defn midifreq
+(defn mtof
   "Return the frequency corresponding to the given MIDI note number."
   [note]
   (if (is-node? note)
@@ -1106,3 +1106,52 @@
     node))
 
 (def choose-gate choose)
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; MIDI notes
+
+(def ^:private note-names
+  [["C" "B#"]
+   ["C#" "Db"]
+   ["D"]
+   ["D#" "Eb"]
+   ["E" "Fb"]
+   ["F" "E#"]
+   ["F#" "Gb"]
+   ["G"]
+   ["G#" "Ab"]
+   ["A"]
+   ["A#" "Bb"]
+   ["B" "Cb"]])
+
+(doseq [[note names] (map vector
+                          (range 128)
+                          (cycle note-names))]
+  (let [octave-num (- (quot note 12) 1)]
+    (doseq [name names]
+      (eval
+       `(def ~(symbol (str name octave-num)) ~note)))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Scales
+
+(def ionian [0 2 4 5 7 9 11])
+(def dorian [0 2 3 5 7 9 10])
+(def phrygian [0 1 3 5 7 8 10])
+(def lydian [0 2 4 6 7 9 11])
+(def mixolydian [0 2 4 5 7 9 10])
+(def aeolian [0 2 3 5 7 8 10])
+(def locrian [0 1 3 5 6 8 10])
+
+(def major ionian)
+(def minor aeolian)
+
+(def major-pentatonic [0 2 4 7 9])
+(def minor-pentatonic [0 3 5 7 10])
+
+(def blues [0 3 5 6 7 10])
+
+(def harmonic-minor [0 2 3 5 7 8 11])
+(def melodic-minor [0 2 3 5 7 9 11])
+
+(def chromatic (range 12))
