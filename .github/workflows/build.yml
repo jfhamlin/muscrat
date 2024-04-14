@@ -35,10 +35,15 @@ jobs:
     runs-on: ${{ matrix.build.os }}
     steps:
     - uses: actions/checkout@v3
-    - uses: cachix/install-nix-action@v22
+    - uses: actions/setup-go@v5
       with:
-        nix_path: nixpkgs=channel:nixos-unstable
-    - run: nix-shell --run 'PATH=$(go env GOPATH)/bin:$PATH make app'
+        go-version-file: './go.mod'
+    # node v18.17.1
+    - uses: actions/setup-node@v4
+      with:
+        node-version: '18.17.1'
+
+    - run: PATH=$(go env GOPATH)/bin:$PATH make app
 
     ## MacOS specific steps
     - name: Add macOS perms
