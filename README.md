@@ -1,7 +1,7 @@
 # muscrat
 
 <p align="center">
-    <img alt="muscrat logo" src="./pkg/gui/assets/images/muscrat.svg" width="512" />
+    <img alt="muscrat logo" src="./build/appicon.png" width="512" />
 </p>
 
 
@@ -9,7 +9,7 @@
 
 Clone the repository and run:
 ```shell
-make dev
+make
 ```
 
 Pre-built binaries will be available soon.
