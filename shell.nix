@@ -8,11 +8,6 @@ pkgs.mkShell {
     pkgs.go_1_21
     pkgs.nodejs
 
-    pkgs.SDL2
-
-    # Seemingly needed because we're linking statically
-    pkgs.libiconv
-
     pkgs.pkgconfig
 
     frameworks.Security

@@ -23,14 +23,12 @@ import (
 	"unsafe"
 
 	"github.com/ebitengine/purego/objc"
-
-	"github.com/ebitengine/oto/v3/internal/mux"
 )
 
 const (
 	float32SizeInBytes = 4
 
-	bufferCount = 4
+	bufferCount = 8
 
 	noErr = 0
 )
@@ -56,14 +54,14 @@ func newAudioQueue(sampleRate, channelCount int, oneBufferSizeInBytes int) (_Aud
 		0, //CFStringRef
 		0,
 		&audioQueue); osstatus != noErr {
-		return 0, nil, fmt.Errorf("oto: AudioQueueNewFormat with StreamFormat failed: %d", osstatus)
+		return 0, nil, fmt.Errorf("AudioQueueNewFormat with StreamFormat failed: %d", osstatus)
 	}
 
 	bufs := make([]_AudioQueueBufferRef, 0, bufferCount)
 	for len(bufs) < cap(bufs) {
 		var buf _AudioQueueBufferRef
 		if osstatus := _AudioQueueAllocateBuffer(audioQueue, uint32(oneBufferSizeInBytes), &buf); osstatus != noErr {
-			return 0, nil, fmt.Errorf("oto: AudioQueueAllocateBuffer failed: %d", osstatus)
+			return 0, nil, fmt.Errorf("AudioQueueAllocateBuffer failed: %d", osstatus)
 		}
 		buf.mAudioDataByteSize = uint32(oneBufferSizeInBytes)
 		bufs = append(bufs, buf)
@@ -80,8 +78,9 @@ type context struct {
 
 	cond *sync.Cond
 
-	mux *mux.Mux
-	err atomicError
+	input         chan []float32
+	lastInput     []float32
+	lastInputView []float32
 }
 
 // TODO: Convert the error code correctly.
@@ -89,7 +88,7 @@ type context struct {
 
 var theContext *context
 
-func newContext(sampleRate int, channelCount int, format mux.Format, bufferSizeInBytes int) (*context, error) {
+func newContext(sampleRate int, channelCount int, bufferSizeInBytes int) (*context, error) {
 	// defaultOneBufferSizeInBytes is the default buffer size in bytes.
 	//
 	// 12288 seems necessary at least on iPod touch (7th) and MacBook Pro 2020.
@@ -99,7 +98,7 @@ func newContext(sampleRate int, channelCount int, format mux.Format, bufferSizeI
 
 	var oneBufferSizeInBytes int
 	if bufferSizeInBytes != 0 {
-		oneBufferSizeInBytes = bufferSizeInBytes / bufferCount
+		oneBufferSizeInBytes = bufferSizeInBytes
 	} else {
 		oneBufferSizeInBytes = defaultOneBufferSizeInBytes
 	}
@@ -108,8 +107,8 @@ func newContext(sampleRate int, channelCount int, format mux.Format, bufferSizeI
 
 	c := &context{
 		cond:                 sync.NewCond(&sync.Mutex{}),
-		mux:                  mux.New(sampleRate, channelCount, format),
 		oneBufferSizeInBytes: oneBufferSizeInBytes,
+		input:                make(chan []float32, bufferCount),
 	}
 	theContext = c
 
@@ -137,7 +136,7 @@ try:
 			retryCount++
 			goto try
 		}
-		return nil, fmt.Errorf("oto: AudioQueueStart failed at newContext: %d", osstatus)
+		return nil, fmt.Errorf("AudioQueueStart failed at newContext: %d", osstatus)
 	}
 
 	go c.loop()
@@ -149,39 +148,39 @@ func (c *context) wait() bool {
 	c.cond.L.Lock()
 	defer c.cond.L.Unlock()
 
-	for len(c.unqueuedBuffers) == 0 && c.err.Load() == nil {
+	for len(c.unqueuedBuffers) == 0 {
 		c.cond.Wait()
 	}
-	return c.err.Load() == nil
+	return true
 }
 
 func (c *context) loop() {
-	buf32 := make([]float32, c.oneBufferSizeInBytes/4)
 	for {
 		if !c.wait() {
 			return
 		}
-		c.appendBuffer(buf32)
+		c.fillBuffer()
 	}
 }
 
-func (c *context) appendBuffer(buf32 []float32) {
+func (c *context) fillBuffer() {
 	c.cond.L.Lock()
 	defer c.cond.L.Unlock()
 
-	if c.err.Load() != nil {
-		return
-	}
-
-	buf := c.unqueuedBuffers[0]
-	copy(c.unqueuedBuffers, c.unqueuedBuffers[1:])
+	buf := c.unqueuedBuffers[len(c.unqueuedBuffers)-1]
 	c.unqueuedBuffers = c.unqueuedBuffers[:len(c.unqueuedBuffers)-1]
 
-	c.mux.ReadFloat32s(buf32)
-	copy(unsafe.Slice((*float32)(unsafe.Pointer(buf.mAudioData)), buf.mAudioDataByteSize/float32SizeInBytes), buf32)
+	inBuf := <-c.input
+	if len(inBuf) != int(buf.mAudioDataByteSize/float32SizeInBytes) {
+		panic(fmt.Errorf("unexpected input size: %d != %d", len(c.lastInput), buf.mAudioDataByteSize/float32SizeInBytes))
+	}
+
+	copy(unsafe.Slice((*float32)(unsafe.Pointer(buf.mAudioData)), buf.mAudioDataByteSize/float32SizeInBytes), inBuf)
+
+	pool.Put(inBuf)
 
 	if osstatus := _AudioQueueEnqueueBuffer(c.audioQueue, buf, 0, nil); osstatus != noErr {
-		c.err.TryStore(fmt.Errorf("oto: AudioQueueEnqueueBuffer failed: %d", osstatus))
+		panic(fmt.Errorf("AudioQueueEnqueueBuffer failed: %d", osstatus))
 	}
 }
 
@@ -189,11 +188,8 @@ func (c *context) Suspend() error {
 	c.cond.L.Lock()
 	defer c.cond.L.Unlock()
 
-	if err := c.err.Load(); err != nil {
-		return err.(error)
-	}
 	if osstatus := _AudioQueuePause(c.audioQueue); osstatus != noErr {
-		return fmt.Errorf("oto: AudioQueuePause failed: %d", osstatus)
+		return fmt.Errorf("AudioQueuePause failed: %d", osstatus)
 	}
 	return nil
 }
@@ -201,10 +197,6 @@ func (c *context) Suspend() error {
 func (c *context) Resume() error {
 	c.cond.L.Lock()
 	defer c.cond.L.Unlock()
-
-	if err := c.err.Load(); err != nil {
-		return err.(error)
-	}
 
 	var retryCount int
 try:
@@ -222,14 +214,7 @@ try:
 			time.Sleep(10 * time.Millisecond)
 			goto try
 		}
-		return fmt.Errorf("oto: AudioQueueStart failed at Resume: %d", osstatus)
-	}
-	return nil
-}
-
-func (c *context) Err() error {
-	if err := c.err.Load(); err != nil {
-		return err.(error)
+		return fmt.Errorf("AudioQueueStart failed at Resume: %d", osstatus)
 	}
 	return nil
 }

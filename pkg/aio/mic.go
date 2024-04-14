@@ -12,19 +12,10 @@ import (
 	"github.com/jfhamlin/muscrat/pkg/console"
 	"github.com/jfhamlin/muscrat/pkg/ugen"
 	"github.com/oov/audio/resampler"
-
-	// pprof
-	"net/http"
-	_ "net/http/pprof"
 )
 
 func init() {
 	portaudio.Initialize()
-
-	// start pprof
-	go func() {
-		fmt.Println(http.ListenAndServe("localhost:6060", nil))
-	}()
 }
 
 func chk(err error) {
