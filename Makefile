@@ -6,13 +6,9 @@ MUSCRAT_SAMPLE_PATH ?= ./data/samples
 dev: wails
 	@MUSCRAT_SAMPLE_PATH=$(MUSCRAT_SAMPLE_PATH) wails dev
 
-.PHONY: build/bin/mrat # force rebuild
-build/bin/mrat:
-	@CGO_ENABLED=1 go build -o build/bin/mrat cmd/mrat/main.go
-
 .PHONY: app
-app:
-	@wails build
+app: wails
+	@./scripts/make/app.sh
 
 .PHONY: gen
 gen:
@@ -21,6 +17,10 @@ gen:
 .PHONY: wails
 wails:
 	@which wails 2>&1 > /dev/null || go install github.com/wailsapp/wails/v2/cmd/wails@latest
+
+.PHONY: clean
+clean:
+	@rm -rf build/bin
 
 # run-race: # disable checkptr because glojure uses an unsafe method to support dynamic vars.
 # 	@go run -gcflags=all=-d=checkptr=0 -race cmd/mrat/main.go  $(SCRIPT)

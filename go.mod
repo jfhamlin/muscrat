@@ -1,8 +1,11 @@
 module github.com/jfhamlin/muscrat
 
-go 1.21
+go 1.21.3
+
+toolchain go1.21.9
 
 require (
+	github.com/ebitengine/purego v0.7.0
 	github.com/fsnotify/fsnotify v1.6.0
 	github.com/glojurelang/glojure v0.2.3-0.20240129062610-e04ecdbb91c9
 	github.com/go-audio/audio v1.0.0
@@ -13,7 +16,6 @@ require (
 	github.com/mewkiz/flac v1.0.10
 	github.com/oov/audio v0.0.0-20171004131523-88a2be6dbe38
 	github.com/stretchr/testify v1.8.4
-	github.com/veandco/go-sdl2 v0.4.0
 	github.com/wailsapp/wails/v2 v2.8.0
 	gitlab.com/gomidi/midi/v2 v2.0.30
 	gonum.org/v1/gonum v0.14.0
@@ -66,8 +68,10 @@ require (
 	golang.org/x/exp v0.0.0-20230522175609-2e198f4a06a1 // indirect
 	golang.org/x/image v0.12.0 // indirect
 	golang.org/x/net v0.20.0 // indirect
-	golang.org/x/sys v0.16.0 // indirect
+	golang.org/x/sys v0.18.0 // indirect
 	golang.org/x/text v0.14.0 // indirect
 	gopkg.in/check.v1 v1.0.0-20200227125254-8fa46927fb4f // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
+
+replace github.com/gordonklaus/portaudio => github.com/KarpelesLab/static-portaudio v0.6.190600

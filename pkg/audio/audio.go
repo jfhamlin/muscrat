@@ -1,21 +1,10 @@
 package audio
 
 import (
-	"fmt"
-	"time"
-	"unsafe"
+	"sync"
 
 	"github.com/jfhamlin/muscrat/pkg/conf"
-	"github.com/jfhamlin/muscrat/pkg/console"
-	"github.com/veandco/go-sdl2/sdl"
 )
-
-func init() {
-	// initialize SDL audio
-	if err := sdl.InitSubSystem(sdl.INIT_AUDIO); err != nil {
-		panic(err)
-	}
-}
 
 type (
 	Option func(*options)
@@ -25,88 +14,57 @@ type (
 
 const (
 	maxQueuedBuffers = 1
-	sampleSize       = 4 // assume 32-bit float samples
+
+	numChannels = 2
+	sampleRate  = 44100
 )
 
 var (
-	float32Buf []float32
-
-	audioSpec *sdl.AudioSpec
+	myCtx *context
 )
 
-func Open(opts ...Option) error {
-	if audioSpec != nil {
-		panic("audio already open")
-	}
+func SampleRate() int {
+	return sampleRate
+}
 
-	// By default, 32-bit float samples, stereo, sample rate
-	spec := &sdl.AudioSpec{
-		Freq:     int32(conf.SampleRate),
-		Format:   sdl.AUDIO_F32SYS,
-		Channels: 2,
-		Samples:  uint16(conf.OutputBufferSize),
-	}
-	if err := sdl.OpenAudio(spec, nil); err != nil {
+func NumChannels() int {
+	return numChannels
+}
+
+func Open(opts ...Option) error {
+	ctx, err := newContext(SampleRate(), NumChannels(), 4*numChannels*conf.OutputBufferSize)
+	if err != nil {
 		return err
 	}
-	sdl.PauseAudio(false)
-	audioSpec = spec
 
-	float32Buf = make([]float32, int(spec.Samples)*int(spec.Channels))
+	myCtx = ctx
 
 	return nil
 }
 
 func Close() {
-	sdl.CloseAudio()
-	audioSpec = nil
+
 }
 
-func SampleRate() int {
-	return int(audioSpec.Freq)
-}
-
-func NumChannels() int {
-	return int(audioSpec.Channels)
-}
-
-func numBytesToNumSamples(numBytes uint32) int {
-	return int(numBytes) / int(audioSpec.Channels*sampleSize)
-}
-
-// var (
-// 	timeOfLastQueuedAudio = time.Now()
-// )
+var (
+	pool = &sync.Pool{
+		New: func() interface{} {
+			return make([]float32, numChannels*conf.OutputBufferSize)
+		},
+	}
+)
 
 func QueueAudioFloat64(fbuf []float64) error {
-	// TODO: just use the callback version
-
-	// if dur := time.Since(timeOfLastQueuedAudio); dur > time.Millisecond {
-	// 	fmt.Printf("time since last queued audio: %v\n", dur)
-	// }
-	// defer func() {
-	// 	timeOfLastQueuedAudio = time.Now()
-	// }()
-
-	bufferByteSize := sampleSize * int(audioSpec.Channels) * int(audioSpec.Samples)
-	sz := sdl.GetQueuedAudioSize(1)
-	if sz < 1024 {
-		fmt.Println(fmt.Sprintf("audio buffer underflow: %d < %d", sz, bufferByteSize))
-		console.Log(console.Warn, "audio buffer underflow", nil)
-	}
-	for numBytesToNumSamples(sdl.GetQueuedAudioSize(1)) > maxQueuedBuffers*bufferByteSize {
-		excessSamples := numBytesToNumSamples(sdl.GetQueuedAudioSize(1)) - maxQueuedBuffers*bufferByteSize
-		if excessSamples < 0 {
-			break
-		}
-		sleepTime := time.Duration(excessSamples) * time.Second / time.Duration(audioSpec.Freq)
-		time.Sleep(sleepTime)
+	if myCtx == nil {
+		panic("audio not open")
 	}
 
-	for i, f := range fbuf {
-		float32Buf[i] = float32(f)
+	buf := pool.Get().([]float32)
+	for i := 0; i < len(fbuf); i++ {
+		buf[i] = float32(fbuf[i])
 	}
-	sendBuf := float32Buf[:len(fbuf)]
-	buf := unsafe.Slice((*byte)(unsafe.Pointer(&sendBuf[0])), len(sendBuf)*4)
-	return sdl.QueueAudio(1, buf)
+
+	myCtx.input <- buf
+
+	return nil
 }

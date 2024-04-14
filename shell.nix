@@ -8,13 +8,7 @@ pkgs.mkShell {
     pkgs.go_1_21
     pkgs.nodejs
 
-    pkgs.SDL2
-    pkgs.portaudio
-
     pkgs.pkgconfig
-
-    # for icon generation
-    pkgs.imagemagick
 
     frameworks.Security
     frameworks.Cocoa
@@ -22,8 +16,5 @@ pkgs.mkShell {
     frameworks.UniformTypeIdentifiers
     frameworks.ForceFeedback
     frameworks.Kernel
-
-    # for fyne
-    frameworks.UserNotifications
   ];
 }
