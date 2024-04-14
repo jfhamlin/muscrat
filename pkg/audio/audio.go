@@ -1,112 +1,167 @@
 package audio
 
 import (
+	"encoding/binary"
 	"fmt"
+	"math"
+	"sync"
 	"time"
-	"unsafe"
 
+	"github.com/ebitengine/oto/v3"
 	"github.com/jfhamlin/muscrat/pkg/conf"
-	"github.com/jfhamlin/muscrat/pkg/console"
-	"github.com/veandco/go-sdl2/sdl"
 )
-
-func init() {
-	// initialize SDL audio
-	if err := sdl.InitSubSystem(sdl.INIT_AUDIO); err != nil {
-		panic(err)
-	}
-}
 
 type (
 	Option func(*options)
 
 	options struct{}
+
+	bufferReader struct {
+		// circular buffer
+		buf   []byte
+		pos   int
+		count int
+		input chan []byte
+	}
 )
 
 const (
 	maxQueuedBuffers = 1
-	sampleSize       = 4 // assume 32-bit float samples
+
+	numChannels = 2
+	sampleRate  = 44100
 )
 
 var (
-	float32Buf []float32
-
-	audioSpec *sdl.AudioSpec
+	otoCtx *oto.Context
+	player *oto.Player
+	reader *bufferReader
 )
 
+func SampleRate() int {
+	return sampleRate
+}
+
+func NumChannels() int {
+	return numChannels
+}
+
 func Open(opts ...Option) error {
-	if audioSpec != nil {
+	if otoCtx != nil {
 		panic("audio already open")
 	}
 
-	// By default, 32-bit float samples, stereo, sample rate
-	spec := &sdl.AudioSpec{
-		Freq:     int32(conf.SampleRate),
-		Format:   sdl.AUDIO_F32SYS,
-		Channels: 2,
-		Samples:  uint16(conf.OutputBufferSize),
-	}
-	if err := sdl.OpenAudio(spec, nil); err != nil {
+	//bufferDur := 4 * time.Duration(float64(time.Second)*float64(conf.OutputBufferSize)/sampleRate)
+	bufferDur := time.Duration(0)
+	ctx, ready, err := oto.NewContext(&oto.NewContextOptions{
+		SampleRate:   sampleRate,
+		ChannelCount: numChannels,
+		Format:       oto.FormatFloat32LE,
+		BufferSize:   bufferDur,
+	})
+	if err != nil {
 		return err
 	}
-	sdl.PauseAudio(false)
-	audioSpec = spec
+	<-ready
 
-	float32Buf = make([]float32, int(spec.Samples)*int(spec.Channels))
+	otoCtx = ctx
+	reader = &bufferReader{
+		// enough space for two output buffers
+		buf:   make([]byte, 2*4*conf.OutputBufferSize*numChannels),
+		input: make(chan []byte, maxQueuedBuffers),
+	}
+	player = otoCtx.NewPlayer(reader)
+	player.SetBufferSize(4 * numChannels * conf.OutputBufferSize)
+
+	player.Play()
 
 	return nil
 }
 
 func Close() {
-	sdl.CloseAudio()
-	audioSpec = nil
+	if player != nil {
+		player.Close()
+		player = nil
+		otoCtx = nil
+		reader = nil
+	}
 }
 
-func SampleRate() int {
-	return int(audioSpec.Freq)
-}
+var (
+	pool = &sync.Pool{
+		New: func() interface{} {
+			return make([]byte, 4*numChannels*conf.OutputBufferSize)
+		},
+	}
 
-func NumChannels() int {
-	return int(audioSpec.Channels)
-}
-
-func numBytesToNumSamples(numBytes uint32) int {
-	return int(numBytes) / int(audioSpec.Channels*sampleSize)
-}
-
-// var (
-// 	timeOfLastQueuedAudio = time.Now()
-// )
+	val = float32(-1)
+	cnt = 0
+)
 
 func QueueAudioFloat64(fbuf []float64) error {
-	// TODO: just use the callback version
-
-	// if dur := time.Since(timeOfLastQueuedAudio); dur > time.Millisecond {
-	// 	fmt.Printf("time since last queued audio: %v\n", dur)
-	// }
-	// defer func() {
-	// 	timeOfLastQueuedAudio = time.Now()
-	// }()
-
-	bufferByteSize := sampleSize * int(audioSpec.Channels) * int(audioSpec.Samples)
-	sz := sdl.GetQueuedAudioSize(1)
-	if sz < 1024 {
-		fmt.Println(fmt.Sprintf("audio buffer underflow: %d < %d", sz, bufferByteSize))
-		console.Log(console.Warn, "audio buffer underflow", nil)
+	if reader == nil {
+		panic("audio not open")
 	}
-	for numBytesToNumSamples(sdl.GetQueuedAudioSize(1)) > maxQueuedBuffers*bufferByteSize {
-		excessSamples := numBytesToNumSamples(sdl.GetQueuedAudioSize(1)) - maxQueuedBuffers*bufferByteSize
-		if excessSamples < 0 {
-			break
+
+	buf := pool.Get().([]byte)
+	if len(buf) != 4*len(fbuf) {
+		panic("unexpected buffer size")
+	}
+
+	for i, flt := range fbuf {
+		_ = flt
+		//f32 := float32(flt)
+		f32 := val
+		cnt++
+		if cnt > 100 {
+			val = -val
+			cnt = 0
 		}
-		sleepTime := time.Duration(excessSamples) * time.Second / time.Duration(audioSpec.Freq)
-		time.Sleep(sleepTime)
+
+		floatBits := math.Float32bits(f32)
+		binary.LittleEndian.PutUint32(buf[4*i:], floatBits)
 	}
 
-	for i, f := range fbuf {
-		float32Buf[i] = float32(f)
+	reader.input <- buf
+
+	return nil
+}
+
+func (r *bufferReader) Read(p []byte) (int, error) {
+	if r.count == 0 {
+		r.fillBuffer()
 	}
-	sendBuf := float32Buf[:len(fbuf)]
-	buf := unsafe.Slice((*byte)(unsafe.Pointer(&sendBuf[0])), len(sendBuf)*4)
-	return sdl.QueueAudio(1, buf)
+	if len(p) > r.count {
+		p = p[:r.count]
+	}
+	fmt.Println("reading", len(p), "bytes")
+
+	n := 0
+	for n < len(p) {
+		n = copy(p, r.buf[r.pos:])
+		r.pos = (r.pos + n) % len(r.buf)
+	}
+	r.count -= len(p)
+
+	return len(p), nil
+}
+
+func (r *bufferReader) fillBuffer() {
+	buf := <-r.input
+
+	if (len(r.buf)-r.pos)%4 != 0 {
+		panic("invalid buffer position")
+	}
+
+	insertPos := (r.pos + r.count) % len(r.buf)
+	for i := 0; i < len(buf); i += 4 {
+		r.buf[insertPos] = buf[i]
+		r.buf[insertPos+1] = buf[i+1]
+		r.buf[insertPos+2] = buf[i+2]
+		r.buf[insertPos+3] = buf[i+3]
+		insertPos = (insertPos + 4) % len(r.buf)
+	}
+	r.count += len(buf)
+
+	pool.Put(buf)
 }
