@@ -40,7 +40,6 @@ jobs:
     - uses: actions/setup-go@v5
       with:
         go-version-file: './go.mod'
-    # node v18.17.1
     - uses: actions/setup-node@v4
       with:
         node-version: '18.17.1'
