@@ -43,7 +43,6 @@
   # CHORDS AND UNISONS
   "
   (:require [mrat.core :refer :all]
-            [mrat.midi]
             [glojure.string :as str]))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -123,7 +122,9 @@
   [key {:keys [acc name octave] :as note}]
   (if (or (= name \z) (= name \x))
     0
-    (let [midi-map (ns-map 'mrat.midi)
+    (let [midi-map (ns-map 'mrat.core)  ;; all midi notes are in core
+                                        ;; we're ok with collisions
+                                        ;; with other symbols in core.
           upper-name (char (unicode.ToUpper name))
           midi-octave 4 ;; default midi octave
           is-lower (unicode.IsLower name)
@@ -133,7 +134,7 @@
           .get
           (+ (* 12 octave-scale))
           (+ semitone-offset)
-          midifreq))))
+          mtof))))
 
 (defn- note-len
   [default-len {:keys [len] :as note}]
@@ -203,10 +204,10 @@
           note-schedule (flatten (map #(let [zero-count (/ (- % scheduling-unit) scheduling-unit)]
                                         (concat [1] (repeat (long zero-count) 0)))
                                       note-lengths))
-          note-clock (* (sequencer clock note-schedule) clock)
-          pitches (sequencer note-clock pitches)]
+          note-clock (* (step clock note-schedule) clock)
+          pitches (step note-clock pitches)]
       {:voices [{:pitches pitches
-                 :durs (sequencer note-clock note-durs)
+                 :durs (step note-clock note-durs)
                  ;; rests are represented as a pitch of 0, so we can
                  ;; gate the clock with the pitches to avoid
                  ;; triggering an envelope on rests.

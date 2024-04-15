@@ -1,8 +1,5 @@
 (ns examples.scriabin
   (:require [mrat.core :refer :all] :reload
-            [mrat.welsh :refer :all] :reload
-            [mrat.scales :refer :all] :reload
-            [mrat.midi :refer :all] :reload
             [mrat.abc :as abc] :reload))
 
 (def tempo-in (midi-in "tempo" :cc :controller 70 :default 0.5))
@@ -10,6 +7,8 @@
 
 (def dynamics-in (midi-in "dynamics" :cc :controller 74 :default 0.5))
 (def dynamics-db (decibels (- (* 40 (- 1.0 dynamics-in)))))
+
+(def room-size (midi-in "room-size" :cc :controller 71 :default 0.0))
 
 ;; transcription of scriabin's Four Preludes, Op. 22, No. 1
 (def score
@@ -71,7 +70,7 @@
                      (* envelope-bass))]
     (-> (+ sig (* (decibels -5) sig-bass))
         (* dynamics-db)
-        (freeverb :room-size 0.1))))
+        (freeverb :room-size room-size))))
 
 ;;(wavout tune :filename "scriabin.wav")
 

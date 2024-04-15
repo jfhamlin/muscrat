@@ -1080,12 +1080,13 @@
   (let [bps (/ bpm 60.0)]
     (apply impulse (* bps res) flags)))
 
-(defn sequencer
-  [gate freqs]
+(defn step
+  "Cycle through a sequence of values on each trigger."
+  [trig freqs]
   (let [node (add-node! :sequencer github.com$jfhamlin$muscrat$pkg$pattern.NewSequencer)
-        gate (as-node gate)
+        trig (as-node trig)
         freqs (map as-node freqs)]
-    (add-edge! gate node "trigger")
+    (add-edge! trig node "trigger")
     (doseq-idx [[freq i] freqs]
                (add-edge! freq node (str \$ i)))
     node))
@@ -1096,16 +1097,16 @@
     (* s clock)))
 
 (defn choose
-  [gate opts]
+  "Pick randomly from a sequence of values, making a new choice on each
+  trigger."
+  [trig opts]
   (let [node (add-node! :choose github.com$jfhamlin$muscrat$pkg$pattern.NewChoose)
-        gate (as-node gate)
+        trig (as-node trig)
         opts (map as-node opts)]
-    (add-edge! gate node "trigger")
+    (add-edge! trig node "trigger")
     (doseq-idx [[opt i] opts]
                (add-edge! opt node (str \$ i)))
     node))
-
-(def choose-gate choose)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; MIDI notes
