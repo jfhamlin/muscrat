@@ -171,13 +171,18 @@
                              (vector? channels)) [channels channels] channels)
         channels (if (= (count channels) 0) [0 0] channels)
         channels (if (= (count channels) 1) [(first channels) (first channels)] channels)
-        num-sinks (count (outputs *graph*))
-        ch-inds (map vector channels (range (count channels)))]
+        ch-inds (map vector channels (range (count channels)))
+        find-or-create-sink (fn [i]
+                              (let [outputs (filter #(= (:type %) :out) (:nodes @*graph*))
+                                    sink (first (filter #(= (first (:args %)) i) outputs))]
+                                (if sink
+                                  sink
+                                  (add-node! :out nil :args [i] :sink true))))]
     (doseq [[ch i] ch-inds]
       (let [gen (as-node ch)
-            chan-id (+ num-sinks i)
-            sink (add-node! :out nil :args [chan-id] :sink true)]
-        (add-edge! gen sink "in"))))) ;; port name doesn't matter for out nodes
+            sink (find-or-create-sink i)]
+        ;; port name doesn't matter for out nodes
+        (add-edge! gen sink (str "in" (count (:nodes @*graph*))))))))
 
 (defn- constant-node
   [x]
