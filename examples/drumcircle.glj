@@ -1,17 +1,14 @@
 (ns examples.drumcircle
-  (:require [mrat.core :refer :all]
-            [mrat.scales :refer :all]
-            [mrat.midi :refer :all]
-            [mrat.abc :as abc]))
+  (:require [mrat.core :refer :all]))
 
-(def trig (impulse (line 4 6 10)))
+(def trig (impulse 4))
 
-(def notes (map midifreq [Eb5 B3 C2 D5 B2 C3 G4 A3]))
-(def prog (sequencer trig notes))
-(play (-> (sin prog :mul 0.2)
+(def notes (map mtof [Eb5 B3 C2 D5 B2 C3 G4 A3]))
+(def prog (step trig notes))
+(play (-> (saw prog :mul 0.2)
           (combc 2 0.014 1)
-          (* 0.5)
+          (* 0.7)
           (rlpf 300 0.3)
-          (+ (-> (play-buf :loop_amen_full :rate (choose trig [0.4 1 0.1 2 1.5 0.6 0.25]) :trigger trig :mul 0.1)
-                 (rhpf 1000 0.05 :mul 0.8)))
-          (freeverb :room-size 0.8)))
+          (+ (-> (play-buf :loop_amen_full :rate (step trig [0.4 1 0.1 2 1.5 0.6 0.25]) :trigger trig :mul 0.1)
+                 (rhpf 1500 0.05 :mul 0.3)))
+          (freeverb :room-size 0.75)))

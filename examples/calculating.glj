@@ -1,8 +1,5 @@
 (ns examples.calculating
-  (:require [mrat.core :refer :all]
-            [mrat.scales :refer :all]
-            [mrat.midi :refer :all]
-            [mrat.abc :as abc]))
+  (:require [mrat.core :refer :all]))
 
 (def metro (lfpulse 8 :duty 0.2))
 
@@ -12,4 +9,4 @@
           (* metro)
           (combc 2 0.01 3)
           (rlpf (* freq 8) 1)
-          (* 0.4)))
+          (* 0.1)))

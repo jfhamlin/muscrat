@@ -1,0 +1,10 @@
+(ns user
+      (:require [mrat.core :refer :all]
+        [mrat.scales :refer :all]
+        [mrat.midi :refer :all]))
+
+(play (-> (saw [100 150 202 304 606] :mul 0.5 :iphase [0.2 0 0.5])
+          (bitcrush :bits 3)
+          (rlpf 650 :mul 0.25)
+          sum
+          limiter))

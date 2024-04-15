@@ -1,0 +1,29 @@
+(ns user
+  (:require [mrat.core :refer :all]
+    [mrat.scales :refer :all]
+    [mrat.midi :refer :all]))
+
+(def trig (impulse 8))
+;;(def drum-trig (impulse 2 :sync trig))
+
+(def note (sequencer trig
+                     (map midifreq [A3 B3 D4 G4 B3 A3 C3
+                                    A3 B3 D4 G4 B3 A3 C3
+                                    A3 B3 D4 G4 B3 A3 C3
+                                    A3 B3 D4 G4 B3 A3 D3])))
+
+(def cutoff
+  (envelope trig
+            [(* 4 note) (* (semitones 7) note) (* 4 note)]
+            [0.02 0.05]))
+
+(play (-> (sin note
+               :sync trig
+               :mul (sin 2 :sync trig :mul 0.3 :add 0.8))
+          wfold
+          (* (envelope trig [0 1 1 0] [0.05 0.05 0.01]))
+          (rlpf cutoff 0.5)
+          (freeverb :room-size 0.5)
+          (* 0.6)
+          ;;(+ (play-buf :bass_hit_c :trigger trig :mul 0.3 :rate 0.6))
+          limiter))

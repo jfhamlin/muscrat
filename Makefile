@@ -1,10 +1,13 @@
 
 # environment variables
 MUSCRAT_SAMPLE_PATH ?= ./data/samples
+MUSCRAT_STDLIB_PATH ?= ./pkg/stdlib
 
 .PHONY: dev
 dev: wails
-	@MUSCRAT_SAMPLE_PATH=$(MUSCRAT_SAMPLE_PATH) wails dev
+	@MUSCRAT_SAMPLE_PATH=$(MUSCRAT_SAMPLE_PATH) \
+	 MUSCRAT_STDLIB_PATH=$(MUSCRAT_STDLIB_PATH) \
+	 wails dev
 
 .PHONY: app
 app: wails

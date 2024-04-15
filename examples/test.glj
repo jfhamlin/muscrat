@@ -1,0 +1,8 @@
+(ns user
+  (:require [mrat.core :refer :all]
+    [mrat.scales :refer :all]
+    [mrat.midi :refer :all]))
+
+(play (-> (saw (sin 293 :mul 200 :add 300) :mul (sin 100 :mul 5 :add 10))
+          wfold
+          (rlpf 400 0.2)))

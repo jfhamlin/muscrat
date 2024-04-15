@@ -1,7 +1,5 @@
 (ns examples.synth
-  (:require [mrat.core :refer :all] :reload
-            [mrat.midi :refer :all] :reload
-            [mrat.welsh] :reload))
+  (:require [mrat.core :refer :all]))
 
 (defn pad
   ([gate] (pad gate 440))
@@ -15,12 +13,11 @@
          asr (env-asr gate [1 1 8])]
      (* amp asr snd))))
 
-
 (def ivals (map semitones [3 7 12 14 15 24]))
 
 (def trig (sqr 0.25))
 
-(def s (sequencer trig (map midifreq [E2 G2 F#2 A2 C2 B2])))
+(def s (step trig (map mtof [E2 G2 F#2 A2 C2 B2])))
 
 (play (sum
        (map #(-> (pad trig (* s %) (decibels -35))
@@ -28,4 +25,3 @@
                  (lores (* 4 s) 0.8)
                  (freeverb :room-size 0.6))
             ivals)))
-

@@ -1,41 +1,40 @@
 (ns examples.ihylpr
   "A cover of 'I heard you like polyrhythms' by Virtual Riot
   https://www.youtube.com/watch?v=SthcxWPXG_E"
-  (:require [mrat.core :refer :all]
-            [mrat.welsh :refer :all]
-            [mrat.scales :refer :all]
-            [mrat.midi :refer :all]
-            [mrat.abc :as abc]))
+  (:require [mrat.core :refer :all]))
 
 (def bps 1.0)
 
 (def speed-factor 0.005)
 
+(def offset (choose (impulse (/ bps 10)) [-9 -5 0 3 7 12]))
+
 (def notes
-  [E8 D8
-   B7 A7 G7 F#7 E7 D7
-   B6 A6 G6 F#6 E6 D6
-   B5 A5 G5 F#5 E5 D5
-   B4 A4 G4 F#4 E4 D4
-   B3 G3 E3 D3
-   B2 G2 E2
-   B1 E1])
+  (map #(+ % offset) [E8 D8 B7 A7 G7 F#7
+   E7 D7 B6 A6 G6 F#6
+   E6 D6 B5 A5 G5 F#5
+   E5 D5 B4 A4 G4 F#4
+   E4 D4 B3    G3
+   E3 D3 B2    G2
+   E2 B1
+   E1]))
 
 (def rand-source (math$rand.NewSource 214))
 (def mrand (math$rand.New rand-source))
 
 (defn synth
   [rate note]
-  (let [osc (sin (midifreq note))
+  (let [osc (sqr (mtof note) :duty 0.2)
         trig (impulse rate :iphase (.Float64 mrand))
-        envelope (env trig [0 1 1 0] [0.01 0.02 0.1])]
-    (* osc envelope)))
+        amp (env trig [0 1 1 0] [0.01 0.02 0.1])]
+    (* osc amp)))
 
 (def ihylpr
   (-> (map #(-> (synth (/ bps (+ 1 (* speed-factor %1))) %2)
                 (pan2 (/ %1 (count notes)))) (range (count notes)) notes)
       (sum)
       (* (/ 1 (inc (count notes))))
+      (* 4)
       (freeverb :room-size 0.5)))
 
 (play ihylpr)

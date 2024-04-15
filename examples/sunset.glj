@@ -1,7 +1,5 @@
 (ns examples.sunset
-  (:require [mrat.core :refer :all]
-            [mrat.scales :refer :all]
-            [mrat.midi :refer :all]))
+  (:require [mrat.core :refer :all]))
 
 (def melody-amp (* 0.3 (midi-in "melody" :cc :controller 70 :default 0.5)))
 (def drone-amp (midi-in "drone" :cc :controller 74 :default 0.6))
@@ -11,12 +9,8 @@
 
 (def res (* 0.95 (midi-in "res" :cc :controller 75 :default 0.6)))
 
-(defn watch
-  [node]
-  node)
-
-(def hpcutoff (midifreq (+ 40 (* 90 (midi-in "hpcutoff" :cc :controller 76 :default 0)))))
-(def lpcutoff (midifreq (+ 20 (* 110 (midi-in "lpcutoff" :cc :controller 77 :default 1)))))
+(def hpcutoff (mtof (+ 40 (* 90 (midi-in "hpcutoff" :cc :controller 76 :default 0)))))
+(def lpcutoff (mtof (+ 20 (* 110 (midi-in "lpcutoff" :cc :controller 77 :default 1)))))
 
 (def intervals [0 7 0 5 0 10
                 0 5 0 3 0 7
@@ -27,11 +21,11 @@
 
 (def root-midi 50)
 
-(def metro (impulse 8))
+(def metro (impulse 6))
 
 (def metro-slo (impulse 0.1))
 
-(def freq (sequencer metro (map (comp midifreq #(+ root-midi
+(def freq (step metro (map (comp mtof #(+ root-midi
                                                   (choose metro [0 0 0 0 0 0 0 0 0 0
                                                                  7 7 7 7 7 7
                                                                  -12 -12 -12
@@ -40,9 +34,9 @@
                                                                  ]) %)) intervals)))
 
 (def hi-pad
-  (-> (sum (map #(saw % :iphase (math$rand.Float64)) (map #(midifreq (+ root-midi 24 %)) [-2 0 7.1 3 12.1 24.1 35.9])))
+  (-> (sum (map #(saw % :iphase (math$rand.Float64)) (map #(mtof (+ root-midi 24 %)) [-2 0 7.1 3 12.1 24.1 35.9])))
       (* 0.2)
-      (lores (midifreq (+ root-midi 12 24 (lfpulse 1/8 :mul 24))) res)
+      (lores (mtof (+ root-midi 12 24 (lfpulse 1/8 :mul 24))) res)
       (* (env-adsr metro-slo [1 2 0.5 6]))
       (combc 0.25 0.175 4)))
 
@@ -50,9 +44,9 @@
               (* (env-adsr metro [0.01 0.05 0.7 0.5]))
               (combc 1 0.25 (line 0 5 60))
               (* melody-amp)
-              (rlpf (midifreq (- split-cutoff-midi 12))))
+              (rlpf (mtof (- split-cutoff-midi 12))))
           (+ (-> hi-pad
-                 (rhpf (midifreq (+ split-cutoff-midi 12)))
+                 (rhpf (mtof (+ split-cutoff-midi 12)))
                  (pan2 (sin 2 :mul (line 0 1 240)) :mul drone-amp)))
           (* amp)
           (rlpf lpcutoff 1)
@@ -62,5 +56,5 @@
                  (* (env-perc metro [0.01 0.05]))
                  (combc 2 0.2 0.5)
                  (* (noise-quad 4 :mul 0.3 :add 0.7))))
-          (freeverb :room-size 0.2)
+          (freeverb :room-size 0.3)
           limiter))

@@ -5,7 +5,7 @@
             [mrat.welsh] :reload))
 
 (def root E3)
-(def notes (map #(* root (semitones %))
+(def notes (map #(* (midifreq root) (semitones %))
                 aeolian))
 
 (defn synth

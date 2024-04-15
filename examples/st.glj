@@ -1,8 +1,5 @@
 (ns examples.st
-  (:require [mrat.core :refer :all] :reload
-            [mrat.midi :refer :all] :reload
-            [mrat.scales :refer :all] :reload
-            [mrat.welsh] :reload))
+  (:require [mrat.core :refer :all] :reload))
 
 (def song-dur (* 60 3))
 
@@ -30,7 +27,7 @@
 
 (def duty-env (env 1 [0.8 0.8 0.2 0.2] [30 2 100]))
 
-(def root (midifreq E3))
+(def root (mtof E3))
 (def notes (map #(* root (semitones %))
                 aeolian))
 
@@ -50,7 +47,7 @@
 
 (def melody
   (let [gate (noise melody-freq-seq)
-        freq (choose-gate gate notes)
+        freq (choose gate notes)
         amp (decibels melody-env)]
     (-> (mixed-synth gate freq (env 1 [0 1 1] [120 100]))
         (lores (* 2 freq) 0.9)
@@ -85,4 +82,3 @@
         noise-bursts)))
 ;; (wavout song)
 (play song)
-

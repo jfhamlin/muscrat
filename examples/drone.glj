@@ -1,14 +1,13 @@
 (ns examples.drone
-  (:require [mrat.core :refer :all]
-            [mrat.midi :refer :all]))
+  (:require [mrat.core :refer :all]))
 
 (defn drone
   [rate notes [a r]]
   (let [trig (impulse rate)
-        freq (midifreq (choose trig notes))
+        freq (mtof (choose trig notes))
         envelope (env trig [0 1 1 0] [a 0.1 r])]
     (-> (saw freq :duty (sin (* 0.75 rate) :mul 0.25 :add 0.75))
-        (rlpf (* 4 freq) 0.3)
+        (rlpf (* 2 freq) 0.8)
         (* envelope))))
 
 (play (-> (+ (drone 1/8 [D3 E3] [6 6])
@@ -16,6 +15,9 @@
              (drone 1/11 [A4 C#4] [5 5])
              (drone 1/7 [E4 B4] [5 4])
              )
+          (+ (-> (pink-noise)
+                 (* 0.1)
+                 (rhpf (mtof B8) (sin 1/10 :mul 0.5 :add 0.6))))
           (freeverb :room-size 0.6)
           (* 0.2)
           limiter))
