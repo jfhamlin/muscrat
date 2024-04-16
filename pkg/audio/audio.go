@@ -21,6 +21,10 @@ const (
 
 var (
 	myCtx *context
+
+	// safetyClipThreshold is the maximum value that can be queued to the audio
+	// modeled after the safety clip threshold in supercollider.
+	safetyClipThreshold = 1.0
 )
 
 func SampleRate() int {
@@ -61,7 +65,13 @@ func QueueAudioFloat64(fbuf []float64) error {
 
 	buf := pool.Get().([]float32)
 	for i := 0; i < len(fbuf); i++ {
-		buf[i] = float32(fbuf[i])
+		val := fbuf[i]
+		if val > safetyClipThreshold {
+			val = safetyClipThreshold
+		} else if val < -safetyClipThreshold {
+			val = -safetyClipThreshold
+		}
+		buf[i] = float32(val)
 	}
 
 	myCtx.input <- buf
