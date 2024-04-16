@@ -1,14 +1,10 @@
 (ns examples.compus
-  (:require [mrat.core :refer :all]
-            [mrat.welsh :refer :all]
-            [mrat.scales :refer :all]
-            [mrat.midi :refer :all]
-            [mrat.abc :as abc]))
+  (:require [mrat.core :refer :all]))
 
 (defugen mod-pulse-synth
   [gate 1
    note 52
-   cutoff-freq (midifreq 100)
+   cutoff-freq (mtof 100)
    attack 0.001
    decay 0
    sustain 1
@@ -29,7 +25,7 @@
         ctl-wave-mul (- (* 2 (if (> mod-invert-wave 0) 1 0)) 1)
         ctl-wave (* -1 ctl-wave ctl-wave-mul)
         mod-note (+ min-note (* ctl-wave (/ (- max-note min-note) 2)))
-        freq (midifreq mod-note)
+        freq (mtof mod-note)
         snd (pulse freq :duty pulse-width)
         snd (rlpf snd cutoff-freq)
         amp-fudge 0.8
@@ -53,13 +49,13 @@
             :rate (choose trig [0.5 0.5 1 1 2 4])))
 
 (def bass1 (mod-pulse-synth trig C1
-                            :cutoff-freq (midifreq (rrand 50 90 trig))
+                            :cutoff-freq (mtof (rrand 50 90 trig))
                             :amp (rrand 0.5 1 trig)
                             :release 1
                             :mod-phase (choose trig [0.25 0.5 1])))
 
 (def bass2 (mod-pulse-synth trig C2
-                            :cutoff-freq (midifreq 60)
+                            :cutoff-freq (mtof 60)
                             :amp 0.35
                             :mod-phase 0.25
                             :mod-range (choose trig [24 36 34])
