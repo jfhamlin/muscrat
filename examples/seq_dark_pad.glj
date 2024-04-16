@@ -3,7 +3,7 @@
 
 (defn pad
   ([gate] (pad gate 440))
-  ([gate freq] (pad gate freq (decibels -20)))
+  ([gate freq] (pad gate freq (dbamp -20)))
   ([gate freq amp]
    (let [size 32
          freqs (map #(* freq (semitones %)) (repeatedly size #(* 0.1 (noise 8))))
@@ -20,7 +20,7 @@
 (def s (step trig (map mtof [E2 G2 F#2 A2 C2 B2])))
 
 (play (sum
-       (map #(-> (pad trig (* s %) (decibels -35))
+       (map #(-> (pad trig (* s %) (dbamp -35))
                  (delayl 1 (* 0.01 (math$rand.Float64)))
                  (lores (* 4 s) 0.8)
                  (freeverb :room-size 0.6))

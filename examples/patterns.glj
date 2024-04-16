@@ -45,7 +45,7 @@
         (* (env-adsr gate [0.05 0.2 0.7 0.1]))
         (lores (* 2 freq) 0.7)))
         (fn [signal] (* signal signal))  ;; Squaring the signal for a simple distortion
-        (decibels 3))  ;; Boosting volume
+        (dbamp 3))  ;; Boosting volume
 
 ;; Sub Bass
 (defn sub-bass
@@ -56,42 +56,42 @@
 (def bass
   (let [gate (sqr 0.25 :duty 0.5)
         freq (choose-gate gate notes)
-        amp (decibels -5)]
+        amp (dbamp -5)]
     (-> (bassline gate freq)
         (* amp))))
 
 (def atmospheric
   (let [gate (sqr 0.125 :duty 0.5)
         freq (choose-gate gate (map #(* % (octaves 1)) notes))
-        amp (decibels -10)]
+        amp (dbamp -10)]
     (-> (pad gate freq)
         (* amp))))
 
 (def rhythmic-element
   (let [gate (sqr 2 :duty 0.7)
         freq (choose-gate gate notes)
-        amp (decibels -15)]
+        amp (dbamp -15)]
     (-> (rhythm gate freq)
         (* amp))))
 
 (def secondary-rhythmic
   (let [gate (sqr 4 :duty 0.7)
         freq (choose-gate gate notes)
-        amp (decibels -15)]
+        amp (dbamp -15)]
     (-> (sec-rhythm gate freq)
         (* amp))))
 
 (def lead-synth
   (let [gate (sqr 1 :duty 0.5)
         freq (choose-gate gate (map #(* % (octaves 1)) notes))  ;; Moving an octave down
-        amp (decibels -7)]  ;; Slightly louder
+        amp (dbamp -7)]  ;; Slightly louder
     (-> (lead gate freq)
         (* amp))))
 
 (def sub-bass-layer
   (let [gate (sqr 0.25 :duty 0.5)
         freq (choose-gate gate (map #(* % (octaves -1)) notes))
-        amp (decibels -5)]
+        amp (dbamp -5)]
     (-> (sub-bass gate freq)
         (* amp))))
 
@@ -100,8 +100,8 @@
 (def lead-synth
   (let [gate (sqr 1 :duty 0.5)
         freq (choose-gate gate (map #(* % (octaves 1)) notes))  ;; Moving an octave down
-        amp (decibels -7)]  ;; Slightly louder
+        amp (dbamp -7)]  ;; Slightly louder
     (-> (lead gate freq)
         (* amp))))
 
-(play (* (decibels -5) (+ bass atmospheric rhythmic-element secondary-rhythmic lead-synth sub-bass-layer)))
+(play (* (dbamp -5) (+ bass atmospheric rhythmic-element secondary-rhythmic lead-synth sub-bass-layer)))

@@ -6,7 +6,7 @@
 (def tempo (* 2 72 tempo-in)) ;; 72 quarter notes per minute default
 
 (def dynamics-in (midi-in "dynamics" :cc :controller 74 :default 0.5))
-(def dynamics-db (decibels (- (* 40 (- 1.0 dynamics-in)))))
+(def dynamics-db (dbamp (- (* 40 (- 1.0 dynamics-in)))))
 
 (def room-size (midi-in "room-size" :cc :controller 71 :default 0.0))
 
@@ -68,7 +68,7 @@
         sig-bass (-> (saw (* root-bass (semitones (sin 6 :mul 0.1))))
                      (lores (* root-bass 3) 0.9)
                      (* envelope-bass))]
-    (-> (+ sig (* (decibels -5) sig-bass))
+    (-> (+ sig (* (dbamp -5) sig-bass))
         (* dynamics-db)
         (freeverb :room-size room-size))))
 

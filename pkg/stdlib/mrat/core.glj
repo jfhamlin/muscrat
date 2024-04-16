@@ -242,7 +242,7 @@
   [x kind]
   (add-node! :freq-ratio NewFreqRatio :args [kind] :in-edges {"in" x}))
 
-(defn decibels
+(defn dbamp
   "Return the amplitude ratio corresponding to the given decibel value."
   [db]
   (if (is-node? db)

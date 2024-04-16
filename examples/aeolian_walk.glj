@@ -14,7 +14,7 @@
 
 (play (let [gate (noise 16)
             freq (choose gate notes)
-            amp (decibels -10)]
+            amp (dbamp -10)]
         (-> (synth gate freq)
             (lores (* 4 freq) 0.9)
             (freeverb :room-size 0.5)

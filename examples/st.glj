@@ -48,14 +48,14 @@
 (def melody
   (let [gate (noise melody-freq-seq)
         freq (choose gate notes)
-        amp (decibels melody-env)]
+        amp (dbamp melody-env)]
     (-> (mixed-synth gate freq (env 1 [0 1 1] [120 100]))
         (lores (* 2 freq) 0.9)
         (freeverb :room-size room-size-env :dry dry-env)
         (* amp))))
 
 (def drone
-  (let [amp (decibels drone-env)
+  (let [amp (dbamp drone-env)
         freq (* root (octaves -1))]
     (-> (sum (repeatedly
              16
@@ -76,7 +76,7 @@
         (* noise-env))))
 
 (def song
-  (* (decibels song-env)
+  (* (dbamp song-env)
      (+ drone
         melody
         noise-bursts)))

@@ -19,9 +19,9 @@
                 0 0 0 0 0 0
                 ])
 
-(def root-midi 50)
+(def root-midi 40)
 
-(def metro (impulse 6))
+(def metro (impulse 4))
 
 (def metro-slo (impulse 0.1))
 
@@ -55,6 +55,7 @@
                  (bpf 300 0.15) ;;(* freq (choose metro [0.25 0.5 2 4])) 0.2)
                  (* (env-perc metro [0.01 0.05]))
                  (combc 2 0.2 0.5)
+                 (* 0.8)
                  (* (noise-quad 4 :mul 0.3 :add 0.7))))
-          (freeverb :room-size 0.3)
+          (freeverb :room-size 0.6)
           limiter))
