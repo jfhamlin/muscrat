@@ -6,7 +6,17 @@ import (
 	"github.com/wailsapp/wails/v2"
 	"github.com/wailsapp/wails/v2/pkg/options"
 	"github.com/wailsapp/wails/v2/pkg/options/assetserver"
+
+	// pprof
+
+	_ "net/http/pprof"
 )
+
+// func init() {
+// 	go func() {
+// 		log.Println(http.ListenAndServe("localhost:6060", nil))
+// 	}()
+// }
 
 //go:embed all:frontend/dist
 var assets embed.FS
