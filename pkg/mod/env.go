@@ -116,10 +116,7 @@ func NewEnvelope(opts ...EnvOption) ugen.UGen {
 		case shapeExp:
 			delta = math.Pow(stageLevel/level, 1/float64(counter))
 		case shapeHold:
-			// NOT RIGHT
-			// hold should maintain the previous level and update at the end of the hold period
-			// step should immediately jump to the next level
-			level = stageLevel
+			level = levels[stage-1][idx]
 			delta = 0
 		}
 	}
@@ -188,6 +185,7 @@ func NewEnvelope(opts ...EnvOption) ugen.UGen {
 						setupStage(cfg, levels, times, i)
 					} else {
 						shape = shapeSustain
+						level = levels[stage][i]
 					}
 				}
 			}

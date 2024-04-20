@@ -1,0 +1,21 @@
+(ns user
+  (:require [mrat.core :refer :all]))
+
+(defugen kick
+  [trig 0]
+  (let [[hi lo] [700 54]
+        freq (env-perc trig [0 0.13] :curve -6)
+        freq (linexp freq 0 1 lo hi)
+        ;; another little layer
+        freq (* freq (+ 1 (env-perc trig [0.001 0.01])))
+        ;; hey why not one more
+        freq (* freq (+ 1 (* 0.1 (env-perc trig [0.02 0.02]))))
+        snd (sin freq)
+        snd (* snd (+ 1 (env-perc trig [0 0.01])))
+        snd (tanh snd)
+        snd (* snd (env trig [0 1 1 0] [0.001 0.1 0.3] :curve -4))
+        snd (* snd (dbamp -2))]
+    snd))
+
+
+(play (kick (impulse 2) :mul 0.5))

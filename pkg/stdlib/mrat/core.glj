@@ -12,6 +12,7 @@
                                                  NewExp
                                                  NewPow
                                                  NewTanh
+                                                 NewLinExp
                                                  NewLatch
                                                  NewCopySign
                                                  NewFreqRatio
@@ -260,6 +261,16 @@
   (if (is-node? x)
     (add-node! :tanh NewTanh :in-edges {:in x})
     (math.Tanh x)))
+
+(defn linexp
+  "Maps x from the linear range [srclo, srchi] to the exponential
+  range [dstlo, dsthi]"
+  [x srclo srchi dstlo dsthi]
+  (add-node! :linexp NewLinExp :in-edges {:in x
+                                          :srclo srclo
+                                          :srchi srchi
+                                          :dstlo dstlo
+                                          :dsthi dsthi}))
 
 (defn copy-sign
   "Returns x with the sign of s. If x or s are nodes, creates a new node
@@ -678,8 +689,8 @@
   (env gate [0 1 s 0] [a d r] :release-node 2))
 
 (defn env-perc
-  [gate [a d]]
-  (env gate [0 1 0] [a d]))
+  [gate [a d] & {:keys [curve]}]
+  (env gate [0 1 0] [a d] :curve (or curve :lin)))
 
 (defugen line
   "Generates a line from the start value to the end value over the given
