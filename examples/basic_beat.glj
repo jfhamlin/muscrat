@@ -1,7 +1,0 @@
-(ns examples.basic_beat
-  (:require [mrat.core :refer :all]
-            [mrat.midi :refer :all]
-            [mrat.scales :refer :all]
-            [mrat.welsh]))
-
-(play (sin 200))

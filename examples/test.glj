@@ -1,5 +1,0 @@
-(ns user
-  (:require [mrat.core :refer :all]))
-
-(play (sin 200 :mul 0.2))
-(play (sin 200 :sync (impulse 340) :mul 0.2))

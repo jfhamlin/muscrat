@@ -58,9 +58,9 @@
   (let [amp (dbamp drone-env)
         freq (* root (octaves -1))]
     (-> (sum (repeatedly
-             16
-             #(saw (* freq (semitones (* 0.2 (noise-quad 8))))
-                   :iphase (math$rand.Float64))))
+              16
+              #(saw (* freq (semitones (* 0.2 (noise-quad 8))))
+                    :iphase (math$rand.Float64))))
         (lores (* 2 freq) 0.8)
         (* amp))))
 

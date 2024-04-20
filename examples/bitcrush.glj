@@ -1,5 +1,5 @@
 (ns user
-      (:require [mrat.core :refer :all]))
+  (:require [mrat.core :refer :all]))
 
 (play (-> (saw [100 150 202 304 606] :mul 0.5 :iphase [0.2 0 0.5])
           (bitcrush :bits (step (impulse 8) [3 2 16 5]))

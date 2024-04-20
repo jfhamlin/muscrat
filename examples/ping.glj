@@ -1,4 +1,0 @@
-(ns examples.ping
-  (:require [mrat.core :refer :all]))
-
-(play (sin (xline 200 10000 15)))

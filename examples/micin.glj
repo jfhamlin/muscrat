@@ -2,5 +2,4 @@
   (:require [mrat.core :refer :all]))
 
 (play (-> (sound-in)
-          (bpf 400 1)
           (delayc 1 0.5)))

@@ -23,7 +23,7 @@
   (let [offset (choose gate [0 0 0 0 0 0 12 12 12 24])]
     (step gate
           (->> mixolydian
-               (map #(+ D0 % offset))
+               (map #(+ D2 % offset))
                (map mtof)))))
 
 (def op-conf
