@@ -119,7 +119,7 @@ func RegisterImports(_register func(string, interface{})) {
 	////////////////////////////////////////
 	_register("github.com/jfhamlin/muscrat/pkg/mod.EnvOption", reflect.TypeOf((*github_com_jfhamlin_muscrat_pkg_mod.EnvOption)(nil)).Elem())
 	_register("github.com/jfhamlin/muscrat/pkg/mod.NewEnvelope", github_com_jfhamlin_muscrat_pkg_mod.NewEnvelope)
-	_register("github.com/jfhamlin/muscrat/pkg/mod.WithInterpolation", github_com_jfhamlin_muscrat_pkg_mod.WithInterpolation)
+	_register("github.com/jfhamlin/muscrat/pkg/mod.WithCurve", github_com_jfhamlin_muscrat_pkg_mod.WithCurve)
 	_register("github.com/jfhamlin/muscrat/pkg/mod.WithReleaseNode", github_com_jfhamlin_muscrat_pkg_mod.WithReleaseNode)
 
 	// package github.com/jfhamlin/muscrat/pkg/osc

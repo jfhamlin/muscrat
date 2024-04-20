@@ -11,10 +11,24 @@ import (
 	"github.com/jfhamlin/muscrat/pkg/ugen"
 )
 
-type envOptions struct {
-	interp      string
-	releaseNode int
-}
+const (
+	shapeLin     = "lin"
+	shapeCurve   = "curve"
+	shapeExp     = "exp"
+	shapeHold    = "hold"
+	shapeSustain = "sustain"
+)
+
+type (
+	envOptions struct {
+		// curve describes the interpolation of each stage its length should
+		// be less than or equal to the number of stages. if less, curve
+		// values will wrap around for any additional stages.
+		// values can be strings or floats
+		curve       []any
+		releaseNode int
+	}
+)
 
 type EnvOption func(*envOptions)
 
@@ -24,44 +38,40 @@ func WithReleaseNode(node int) EnvOption {
 	}
 }
 
-func WithInterpolation(interp string) EnvOption {
+func WithCurve(curve []any) EnvOption {
 	return func(o *envOptions) {
-		o.interp = interp
+		o.curve = curve
 	}
 }
 
 func NewEnvelope(opts ...EnvOption) ugen.UGen {
-	// Behavior follows that of SuperCollider's Env/EnvGen
+	// Behavior more or less follows that of SuperCollider's Env/EnvGen
 	// https://doc.sccode.org/Classes/Env.html
 
-	type Interp int
-	const (
-		LinInterp Interp = iota
-		ExpInterp
-		HoldInterp
-		SustainInterp
-	)
-
 	o := envOptions{
-		interp:      "lin",
+		curve:       []any{"lin"},
 		releaseNode: -1,
 	}
 	for _, opt := range opts {
 		opt(&o)
 	}
 
-	interp := LinInterp
-	switch o.interp {
-	case "lin":
-		interp = LinInterp
-	case "exp":
-		interp = ExpInterp
-	case "hold":
-		interp = HoldInterp
-	default:
-		panic(fmt.Sprintf("unknown interpolation type: %s", o.interp))
+	// validate the curve values
+	for _, c := range o.curve {
+		switch c := c.(type) {
+		case string:
+			switch c {
+			case shapeLin, shapeExp, shapeHold:
+			default:
+				panic(fmt.Sprintf("invalid curve value: %s", c))
+			}
+		case float64:
+		default:
+			panic(fmt.Sprintf("invalid curve value: %v (%T)", c, c))
+		}
 	}
-	inputInterp := interp
+
+	shape := shapeLin
 
 	lastGate := false
 
@@ -70,18 +80,45 @@ func NewEnvelope(opts ...EnvOption) ugen.UGen {
 	delta := 0.0
 	counter := 0
 
+	// for curve interpolation
+	var a2, b1 float64
+
 	setupStage := func(cfg ugen.SampleConfig, levels, times [][]float64, idx int) {
 		stageLevel := levels[stage][idx]
 		stageTime := times[stage-1][idx]
+		stageShape := o.curve[(stage-1)%len(o.curve)]
 
-		interp = inputInterp
+		var curve float64
+		switch s := stageShape.(type) {
+		case string:
+			shape = s
+		case float64:
+			shape = shapeCurve
+			curve = s
+		default:
+			panic(fmt.Sprintf("invalid curve value: %v (%T)", stageShape, stageShape))
+		}
+
 		counter = int(stageTime * float64(cfg.SampleRateHz))
-		switch interp {
-		case LinInterp:
+		switch shape {
+		case shapeLin:
 			delta = (stageLevel - level) / float64(counter)
-		case ExpInterp:
+		case shapeCurve:
+			if math.Abs(curve) < 0.001 {
+				shape = shapeLin
+				delta = (stageLevel - level) / float64(counter)
+			} else {
+				a1 := (stageLevel - level) / (1 - math.Exp(curve))
+				a2 = level + a1
+				b1 = a1
+				delta = math.Exp(curve / float64(counter))
+			}
+		case shapeExp:
 			delta = math.Pow(stageLevel/level, 1/float64(counter))
-		case HoldInterp:
+		case shapeHold:
+			// NOT RIGHT
+			// hold should maintain the previous level and update at the end of the hold period
+			// step should immediately jump to the next level
 			level = stageLevel
 			delta = 0
 		}
@@ -124,14 +161,17 @@ func NewEnvelope(opts ...EnvOption) ugen.UGen {
 				continue
 			}
 
-			switch interp {
-			case LinInterp:
+			switch shape {
+			case shapeLin:
 				level += delta
-			case ExpInterp:
+			case shapeCurve:
+				b1 *= delta
+				level = a2 - b1
+			case shapeExp:
 				level *= delta
-			case HoldInterp:
+			case shapeHold:
 				// do nothing
-			case SustainInterp:
+			case shapeSustain:
 				// do nothing
 			}
 
@@ -141,13 +181,13 @@ func NewEnvelope(opts ...EnvOption) ugen.UGen {
 					level = levels[stage][i]
 				}
 				if lastGate && stage == o.releaseNode {
-					interp = SustainInterp
+					shape = shapeSustain
 				} else {
 					if stage+1 < len(levels) {
 						stage++
 						setupStage(cfg, levels, times, i)
 					} else {
-						interp = SustainInterp
+						shape = shapeSustain
 					}
 				}
 			}
