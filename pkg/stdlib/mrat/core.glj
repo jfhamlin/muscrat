@@ -6,13 +6,18 @@
                                                  NewFMA
                                                  NewFMAStatic
                                                  NewQuotient
+                                                 NewMax
+                                                 NewMin
                                                  NewAbs
                                                  NewExp
                                                  NewPow
+                                                 NewTanh
+                                                 NewLatch
                                                  NewCopySign
                                                  NewFreqRatio
                                                  NewMIDIFreq
                                                  NewImpulse
+                                                 NewPulseDiv
                                                  SimpleUGenFunc
                                                  WithInterp
                                                  WithDefaultDutyCycle
@@ -65,6 +70,8 @@
 
 (def SAMPLE-RATE github.com$jfhamlin$muscrat$pkg$conf.SampleRate)
 (def BUFFER-SIZE github.com$jfhamlin$muscrat$pkg$conf.BufferSize)
+(def BUFFER-DUR (/ BUFFER-SIZE SAMPLE-RATE))
+(def SAMPLE-DUR (/ 1 SAMPLE-RATE))
 (def SAMPLE-FILE-PATHS github.com$jfhamlin$muscrat$pkg$conf.SampleFilePaths)
 
 (defmacro doseq-idx
@@ -212,6 +219,22 @@
     (add-node! :sine github.com$jfhamlin$muscrat$pkg$ugen.NewSine :in-edges {:in theta})
     (math.Sin theta)))
 
+(defn min
+  "Returns the minimum of xs. If any element of xs is a node, creates a new
+  node that computes the minimum of xs. Else, returns the minimum of xs"
+  [& xs]
+  (if (some is-node? xs)
+    (add-node! :min NewMin :in-edges (zipmap (map str (range (count xs))) xs))
+    (apply glojure.core/min xs)))
+
+(defn max
+  "Returns the maximum of xs. If any element of xs is a node, creates a new
+  node that computes the maximum of xs. Else, returns the maximum of xs"
+  [& xs]
+  (if (some is-node? xs)
+    (add-node! :max NewMax :in-edges (zipmap (map str (range (count xs))) xs))
+    (apply glojure.core/max xs)))
+
 (defn abs
   "Returns the absolute value of x. If x is a node, creates a new node
   that computes the absolute value of x. Else, returns the absolute
@@ -228,6 +251,15 @@
   (if (is-node? x)
     (add-node! :exp NewExp :in-edges {:in x})
     (math.Exp x)))
+
+(defn tanh
+  "Returns the hyperbolic tangent of x. If x is a node, creates a new
+  node that computes the hyperbolic tangent of x. Else, returns the
+  hyperbolic tangent of x directly."
+  [x]
+  (if (is-node? x)
+    (add-node! :tanh NewTanh :in-edges {:in x})
+    (math.Tanh x)))
 
 (defn copy-sign
   "Returns x with the sign of s. If x or s are nodes, creates a new node
@@ -566,6 +598,16 @@
     (add-edge! freq-node node "w")
     node))
 
+(defugen pulse-div
+  "Outputs one impulse each time it receives a certain number of
+  triggers at its input."
+  [trigger 0
+   div 2
+   start 0]
+  (add-node! :pulse-div NewPulseDiv
+             :args [start]
+             :in-edges {:trigger trigger :div div}))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Noise/Randomness
 
@@ -592,14 +634,14 @@
   when triggered."
   [min 0
    max 1
-   trig 1
+   trigger 1
    ^:noexpand seed 0]
   (let [add min
         mul (- max min)
         rnd (math$rand.New (math$rand.NewSource seed))]
-    (if (and (number? trig) (> trig 0))
+    (if (and (number? trigger) (> trigger 0))
       (fma (.Float64 rnd) mul add)
-      (add-node! :rrand NewRRand :args [rnd] :in-edges {:min min :max max :trig trig}))))
+      (add-node! :rrand NewRRand :args [rnd] :in-edges {:min min :max max :trig trigger}))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Modulators
@@ -839,6 +881,8 @@
 (defn- -comb
   [in max-delay-time delay-time decay-time delay-fn]
   (let [feedback (pipe)
+        ;; there is a fixed delay time of BUFFER-DUR
+        delay-time (max 0 (- delay-time BUFFER-DUR))
         delay (delay-fn feedback max-delay-time delay-time)
         fb-coefficient (comb-feedback delay-time decay-time)
         comb (+ in (* fb-coefficient delay))]
@@ -1112,6 +1156,14 @@
     (doseq-idx [[opt i] opts]
                (add-edge! opt node (str \$ i)))
     node))
+
+(defugen latch
+  "Holds input signal value when triggered. Latch will output 0 until it
+  receives its first trigger."
+  [in 0
+   trigger 0]
+  (add-node! :latch NewLatch :in-edges {:in in :trigger trigger}))
+
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; MIDI notes

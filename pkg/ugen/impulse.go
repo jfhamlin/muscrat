@@ -18,6 +18,8 @@ func NewImpulse(opts ...Option) UGen {
 		ws := cfg.InputSamples["w"]
 		iphases := cfg.InputSamples["iphase"]
 
+		_ = ws[len(out)-1]
+
 		if !initialized {
 			freq = math.Max(ws[0], 0)
 			if len(iphases) > 0 {

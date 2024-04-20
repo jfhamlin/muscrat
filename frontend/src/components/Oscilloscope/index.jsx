@@ -66,7 +66,7 @@ export default ({ analyser }) => {
 
       for(let i = 0; i < bufferLength; i++) {
         const v = dataArray[i] * 0.5 + 0.5; // Normalize and center the waveform
-        const y = v * height;
+        const y = height - v * height;
 
         if(i === 0) {
           ctx.moveTo(x, y);
