@@ -48,7 +48,7 @@ const GRADIENT_COOL = new Gradient([
   { r: 64, g: 224, b: 208 }, // Lighter Turquoise
 ]);
 
-const gradient = GRADIENT_COOL;
+const gradient = GRADIENT_INFRARED;
 
 export default ({ analyser, sampleRate }) => {
   const canvasRef = createRef();

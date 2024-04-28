@@ -36,7 +36,7 @@ func NumChannels() int {
 }
 
 func Open(opts ...Option) error {
-	ctx, err := newContext(SampleRate(), NumChannels(), 4*numChannels*conf.OutputBufferSize)
+	ctx, err := newContext(SampleRate(), NumChannels(), 4*numChannels*conf.BufferSize)
 	if err != nil {
 		return err
 	}
@@ -53,7 +53,7 @@ func Close() {
 var (
 	pool = &sync.Pool{
 		New: func() interface{} {
-			return make([]float32, numChannels*conf.OutputBufferSize)
+			return make([]float32, numChannels*conf.BufferSize)
 		},
 	}
 )

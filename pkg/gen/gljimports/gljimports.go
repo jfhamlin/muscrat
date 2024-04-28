@@ -68,7 +68,6 @@ func RegisterImports(_register func(string, interface{})) {
 	// package github.com/jfhamlin/muscrat/pkg/conf
 	////////////////////////////////////////
 	_register("github.com/jfhamlin/muscrat/pkg/conf.BufferSize", github_com_jfhamlin_muscrat_pkg_conf.BufferSize)
-	_register("github.com/jfhamlin/muscrat/pkg/conf.OutputBufferSize", github_com_jfhamlin_muscrat_pkg_conf.OutputBufferSize)
 	_register("github.com/jfhamlin/muscrat/pkg/conf.SampleFilePaths", github_com_jfhamlin_muscrat_pkg_conf.SampleFilePaths)
 	_register("github.com/jfhamlin/muscrat/pkg/conf.SampleRate", github_com_jfhamlin_muscrat_pkg_conf.SampleRate)
 

@@ -69,13 +69,25 @@
                                                 NewWavOut)
            (github.com$jfhamlin$freeverb-go NewRevModel)))
 
+(defn- docgroup
+  "Add a 'docgroup' metadata key with the provided value to all public
+  vars defined in the mrat.core namespace that do not already have a
+  'docgroup' key."
+  [docgroup]
+  (doseq [v (vals (ns-publics *ns*))
+          :when (and (var? v) (not (:docgroup (meta v))))]
+    (alter-meta! v assoc :docgroup docgroup)))
+
 (def SAMPLE-RATE github.com$jfhamlin$muscrat$pkg$conf.SampleRate)
 (def BUFFER-SIZE github.com$jfhamlin$muscrat$pkg$conf.BufferSize)
 (def BUFFER-DUR (/ BUFFER-SIZE SAMPLE-RATE))
 (def SAMPLE-DUR (/ 1 SAMPLE-RATE))
 (def SAMPLE-FILE-PATHS github.com$jfhamlin$muscrat$pkg$conf.SampleFilePaths)
 
-(defmacro doseq-idx
+(docgroup "Constants")
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defmacro ^:private doseq-idx
   [[locals seq-expr] & body]
   `(let [s# ~seq-expr]
      (doseq [~locals (map vector s# (range (count s#)))]
@@ -89,11 +101,6 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Graph
-
-;;; I am rewriting this file to produce an intermediate representation
-;;; of the graph, which can then be used to generate the actual
-;;; graph. This will allow us to do some optimizations and also to
-;;; generate the graph in a more flexible way.
 
 (def ^:dynamic *graph* (atom {:nodes [] :edges []}))
 
@@ -117,14 +124,14 @@
   "Protocol for types that can be converted to generator nodes."
   (as-node [ug]))
 
-(defn is-node?
+(defn- is-node?
   [x]
   (boolean (and (map? x) (:id x))))
 
 (declare add-edge!)
 (declare constant-node)
 
-(defn add-node!
+(defn- add-node!
   [type ctor & {:keys [key args sink in-edges]}]
   (let [node {:id (gen-id)
               :type type
@@ -137,7 +144,7 @@
       (add-edge! (as-node val) node (name port)))
     node))
 
-(defn add-edge!
+(defn- add-edge!
   [{x-id :id} {y-id :id} port]
   (let [edge {:from x-id :to y-id :port port}]
     (swap! *graph* update-in [:edges] conj edge)
@@ -191,6 +198,9 @@
             sink (find-or-create-sink i)]
         ;; port name doesn't matter for out nodes
         (add-edge! gen sink (str "in" (count (:nodes @*graph*))))))))
+
+(docgroup "Output")
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defn- constant-node
   [x]
@@ -322,6 +332,9 @@
   (if (is-node? note)
     (add-node! :midifreq NewMIDIFreq :in-edges {"in" note})
     (* 440.0 (pow 2 (/ (- note 69.0) 12.0)))))
+
+(docgroup "Utilities")
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Helper for custom sample generators
@@ -462,9 +475,6 @@
 (defn sum
   [coll] (apply + coll))
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; macros
-
 (defn fma
   "A fused multiply and add ugen."
   [in mul add]
@@ -483,6 +493,12 @@
         (add-edge! (as-node in) node "in")
         node))))
 
+(docgroup "Operators")
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; macros
+
 (defmacro defugen
   "Defines a new generator node constructor with semantics similar to defn,
   but with specific constraints and enhancements for argument
@@ -500,7 +516,25 @@
   (let [[doc args & body] (if (string? (first decl))
                             decl
                             (cons "" decl))
-        arg-pairs (partition 2 args)
+        ;; partition the args into pairs of arg-name and default value
+        ;; the default value may optionally be followed by a docstring
+        arg-pairs (loop [args args
+                         arg-pairs []]
+                    (if (empty? args)
+                      arg-pairs
+                      (let [arg-name (first args)
+                            default (second args)
+                            args (drop 2 args)
+                            [doc args] (if (string? (first args))
+                                         [(first args) (rest args)]
+                                         [nil args])
+                            pre-meta (meta arg-name)
+                            new-meta (if pre-meta
+                                       (assoc pre-meta :doc doc)
+                                       {:doc doc})
+                            arg-name (with-meta arg-name new-meta)]
+                        (recur args
+                               (conj arg-pairs [arg-name default])))))
         arg-names (mapv (comp keyword first) arg-pairs)
         ;; noexpands are the arguments that don't support multi-channel expansion
         ;; they are denoted by names with {:noexpand true} in metadata
@@ -511,44 +545,57 @@
         defaults (into {} (map (fn [[k v]] [(keyword k) v]) arg-pairs))
         allowed-keys (merge (set (keys defaults)) :mul :add)
         assignments-sym (gensym "assignments")]
-    `(defn ~name ~doc [& args#]
-       (let [defaults# ~defaults
-             ~assignments-sym (loop [assignments# {}
-                                     arg-names# ~arg-names
-                                     args# args#]
-                                (if (or (empty? args#)
-                                        (contains? ~allowed-keys (first args#)))
-                                  (merge assignments# (apply hash-map args#))
-                                  (if (empty? arg-names#)
-                                    (throw (errors.New "too many positional arguments"))
-                                    (recur (assoc assignments# (first arg-names#) (first args#))
-                                           (rest arg-names#)
-                                           (rest args#)))))
-             ~assignments-sym (merge defaults# ~assignments-sym)
-             ;; duplicate the argument pairs for each argument value
-             ;; to handle multiple channels.
-             expand-arg# (fn [[k# v#]] (if (and (not (contains? ~noexpands k#))
-                                                (seq-or-vec? v#))
-                                         (map #(vector k# %) v#)
-                                         [[k# v#]]))
-             arg-lists# (arrange-multi-channel-args (map expand-arg# (seq ~assignments-sym)))
-             channels# (for [arg-list# arg-lists#]
-                         (let [~assignments-sym (into {} arg-list#)
-                               ~@(mapcat (fn [[arg-name default]]
-                                           `(~arg-name (get ~assignments-sym ~(keyword arg-name))))
-                                         arg-pairs)
-                               ugen# (do ~@body)
-                               mul# (get ~assignments-sym :mul 1)
-                               add# (get ~assignments-sym :add 0)]
-                           (fma ugen# mul# add#)))]
-         (if (= 1 (count channels#))
-           (first channels#)
-           channels#)))))
+    `(do
+       (defn ~name ~doc [& args#]
+         (let [defaults# ~defaults
+               ~assignments-sym (loop [assignments# {}
+                                       arg-names# ~arg-names
+                                       args# args#]
+                                  (if (or (empty? args#)
+                                          (contains? ~allowed-keys (first args#)))
+                                    (merge assignments# (apply hash-map args#))
+                                    (if (empty? arg-names#)
+                                      (throw (errors.New "too many positional arguments"))
+                                      (recur (assoc assignments# (first arg-names#) (first args#))
+                                             (rest arg-names#)
+                                             (rest args#)))))
+               ~assignments-sym (merge defaults# ~assignments-sym)
+               ;; duplicate the argument pairs for each argument value
+               ;; to handle multiple channels.
+               expand-arg# (fn [[k# v#]] (if (and (not (contains? ~noexpands k#))
+                                                  (seq-or-vec? v#))
+                                           (map #(vector k# %) v#)
+                                           [[k# v#]]))
+               arg-lists# (arrange-multi-channel-args (map expand-arg# (seq ~assignments-sym)))
+               channels# (for [arg-list# arg-lists#]
+                           (let [~assignments-sym (into {} arg-list#)
+                                 ~@(mapcat (fn [[arg-name default]]
+                                             `(~arg-name (get ~assignments-sym ~(keyword arg-name))))
+                                           arg-pairs)
+                                 ugen# (do ~@body)
+                                 mul# (get ~assignments-sym :mul 1)
+                                 add# (get ~assignments-sym :add 0)]
+                             (fma ugen# mul# add#)))]
+           (if (= 1 (count channels#))
+             (first channels#)
+             channels#)))
+       ;; add :ugenargs metadata to the function. each arg will get a map
+       ;; with name, efault value, and docstring (if available as :doc
+       ;; metadata on the arg)
+       (let [ugenargs# ~(mapv #(let [[name default] %]
+                                 {:name (str name)
+                                  :default default
+                                  :doc (or (-> name meta :doc) "")})
+                              arg-pairs)]
+         (alter-meta! (var ~name) assoc :ugenargs ugenargs#)))))
+
+(docgroup "Macros")
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Oscillators
 
-(def default-freq 440)
+(def ^:private default-freq 440)
 
 (defn- validate-flags
   [flags defaults]
@@ -571,7 +618,7 @@
       (when (nil? param) (throw (fmt.Errorf "handle-extra-gen-args: unknown parameter: %s" k)))
       (add-edge! gen node param))))
 
-(defmacro defosc
+(defmacro ^:private defosc
   [name ctor & {:keys [default-duty] :or {default-duty 1}}]
   (let [opt-args '[duty iphase sync phase]]
     `(defugen ~name
@@ -619,6 +666,9 @@
              :args [start]
              :in-edges {:trigger trigger :div div}))
 
+(docgroup "Oscillators")
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Noise/Randomness
 
@@ -626,7 +676,7 @@
   "Generates random values between -1 and 1 at the given frequency.
   If frequency is zero or not provided, generates white
   noise."
-  [freq 0]
+  [freq 0 "Frequency with which to generate random values. If zero, generates white noise."]
   (add-node! :noise NewNoise :in-edges {:w freq}))
 
 (defugen pink-noise
@@ -637,22 +687,25 @@
   "Generates quadratically-interpolated random values between -1 and 1
   at the given frequency. If frequency is zero or not provided,
   generates at 500 hz."
-  [freq 500]
+  [freq 500 "Frequency with which to generate random values."]
   (add-node! :noise-quad NewNoiseQuad :in-edges {:w freq}))
 
 (defugen rrand
   "Generates random values between the given min and max values
   when triggered."
-  [min 0
-   max 1
-   trigger 1
-   ^:noexpand seed 0]
+  [min 0 "Minimum value."
+   max 1 "Maximum value."
+   trigger 1 "Trigger to generate a new random value."
+   ^:noexpand seed 0 "Seed for the random number generator."]
   (let [add min
         mul (- max min)
         rnd (math$rand.New (math$rand.NewSource seed))]
     (if (and (number? trigger) (> trigger 0))
       (fma (.Float64 rnd) mul add)
       (add-node! :rrand NewRRand :args [rnd] :in-edges {:min min :max max :trig trigger}))))
+
+(docgroup "Random")
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Modulators
@@ -695,83 +748,74 @@
 (defugen line
   "Generates a line from the start value to the end value over the given
   duration."
-  [start 0
-   end 1
-   dur 1]
-  (env 1 [start end] [dur] :interp :lin))
+  [start 0 "The start value."
+   end 1 "The end value."
+   dur 1 "The duration of the line."]
+  (env 1 [start end] [dur] :curve :lin))
 
 (defugen xline
   "Generates an exponential curve from the start value to the end
   value. Both the start and end values must be non-zero and have the
   same sign."
-  [start 1
-   end 2
-   dur 1]
-  (env 1 [start end] [dur] :interp :exp))
+  [start 1 "The start value."
+   end 1 "The end value."
+   dur 1 "The duration of the line."]
+  (env 1 [start end] [dur] :curve :exp))
+
+(docgroup "Envelopes")
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; Filters and Effects
+;; Filters and Effects, multiple groups
 
 (defugen amplitude
-  [in 0
-   attack-time 0.01
-   release-time 0.01]
+  "Tracks the peak amplitude of a signal."
+  [in 0 "The signal to be processed."
+   attack-time 0.01 "The time in seconds for the amplitude to rise to a new value."
+   release-time 0.01 "The time in seconds for the amplitude to fall to a new value."]
   (add-node! :amplitude NewAmplitude :args [attack-time release-time] :in-edges {:in in}))
+
+(docgroup "Analysis")
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defugen limiter
   "Limits the input amplitude to the given level. Limiter will not
   overshoot, but it needs to look ahead in the audio. Thus there is a
   delay equal to twice the value of the dur parameter.
 
-  Limiter is completely transparent for an in range signal.
-
-  in - The signal to be processed.
-  level - The peak output amplitude level to which to normalize the input.
-  dur - aka lookAheadTime. The buffer delay time. Shorter times will
-        produce smaller delays and quicker transient response times, but may
-        introduce amplitude modulation artifacts."
-  [in 0
-   level 1
-   dur 0.01]
+  Limiter is completely transparent for an in-range signal."
+  [in 0 "The signal to be processed."
+   level 1 "The peak output amplitude level to which to normalize the input."
+   dur 0.01 "aka lookAheadTime. The buffer delay time. Shorter times will produce smaller delays and quicker transient response times, but may introduce amplitude modulation artifacts."]
   (add-node! :limiter
              NewLimiter
              :args [dur]
              :in-edges {:in in
                         :amp level}))
 
-(defn pipe
-  "Create a pipe, which copies the input to the output. The input may be
-  set with pipeset!. This is useful for creating feedback loops."
-  []
-  (let [f (fn [cfg out]
-            (when-let [in (get (:input-samples cfg) "in")]
-              (go/copy out in)))]
-    (add-node! :pipe ugen-fn :args [f])))
-
-(defn pipeset!
-  "Set the input of a pipe."
-  [p in]
-  (add-edge! (as-node in) p "in"))
-
-(defugen freeverb
-  [in 0
-   mix 1/3
-   room-size 0.5
-   damp 0.5]
-  (let [model (NewRevModel)]
-    (add-node! :freeverb
-               #(NewFreeverb model)
+(defugen clip
+  "Clip an input signal when it exceeds threshold low/high values."
+  [in 0 "The signal to be processed."
+   lo -1 "The lower threshold value."
+   hi 1 "The upper threshold value."]
+  (if (some (partial is-node?) [in lo hi])
+    (add-node! :clip NewClip
                :in-edges {:in in
-                          :mix mix
-                          :room-size room-size
-                          :damp damp})))
+                          :lo lo
+                          :hi hi})
+    (-> in
+        (max lo)
+        (min hi))))
+
+(docgroup "Dynamics")
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defugen lores
   "A simple lowpass filter with cutoff and resonance, modeled after the
   Max/MSP lores~ object."
-  [in 0
-   freq 1200
-   reson 0]
+  [in 0 "The signal to be processed."
+   freq 1200 "The cutoff frequency in hertz."
+   reson 0 "Sets a \"resonance factor\" between 0(minimum resonance) and 1(maximum resonance). Values very close to 1 may produce clipping with certain types of input signals."]
   (add-node! :lores NewLowpassFilter
              :in-edges {:in in
                         :cutoff freq
@@ -779,9 +823,9 @@
 
 (defugen rlpf
   "A resonant low-pass filter."
-  [in 0
-   freq 440
-   rq 1]
+  [in 0 "The signal to be processed."
+   freq 440 "The cutoff frequency in hertz."
+   rq 1 "The reciprocal of Q (bandwidth / cutoffFreq)."]
   (add-node! :rlpf NewRLPF
              :in-edges {:in in
                         :freq freq
@@ -842,6 +886,36 @@
                         :w freq
                         :rq rq
                         :db db}))
+
+(docgroup "Filters")
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defn pipe
+  "Create a pipe, which copies the input to the output. The input may be
+  set with pipeset!. This is useful for creating feedback loops."
+  []
+  (let [f (fn [cfg out]
+            (when-let [in (get (:input-samples cfg) "in")]
+              (go/copy out in)))]
+    (add-node! :pipe ugen-fn :args [f])))
+
+(defn pipeset!
+  "Set the input of a pipe."
+  [p in]
+  (add-edge! (as-node in) p "in"))
+
+(defugen freeverb
+  [in 0
+   mix 1/3
+   room-size 0.5
+   damp 0.5]
+  (let [model (NewRevModel)]
+    (add-node! :freeverb
+               #(NewFreeverb model)
+               :in-edges {:in in
+                          :mix mix
+                          :room-size room-size
+                          :damp damp})))
 
 (defn- -delay
   [in max-delay-time delay-time interp-opt]
@@ -926,19 +1000,8 @@
    decay-time 1]
   (-comb in max-delay-time delay-time decay-time delayc))
 
-(defugen clip
-  "Clip an input signal when it exceeds threshold low/high values."
-  [in 0
-   lo -1
-   hi 1]
-  (if (some (partial is-node?) [in lo hi])
-    (add-node! :clip NewClip
-               :in-edges {:in in
-                          :lo lo
-                          :hi hi})
-    (-> in
-        (max lo)
-        (min hi))))
+(docgroup "Delays")
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defugen pan2
   "A two-channel, equal-power panner."
@@ -953,6 +1016,9 @@
         ramp (* level (sine theta))]
     [(* in lamp)
      (* in ramp)]))
+
+(docgroup "Spatialization")
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defugen wfold
   "Fold an input signal when it exceeds threshold low/high values.
@@ -975,6 +1041,9 @@
              :in-edges {:in in
                         :rate rate
                         :bits bits}))
+
+(docgroup "Distortion")
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Sampler
@@ -1038,6 +1107,9 @@
                                 :rate rate
                                 :start-pos start-pos
                                 :loop (or loop 0)}))))))
+
+(docgroup "Sampler")
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; I/O devices
@@ -1132,15 +1204,11 @@
       (add-edge! (as-node ch1) node "$1"))
     node))
 
+(docgroup "I/O")
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Pattern utilities
-
-(defn clock-grid
-  "Generates an impulse given beats per minute and a number of impulses
-  per beat. The impulses are emitted evenly over the beat."
-  [bpm res & flags]
-  (let [bps (/ bpm 60.0)]
-    (apply impulse (* bps res) flags)))
 
 (defn step
   "Cycle through a sequence of values on each trigger."
@@ -1152,11 +1220,6 @@
     (doseq-idx [[freq i] freqs]
                (add-edge! freq node (str \$ i)))
     node))
-
-(defn trig-pattern
-  [clock pattern]
-  (let [s (sequencer clock pattern)]
-    (* s clock)))
 
 (defn choose
   "Pick randomly from a sequence of values, making a new choice on each
@@ -1177,6 +1240,8 @@
    trigger 0]
   (add-node! :latch NewLatch :in-edges {:in in :trigger trigger}))
 
+(docgroup "Patterns")
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; MIDI notes
@@ -1203,6 +1268,9 @@
       (eval
        `(def ~(symbol (str name octave-num)) ~note)))))
 
+(docgroup "MIDI Notes")
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Scales
 
@@ -1226,3 +1294,6 @@
 (def melodic-minor [0 2 3 5 7 9 11])
 
 (def chromatic (range 12))
+
+(docgroup "Scales")
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

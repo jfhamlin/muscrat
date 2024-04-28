@@ -185,7 +185,9 @@ func NewEnvelope(opts ...EnvOption) ugen.UGen {
 						setupStage(cfg, levels, times, i)
 					} else {
 						shape = shapeSustain
-						level = levels[stage][i]
+						if stage < len(levels) {
+							level = levels[stage][i]
+						}
 					}
 				}
 			}

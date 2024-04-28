@@ -7,6 +7,7 @@ import {
 import {
   OpenFileDialog,
   SaveFile,
+  GetNSPublics,
 } from "../../../wailsjs/go/main/App";
 
 import Editor from '@monaco-editor/react';
@@ -25,6 +26,15 @@ export default (props) => {
   const selectedBufferNameRef = useRef(selectedBufferName);
   selectedBufferNameRef.current = selectedBufferName;
 
+  const [completionDisposable, setCompletionDisposable] = useState(null);
+  useEffect(() => {
+    return () => {
+      if (completionDisposable) {
+        completionDisposable.dispose();
+      }
+    };
+  }, [completionDisposable]);
+
   const [editor, setEditor] = useState(null);
   const handleEditorDidMount = (editor, monaco) => {
     setEditor(editor);
@@ -40,6 +50,70 @@ export default (props) => {
         console.log(err);
       });
     });
+
+    GetNSPublics().then((nsPublics) => {
+      console.log("got publics", nsPublics);
+    });
+
+    // custom autocomplete
+    const completionItemProvider = monaco.languages.registerCompletionItemProvider('clojure', {
+      provideCompletionItems: (model, position, context, token) => {
+        return {
+          suggestions: [
+            {
+              label: 'defn',
+              kind: monaco.languages.CompletionItemKind.Function,
+              insertText: 'defn ${1:name} [${2:args}]\n  ${3:body}',
+              insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
+              documentation: 'Define a function',
+            },
+            {
+              label: 'def',
+              kind: monaco.languages.CompletionItemKind.Variable,
+              insertText: 'def ${1:name} ${2:value}',
+              insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
+              documentation: 'Define a variable',
+            },
+            {
+              label: 'let',
+              kind: monaco.languages.CompletionItemKind.Variable,
+              insertText: 'let [${1:bindings}]\n  ${2:body}',
+              insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
+              documentation: 'Define a local variable',
+            },
+            {
+              label: 'if',
+              kind: monaco.languages.CompletionItemKind.Keyword,
+              insertText: 'if ${1:condition}\n  ${2:then}\n  ${3:else}',
+              insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
+              documentation: 'Conditional',
+            },
+            {
+              label: 'when',
+              kind: monaco.languages.CompletionItemKind.Keyword,
+              insertText: 'when ${1:condition}\n  ${2:body}',
+              insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
+              documentation: 'Conditional',
+            },
+            {
+              label: '->',
+              kind: monaco.languages.CompletionItemKind.Operator,
+              insertText: '-> ${1:value} ${2:fn1} ${3:fn2}',
+              insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
+              documentation: 'Thread first',
+            },
+            {
+              label: '->>',
+              kind: monaco.languages.CompletionItemKind.Operator,
+              insertText: '->> ${1:value} ${2:fn1} ${3:fn2}',
+              insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
+              documentation: 'Thread last',
+            },
+          ],
+        };
+      },
+    });
+    setCompletionDisposable(completionItemProvider);
   };
 
   const handleEditorChange = (value, event) => {
@@ -75,7 +149,7 @@ export default (props) => {
     <>
       <div className="h-full">
         <Editor options={options}
-                height="85vh"
+                height="50vh"
                 defaultLanguage="clojure"
                 path={selectedBufferName}
                 defaultValue={code}

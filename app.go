@@ -183,3 +183,7 @@ func (a *App) stopFile() {
 	a.cancelPlayFile = nil
 	<-a.playFileStop
 }
+
+func (a *App) GetNSPublics() []mrat.Symbol {
+	return mrat.GetNSPublics()
+}
