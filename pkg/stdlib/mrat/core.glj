@@ -734,12 +734,12 @@
 (def envelope env)
 
 (defn env-asr
-  [gate [a s r]]
-  (env gate [0 s 0] [a r] :release-node 1))
+  [gate [a s r] & {:keys [curve]}]
+  (env gate [0 s 0] [a r] :release-node 1 :curve (or curve :lin)))
 
 (defn env-adsr
-  [gate [a d s r]]
-  (env gate [0 1 s 0] [a d r] :release-node 2))
+  [gate [a d s r] & {:keys [curve]}]
+  (env gate [0 1 s 0] [a d r] :release-node 2 :curve (or curve :lin)))
 
 (defn env-perc
   [gate [a d] & {:keys [curve]}]
@@ -1267,6 +1267,12 @@
                                 (map #(mod % steps)))]
                    (mapv #(if (> %1 %2) 1 0)
                          tbl (rest tbl)))))))
+
+(defugen impulse-pattern
+  [impulse 1 "The impulse signal to trigger the pattern."
+   ^:noexpand pattern (euclid 3 8) "The pattern to trigger on the impulse signal."]
+  (let [pat-seq (step impulse pattern)]
+    (* impulse pat-seq)))
 
 (docgroup "Patterns")
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

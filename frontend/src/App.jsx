@@ -101,6 +101,8 @@ function App() {
           {/* <HydraView /> */}
           <Toolbar />
           <Editor />
+          {/* horizontal line */}
+          <div className="border-t border-gray-300" />
           <Docs />
         </div>
       </div>

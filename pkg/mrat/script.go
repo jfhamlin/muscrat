@@ -1,6 +1,7 @@
 package mrat
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -54,6 +55,35 @@ type (
 		UGenArgs []UGenArg `json:"ugenargs"`
 	}
 )
+
+// MarshalJSON implements the json.Marshaler interface for the Symbol type.
+func (s Symbol) MarshalJSON() ([]byte, error) {
+	m := map[string]any{
+		"name":  s.Name,
+		"group": s.Group,
+		"doc":   s.Doc,
+	}
+	if len(s.Arglists) > 0 {
+		arglists := make([]string, len(s.Arglists))
+		for i, a := range s.Arglists {
+			arglists[i] = fmt.Sprint(a)
+		}
+		m["arglists"] = arglists
+	}
+	if len(s.UGenArgs) > 0 {
+		ugenargs := make([]map[string]any, len(s.UGenArgs))
+		for i, a := range s.UGenArgs {
+			ugenargs[i] = map[string]any{
+				"name":    a.Name,
+				"default": fmt.Sprint(a.Default),
+				"doc":     a.Doc,
+			}
+		}
+		m["ugenargs"] = ugenargs
+	}
+
+	return json.Marshal(m)
+}
 
 func (cw *consoleWriter) Write(p []byte) (n int, err error) {
 	// write each line to the console

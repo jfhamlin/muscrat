@@ -138,7 +138,7 @@ export default () => {
 
   return (
     // outer div has fixed height, inner divs scroll
-    <div className="p-4 h-full overflow-hidden">
+    <div className="pb-4 mx-2 h-full overflow-hidden mb-2">
       <h1 className="text-2xl">Documentation</h1>
       <div className="flex overflow-hidden h-full">
         {/* each child scrolls separately */}
