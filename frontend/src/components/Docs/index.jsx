@@ -74,9 +74,11 @@ const Detail = ({ symbol }) => {
           </thead>
           <tbody>
             {symbol.ugenargs.map((arg) => {
+              const defaultVal = arg.default === null ? "nil" :
+                                 (arg.default instanceof Object ? '?' : arg.default);
               return <tr key={arg.name}>
                 <td><pre>{arg.name}</pre></td>
-                <td>{arg.default}</td>
+                <td>{defaultVal}</td>
                 <td>{arg.doc}</td>
               </tr>
             })}
