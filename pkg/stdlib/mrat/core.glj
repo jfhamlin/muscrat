@@ -1240,6 +1240,34 @@
    trigger 0]
   (add-node! :latch NewLatch :in-edges {:in in :trigger trigger}))
 
+(defn euclid
+  "Generate a Euclidean rhythm pattern. The Euclidean algorithm is a
+  method for producing rhythms by evenly distributing a number of
+  pulses over a number of steps. The algorithm is based on the
+  greatest common divisor of the number of pulses and steps. The
+  algorithm is generalized to allow for rotation of the pattern.
+
+  For example, with 3 pulses and 8 steps (euclid 3 8), the Euclidean algorithm
+  produces the pattern [1 0 0 1 0 0 1 0]."
+  ([pulses steps rotation]
+   (->> (euclid pulses steps)
+        cycle
+        (drop rotation)
+        (take steps)
+        vec))
+  ([pulses steps]
+   (let [pulses (int (math.Floor pulses))
+         steps (int (math.Floor steps))]
+     (when (> pulses steps)
+       (throw (fmt.Errorf "euclid: pulses must be less than or equal to steps, got %d pulses and %d steps" pulses steps)))
+     (cond (zero? pulses) (repeat steps 0)
+           (== pulses steps) (repeat steps 1)
+           :else (let [tbl (->> (range -1 steps)
+                                (map #(* % pulses))
+                                (map #(mod % steps)))]
+                   (mapv #(if (> %1 %2) 1 0)
+                         tbl (rest tbl)))))))
+
 (docgroup "Patterns")
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
