@@ -1,8 +1,7 @@
 # muscrat
 
-<p align="center">
-  <img alt="muscrat logo" src="./build/appicon.png" width="128" />
-</p>
+A real-time computer music system and language.
+
 <p align="center">
   <img alt="muscrat screenshot" src="./docs/screenshot.png" width="512" />
 </p>
@@ -22,4 +21,3 @@ Otherwise, clone the repository and run:
 ```shell
 make
 ```
-
