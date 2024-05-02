@@ -101,7 +101,7 @@ const Directory = ({ symbols, selectItem, selectedItemName }) => {
   }, [symbols]);
 
   return (
-    <div>
+    <div className="select-none">
       {Object.keys(groups).map((group) => {
         return (
           <Group key={group}
@@ -139,7 +139,7 @@ export default () => {
   return (
     // outer div has fixed height, inner divs scroll
     <div className="pb-4 mx-2 h-full overflow-hidden mb-2">
-      <h1 className="text-2xl">Documentation</h1>
+      <h1 className="text-2xl select-none">Documentation</h1>
       <div className="flex overflow-hidden h-full">
         {/* each child scrolls separately */}
         <div className="w-1/5 overflow-y-auto">

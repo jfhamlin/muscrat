@@ -13,7 +13,15 @@ import (
 	"github.com/mewkiz/flac"
 )
 
-func LoadSample(filename string) []float64 {
+func LoadSample(filename string) (res []float64) {
+	if data, ok := cache.get(filename); ok {
+		return data
+	}
+
+	defer func() {
+		cache.set(filename, res)
+	}()
+
 	f, err := os.Open(filename)
 	if err != nil {
 		panic(err)
