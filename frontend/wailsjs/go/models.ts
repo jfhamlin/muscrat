@@ -57,3 +57,28 @@ export namespace mrat {
 
 }
 
+export namespace ugen {
+	
+	export class Knob {
+	    name: string;
+	    id: number;
+	    min: number;
+	    max: number;
+	    def: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new Knob(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.name = source["name"];
+	        this.id = source["id"];
+	        this.min = source["min"];
+	        this.max = source["max"];
+	        this.def = source["def"];
+	    }
+	}
+
+}
+

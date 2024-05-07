@@ -19,6 +19,7 @@
                                                  NewMIDIFreq
                                                  NewImpulse
                                                  NewPulseDiv
+                                                 NewKnob
                                                  SimpleUGenFunc
                                                  WithInterp
                                                  WithDefaultDutyCycle

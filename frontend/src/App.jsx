@@ -24,6 +24,7 @@ import Spectrogram from "./components/Spectrogram";
 import Oscilloscope from "./components/Oscilloscope";
 import HydraView from "./components/HydraView";
 import Docs from "./components/Docs";
+import Knobs from "./components/Knobs";
 
 const createAudioResources = () => {
   const audioContext = new AudioContext();
@@ -105,6 +106,7 @@ function App() {
           <div className="border-t border-gray-300" />
           <Docs />
         </div>
+        <Knobs />
       </div>
     </BuffersProvider>
   )
