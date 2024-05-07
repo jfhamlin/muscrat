@@ -33,6 +33,10 @@ func NewRLPF() ugen.UGen {
 		freq := cfg.InputSamples["freq"]
 		reson := cfg.InputSamples["reson"]
 
+		_ = in[len(out)-1]
+		_ = freq[len(out)-1]
+		_ = reson[len(out)-1]
+
 		for i := range out {
 			if !coefficientsComputed || freq[i] != prevFreq || reson[i] != prevReson {
 				computeCoefficients(freq[i], reson[i])
