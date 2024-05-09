@@ -65,6 +65,7 @@ export namespace ugen {
 	    min: number;
 	    max: number;
 	    def: number;
+	    step: number;
 	
 	    static createFrom(source: any = {}) {
 	        return new Knob(source);
@@ -77,6 +78,7 @@ export namespace ugen {
 	        this.min = source["min"];
 	        this.max = source["max"];
 	        this.def = source["def"];
+	        this.step = source["step"];
 	    }
 	}
 

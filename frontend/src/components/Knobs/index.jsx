@@ -18,16 +18,19 @@ const Knob = ({ knob }) => {
   return (
     <div>
       <h2>{knob.name}</h2>
-      {/* input */}
+      {/* input, focus on click */}
       <input
         type="range"
         min={knob.min}
         max={knob.max}
         step={knob.step ?? 0.1}
-        value={knob.value}
+        value={value}
         onChange={(e) => {
           EventsEmit('knob-value-change', knob.id, new Number(e.target.value));
           setValue(e.target.value);
+        }}
+        onClick={(e) => {
+          e.target.focus();
         }}
       />
       {/* value */}
@@ -59,7 +62,6 @@ export default () => {
     EventsOn('knobs-changed', (data) => {
       sortKnobs(data);
       setKnobs(data);
-      console.log('knobs', data);
     });
   }, []);
 

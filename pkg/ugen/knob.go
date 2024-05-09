@@ -18,6 +18,7 @@ type (
 		Min  float64 `json:"min"`
 		Max  float64 `json:"max"`
 		Def  float64 `json:"def"`
+		Step float64 `json:"step"`
 
 		valueBits atomic.Uint64
 
@@ -59,7 +60,7 @@ func GetKnobs() []*Knob {
 }
 
 // NewKnob returns a new Knob ugen.
-func NewKnob(name string, def float64, min float64, max float64) *Knob {
+func NewKnob(name string, def, min, max, step float64) *Knob {
 	knobLock.Lock()
 	defer knobLock.Unlock()
 
@@ -69,6 +70,7 @@ func NewKnob(name string, def float64, min float64, max float64) *Knob {
 		Min:  min,
 		Max:  max,
 		Def:  def,
+		Step: step,
 	}
 	k.valueBits.Store(math.Float64bits(def))
 

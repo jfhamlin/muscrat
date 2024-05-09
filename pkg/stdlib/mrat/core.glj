@@ -10,6 +10,7 @@
                                                  NewMin
                                                  NewAbs
                                                  NewExp
+                                                 NewLog2
                                                  NewPow
                                                  NewTanh
                                                  NewLinExp
@@ -196,9 +197,10 @@
                                   (add-node! :out nil :args [i] :sink true))))]
     (doseq [[ch i] ch-inds]
       (let [gen (as-node ch)
-            sink (find-or-create-sink i)]
+            sink (find-or-create-sink i)
+            port (str "in" (count (:edges @*graph*)))]
         ;; port name doesn't matter for out nodes
-        (add-edge! gen sink (str "in" (count (:nodes @*graph*))))))))
+        (add-edge! gen sink port)))))
 
 (docgroup "Output")
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -519,6 +521,15 @@
   (if (is-node? x)
     (add-node! :exp NewExp :in-edges {:in x})
     (math.Exp x)))
+
+(defn log2
+  "Returns the base-2 logarithm of x. If x is a node, creates a new node
+  that computes the base-2 logarithm of x. Else, returns the base-2 logarithm
+  of x directly."
+  [x]
+  (if (is-node? x)
+    (add-node! :exp NewLog2 :in-edges {:in x})
+    (math.Log2 x)))
 
 (defn tanh
   "Returns the hyperbolic tangent of x. If x is a node, creates a new
@@ -1123,8 +1134,13 @@
   [^:noexpand name nil
    default 0
    min-value -1
-   max-value 1]
-  (add-node! :knob NewKnob :args [name default min-value max-value]))
+   max-value 1
+   step nil
+   xform identity]
+  (let [rng (- max-value min-value)
+        step (or step (/ rng 100.0))
+        ugen (add-node! :knob NewKnob :args [name default min-value max-value step])]
+    (xform ugen)))
 
 (defn qwerty-in
   [name & {:keys [voices]}]
@@ -1338,4 +1354,70 @@
 (def chromatic (range 12))
 
 (docgroup "Scales")
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Scales
+
+(defn- fm-op
+  "Creates a simple FM 'operator' in the style of the Yamaha DX series."
+  [freq envelope input & {:keys [feedback]}]
+  (let [phase (phasor freq)
+        feedback (or feedback 0)
+        ;; log2 is used to scale the feedback amount
+        feedback (log2 (+ feedback 1))
+        has-feedback (or (not (number? feedback)) (> feedback 0))
+        fb (if has-feedback (pipe) 0)
+        osc (tri :phase (+ phase input fb)) ;; todo: sync with the trigger so that the phase is reset
+        out (* osc envelope)]
+    (if has-feedback (pipeset! fb (* feedback out)))
+    out))
+
+(defn fm-synth
+  "Create a simple FM synthesizer with the given configuration. The
+  configuration is a sequence of operator configurations, where each
+  operator configuration is a vector of the form:
+
+  [ratio amplitude envelope modulators feedback carrier]
+  - ratio: the frequency ratio of the operator
+  - amplitude: the amplitude of the operator
+  - envelope: the ADSR envelope configuration for the operator
+  - modulators: a sequence of indices of other operators to modulate
+    this operator
+  - feedback: the amount of feedback to apply to the operator
+  - carrier: a boolean indicating whether this operator is a carrier
+    (i.e. the output of the synth)
+
+  The synth will sum the outputs of all carrier operators and return
+  the result.
+
+  For example, to create a simple FM synth with two operators, the
+  first modulating the second:
+
+  ```clojure
+  (fm-synth [[1 1 [0.01 0.1 0.01 0.1] []  0 false]
+             [2 1 [0.01 0.1 0.01 0.1] [0] 0 true]]
+            gate freq)```"
+  [op-conf gate freq]
+  (let [ops (mapv (fn [[r a e m f c]]
+                    (let [input (if-not (empty? m) (pipe) 0)
+                          op (fm-op (* freq r)
+                                    (* a (env-adsr gate e))
+                                    input
+                                    :feedback f)]
+                      {:op op
+                       :mods m
+                       :input input
+                       :carrier c}))
+                  op-conf)]
+    ;; wire up the modulators
+    (doseq [{:keys [op mods input]} ops
+            :when (not (empty? mods))]
+      (let [in-sum (sum (map #(:op (nth ops %)) mods))]
+        (pipeset! input in-sum)))
+    (sum (->> ops
+              (filter :carrier)
+              (map :op)))))
+
+(docgroup "Synth")
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
