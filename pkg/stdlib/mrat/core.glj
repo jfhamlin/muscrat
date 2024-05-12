@@ -84,7 +84,9 @@
 (def BUFFER-SIZE github.com$jfhamlin$muscrat$pkg$conf.BufferSize)
 (def BUFFER-DUR (/ BUFFER-SIZE SAMPLE-RATE))
 (def SAMPLE-DUR (/ 1 SAMPLE-RATE))
-(def SAMPLE-FILE-PATHS github.com$jfhamlin$muscrat$pkg$conf.SampleFilePaths)
+
+(def ^:dynamic *sample-file-paths*
+  (atom (vec github.com$jfhamlin$muscrat$pkg$conf.SampleFilePaths)))
 
 (docgroup "Constants")
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -1060,28 +1062,45 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Sampler
 
-(defn find-sample-path
-  "find-sample-path searches the directory given by the env var
+(defn add-sample-path!
+  [& paths]
+  (swap! *sample-file-paths* #(apply conj % paths)))
+
+(def ^:private supported-sample-suffixes #{".wav" ".aiff" ".aif" ".flac" ".mp3"})
+
+(defn search-samples
+  [pat & pats]
+  (let [matches (atom [])
+        pats (cons pat pats)]
+    (letfn [(walk [s dir-entry err]
+              (when-not err
+                (let [ext (path$filepath.Ext s)
+                      [info err] (os.Stat s)]
+                  (cond
+                    err nil
+                    (not (contains? supported-sample-suffixes ext)) nil
+                    (.IsDir info) nil
+                    (->> pats
+                         (map name)
+                         (map #(re-pattern %))
+                         (map #(re-seq % s))
+                         (every? identity)) (do (swap! matches conj s)
+                                                nil)))))]
+      (doseq [dir @*sample-file-paths*]
+        (path$filepath.WalkDir dir walk))
+      @matches)))
+
+(defn find-sample
+  "find-sample searches the directories given by the env var
   MUSCRAT_SAMPLE_PATH for a sample file whose base name matches the
   given keyword. If the sample is not found, an error is thrown.
 
   Supports the following file extensions: .wav, .aiff, .aif, .flac,"
-  [kw]
-  (letfn [(file-exists? [file] (some? (first (os.Stat file))))]
-    (let [supported-suffixes [".wav" ".aiff" ".aif" ".flac" ".mp3"]
-          sample-path SAMPLE-FILE-PATHS
-          sample-path (if (empty? sample-path)
-                        (throw (errors.New "no sample paths defined"))
-                        sample-path)
-          sample-path (map #(strings.TrimRight % "/") sample-path)
-          matches (for [path sample-path
-                        suffix supported-suffixes
-                        file [(str path "/" (name kw) suffix)]
-                        :when (file-exists? file)]
-                    file)]
-      (if (empty? matches)
-        (throw (errors.New (str "sample not found: " kw)))
-        (first matches)))))
+  [pat & pats]
+  (let [matches (apply search-samples pat pats)]
+    (if (empty? matches)
+      (throw (errors.New (str "sample not found matching " (cons pat pats))))
+      (first matches))))
 
 (defn load-sample
   "Load an audio sample from a file into a buffer (slice of float64s) or
@@ -1089,10 +1108,11 @@
   resampled from the source to the engine's sample rate (available in
   the SAMPLE-RATE var). See play-buf for an example of how to play a
   loaded sample."
-  [path-or-kw]
-  (if (keyword? path-or-kw)
-    (load-sample (find-sample-path path-or-kw))
-    (LoadSample path-or-kw)))
+  [pat-or-pats]
+  (cond
+    (keyword? pat-or-pats) (load-sample [pat-or-pats])
+    (string? pat-or-pats) (LoadSample pat-or-pats)
+    :else (load-sample (apply find-sample pat-or-pats))))
 
 (defugen play-buf
   "Play a buffer (single-channel) or slice of buffers (multi-channel)."
@@ -1101,7 +1121,9 @@
    trigger 1
    start-pos 0
    loop 0]
-  (let [buf-or-bufs (if (keyword? buf-or-bufs)
+  (let [buf-or-bufs (if (or (keyword? buf-or-bufs)
+                            (vector? buf-or-bufs)
+                            (string? buf-or-bufs))
                       (load-sample buf-or-bufs)
                       buf-or-bufs)]
       (when-not (pos? (count buf-or-bufs))
@@ -1139,7 +1161,7 @@
    xform identity]
   (let [rng (- max-value min-value)
         step (or step (/ rng 100.0))
-        ugen (add-node! :knob NewKnob :args [name default min-value max-value step])]
+        ugen (add-node! :knob NewKnob :args [(str name) default min-value max-value step])]
     (xform ugen)))
 
 (defn qwerty-in

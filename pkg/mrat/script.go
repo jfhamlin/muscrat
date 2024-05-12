@@ -14,6 +14,7 @@ import (
 	value "github.com/glojurelang/glojure/pkg/lang"
 	"github.com/glojurelang/glojure/pkg/runtime"
 
+	"github.com/jfhamlin/muscrat/pkg/conf"
 	"github.com/jfhamlin/muscrat/pkg/console"
 	"github.com/jfhamlin/muscrat/pkg/graph"
 )
@@ -110,8 +111,15 @@ func EvalScript(filename string) (res *graph.Graph, err error) {
 	require.Invoke(glj.Read("mrat.core"))
 
 	graphAtom := lang.NewAtom(glj.Read(`{:nodes [] :edges []}`))
+
+	anyPaths := make([]any, len(conf.SampleFilePaths))
+	for i, p := range conf.SampleFilePaths {
+		anyPaths[i] = p
+	}
+	sampleFilePathsAtom := lang.NewAtom(lang.NewVector(anyPaths...))
 	value.PushThreadBindings(value.NewMap(
 		glj.Var("mrat.core", "*graph*"), graphAtom,
+		glj.Var("mrat.core", "*sample-file-paths*"), sampleFilePathsAtom,
 		glj.Var("glojure.core", "*out*"), &consoleWriter{},
 	))
 	defer value.PopThreadBindings()
