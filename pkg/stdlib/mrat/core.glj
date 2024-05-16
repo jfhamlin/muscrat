@@ -524,20 +524,20 @@
     (add-node! :exp NewExp :in-edges {:in x})
     (math.Exp x)))
 
-(defn log2
+(defugen log2
   "Returns the base-2 logarithm of x. If x is a node, creates a new node
   that computes the base-2 logarithm of x. Else, returns the base-2 logarithm
   of x directly."
-  [x]
+  [x 1]
   (if (is-node? x)
     (add-node! :exp NewLog2 :in-edges {:in x})
     (math.Log2 x)))
 
-(defn tanh
+(defugen tanh
   "Returns the hyperbolic tangent of x. If x is a node, creates a new
   node that computes the hyperbolic tangent of x. Else, returns the
   hyperbolic tangent of x directly."
-  [x]
+  [x 0]
   (if (is-node? x)
     (add-node! :tanh NewTanh :in-edges {:in x})
     (math.Tanh x)))
@@ -603,6 +603,12 @@
     (add-node! :midifreq NewMIDIFreq :in-edges {"in" note})
     (* 440.0 (pow 2 (/ (- note 69.0) 12.0)))))
 
+(defn lcm
+  [& x]
+  (letfn [(gcd [a b] (if (zero? b) a (gcd b (mod a b))))
+          (lcm [a b] (/ (* a b) (gcd a b)))]
+    (reduce lcm x)))
+
 (docgroup "Utilities")
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -662,11 +668,13 @@
 
 (defugen impulse
   [freq default-freq
-   iphase nil]
+   iphase nil
+   sync nil] ;; TODO: implement sync
   (let [iphase (if iphase (as-node iphase))
         freq-node (as-node freq)
         node (add-node! :impulse NewImpulse)]
     (if iphase (add-edge! iphase node "iphase"))
+    (if sync (add-edge! sync node "sync"))
     (add-edge! freq-node node "w")
     node))
 
@@ -1258,11 +1266,13 @@
 
 (defn step
   "Cycle through a sequence of values on each trigger."
-  [trig freqs]
+  [trig freqs & {:keys [sync]}]
   (let [node (add-node! :sequencer github.com$jfhamlin$muscrat$pkg$pattern.NewSequencer)
         trig (as-node trig)
-        freqs (map as-node freqs)]
+        freqs (map as-node freqs)
+        sync (if sync (as-node sync) nil)]
     (add-edge! trig node "trigger")
+    (when sync (add-edge! sync node "sync"))
     (doseq-idx [[freq i] freqs]
                (add-edge! freq node (str \$ i)))
     node))
@@ -1316,11 +1326,61 @@
 
 (defugen impulse-pattern
   [impulse 1 "The impulse signal to trigger the pattern."
-   ^:noexpand pattern (euclid 3 8) "The pattern to trigger on the impulse signal."]
-  (let [pat-seq (step impulse pattern)]
+   ^:noexpand pattern (euclid 3 8) "The pattern to trigger on the impulse signal."
+   sync nil]
+  (let [pat-seq (step impulse pattern :sync sync)]
     (* impulse pat-seq)))
 
 (docgroup "Patterns")
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Tidal Cycles-like
+
+(def ^{:dynamic true, :private true} *cps* (atom nil))
+(def ^:dynamic *tctick* (atom nil))
+
+(defn ^:private init-cps!
+  []
+  (reset! *cps* (pipe))
+  (pipeset! @*cps* (/ 135 60 4))
+  (reset! *tctick* (impulse @*cps*)))
+
+(defn setcps!
+  [cps]
+  (pipeset! @*cps* cps))
+
+(defn tcpat
+  [pattern]
+  (cond
+    (= pattern '_) 0
+    (not (coll? pattern)) 1
+    :else (let [sub-patterns (map tcpat pattern)
+                sub-patterns (map #(if (coll? %) % [%]) sub-patterns)
+                counts (map count sub-patterns)
+                lcm-steps (reduce lcm counts)
+                expanded (map (fn [pat cnt] (concat pat (repeat (- lcm-steps cnt) 0)))
+                             sub-patterns counts)]
+            (flatten expanded))))
+
+(defn tcvals
+  [value-pattern]
+  (let [pattern (tcpat value-pattern)
+        values (filter #(not= % '_) (flatten value-pattern))
+        ticks (-> (impulse (* (count pattern) @*cps*) :sync @*tctick*)
+                  (impulse-pattern pattern :sync @*tctick*))
+        value-steps (step ticks values :sync @*tctick*)]
+    [value-steps ticks]))
+
+(defn tctrig
+  [trig-pattern]
+  (let [pattern (tcpat trig-pattern)
+        values (filter #(not= % '_) (flatten trig-pattern))
+        ticks (-> (impulse (* (count pattern) @*cps*) :sync @*tctick*)
+                  (impulse-pattern pattern :sync @*tctick*))]
+    ticks))
+
+(docgroup "Patterns - Tidal-like")
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

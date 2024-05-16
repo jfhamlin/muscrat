@@ -11,7 +11,6 @@ import (
 
 	"github.com/glojurelang/glojure/pkg/glj"
 	"github.com/glojurelang/glojure/pkg/lang"
-	value "github.com/glojurelang/glojure/pkg/lang"
 	"github.com/glojurelang/glojure/pkg/runtime"
 
 	"github.com/jfhamlin/muscrat/pkg/conf"
@@ -112,17 +111,13 @@ func EvalScript(filename string) (res *graph.Graph, err error) {
 
 	graphAtom := lang.NewAtom(glj.Read(`{:nodes [] :edges []}`))
 
-	anyPaths := make([]any, len(conf.SampleFilePaths))
-	for i, p := range conf.SampleFilePaths {
-		anyPaths[i] = p
+	lang.PushThreadBindings(getScriptThreadBindings(graphAtom))
+	defer lang.PopThreadBindings()
+
+	{ // initialize dynamic vars
+		initCPS := glj.Var("mrat.core", "init-cps!")
+		initCPS.Invoke()
 	}
-	sampleFilePathsAtom := lang.NewAtom(lang.NewVector(anyPaths...))
-	value.PushThreadBindings(value.NewMap(
-		glj.Var("mrat.core", "*graph*"), graphAtom,
-		glj.Var("mrat.core", "*sample-file-paths*"), sampleFilePathsAtom,
-		glj.Var("glojure.core", "*out*"), &consoleWriter{},
-	))
-	defer value.PopThreadBindings()
 
 	// get the absolute path to the script
 	absPath, err := filepath.Abs(filename)
@@ -140,12 +135,26 @@ func EvalScript(filename string) (res *graph.Graph, err error) {
 		runtime.AddLoadPath(os.DirFS(dir))
 		addedPaths[dir] = true
 	}
-	require.Invoke(glj.Read(strings.TrimSuffix(name, ".glj")), value.NewKeyword("reload"))
+	require.Invoke(glj.Read(strings.TrimSuffix(name, ".glj")), lang.NewKeyword("reload"))
 
 	require.Invoke(glj.Read("mrat.graph"))
 	simplifyGraph := glj.Var("mrat.graph", "simplify-graph")
 	g := simplifyGraph.Invoke(graphAtom.Deref())
 	return graph.SExprToGraph(g), nil
+}
+
+func getScriptThreadBindings(graphAtom *lang.Atom) lang.IPersistentMap {
+	anyPaths := make([]any, len(conf.SampleFilePaths))
+	for i, p := range conf.SampleFilePaths {
+		anyPaths[i] = p
+	}
+	sampleFilePathsAtom := lang.NewAtom(lang.NewVector(anyPaths...))
+
+	return lang.NewMap(
+		glj.Var("mrat.core", "*graph*"), graphAtom,
+		glj.Var("mrat.core", "*sample-file-paths*"), sampleFilePathsAtom,
+		glj.Var("glojure.core", "*out*"), &consoleWriter{},
+	)
 }
 
 func GetNSPublics() []Symbol {

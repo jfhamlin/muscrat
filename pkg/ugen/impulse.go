@@ -13,12 +13,18 @@ func NewImpulse(opts ...Option) UGen {
 
 	var phaseOffset, freq, phase, phaseIncrement float64
 	initialized := false
+	lastSync := 1.0
 
 	return UGenFunc(func(ctx context.Context, cfg SampleConfig, out []float64) {
 		ws := cfg.InputSamples["w"]
 		iphases := cfg.InputSamples["iphase"]
+		syncs := cfg.InputSamples["sync"]
+		if len(syncs) == 0 {
+			syncs = Zeros
+		}
 
 		_ = ws[len(out)-1]
+		_ = syncs[len(out)-1]
 
 		if !initialized {
 			freq = math.Max(ws[0], 0)
@@ -50,6 +56,12 @@ func NewImpulse(opts ...Option) UGen {
 				}
 			}
 			phase += phaseIncrement
+
+			if syncs[i] > 0 && lastSync <= 0 {
+				phase = 1 // wrap around and trigger a tick
+			}
+			lastSync = syncs[i]
+
 			if phase >= 1 {
 				phase = math.Mod(phase, 1)
 				out[i] = 1
