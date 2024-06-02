@@ -9,6 +9,6 @@
           (combc 2 0.014 1)
           (* 0.5)
           (rlpf 300 0.3)
-          (+ (-> (play-buf :loop_amen_full :rate (step trig [0.4 1 0.1 2 1.5 0.6 0.25]) :trigger trig :mul 0.1)
+          (+ (-> (smp :loop_amen_full :rate (step trig [0.4 1 0.1 2 1.5 0.6 0.25]) :trigger trig :mul 0.1)
                  (rhpf 1400 0.15 :mul 0.2)))
           (freeverb :room-size 0.1)))

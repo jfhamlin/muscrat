@@ -18,6 +18,10 @@ func NewLowpassFilter() ugen.UGen {
 		cuts := cfg.InputSamples["cutoff"]
 		ress := cfg.InputSamples["resonance"]
 
+		_ = in[len(out)-1]
+		_ = cuts[len(out)-1]
+		_ = ress[len(out)-1]
+
 		for i := range out {
 			cut := cuts[i]
 			res := ress[i]

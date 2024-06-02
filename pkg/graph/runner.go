@@ -257,7 +257,7 @@ func (r *Runner) newRunState(g *Graph) *runState {
 
 		node.id = id
 
-		graphNode := nodeMap[id]
+		graphNode := nodeMap[id] // BUGBUG: possible for node not to be found?
 		node.node = graphNode
 
 		var alignment GraphAlignment

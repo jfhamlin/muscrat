@@ -1,6 +1,6 @@
 (ns examples.scriabin
-  (:require [mrat.core :refer :all] :reload
-            [mrat.abc :as abc] :reload))
+  (:require [mrat.core :refer :all]
+            [mrat.abc :as abc]))
 
 (def tempo-in (midi-in "tempo" :cc :controller 70 :default 0.5))
 (def tempo (* 2 72 tempo-in)) ;; 72 quarter notes per minute default
@@ -62,10 +62,10 @@
 (def envelope-bass (mkenv metro-bass dur-bass))
 
 (def tune
-  (let [sig (-> (saw (* root (semitones (sin 6 :mul 0.05))) :duty 0.8)
+  (let [sig (-> (saw (* root (semitones (sin 8 :mul 0.05))) :duty 0.8)
                 (lores (* root (semitones 7)) 0.8)
                 (* envelope))
-        sig-bass (-> (saw (* root-bass (semitones (sin 6 :mul 0.1))))
+        sig-bass (-> (sin (* root-bass (semitones (sin 6 :mul 0.1))) :duty 0.8)
                      (lores (* root-bass 3) 0.9)
                      (* envelope-bass))]
     (-> (+ sig (* (dbamp -5) sig-bass))

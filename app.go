@@ -9,6 +9,8 @@ import (
 	"github.com/jfhamlin/muscrat/pkg/conf"
 	"github.com/jfhamlin/muscrat/pkg/mrat"
 	"github.com/jfhamlin/muscrat/pkg/pubsub"
+	"github.com/jfhamlin/muscrat/pkg/ugen"
+
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
@@ -74,6 +76,24 @@ func (a *App) startup(ctx context.Context) {
 			}
 			a.mtx.Unlock()
 		}
+	})
+
+	pubsub.Subscribe(ugen.KnobsChangedEvent, func(event string, data any) {
+		// send the new knobs to the UI
+		go func() {
+			runtime.EventsEmit(ctx, "knobs-changed", ugen.GetKnobs())
+		}()
+	})
+
+	// forward knob value changes from the UI to the pubsub
+	runtime.EventsOn(ctx, "knob-value-change", func(data ...any) {
+		id := data[0].(float64)
+		value := data[1].(float64)
+		update := ugen.KnobUpdate{
+			ID:    uint64(id),
+			Value: value,
+		}
+		pubsub.Publish(ugen.KnobValueChangeEvent, update)
 	})
 
 	pubsub.Subscribe("console.log", func(event string, data any) {
@@ -186,4 +206,8 @@ func (a *App) stopFile() {
 
 func (a *App) GetNSPublics() []mrat.Symbol {
 	return mrat.GetNSPublics()
+}
+
+func (a *App) GetKnobs() []*ugen.Knob {
+	return ugen.GetKnobs()
 }

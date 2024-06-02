@@ -1,16 +1,16 @@
 (ns examples.sunset
   (:require [mrat.core :refer :all]))
 
-(def melody-amp (* 0.3 (midi-in "melody" :cc :controller 70 :default 0.5)))
-(def drone-amp (midi-in "drone" :cc :controller 74 :default 0.6))
-(def amp (* 0.8 (midi-in "amp" :cc :controller 73 :default 0.5)))
+(def melody-amp (* 0.3 (knob "melody" 0.5 0 1)))
+(def drone-amp (knob "drone" 0.6 0 1))
+(def amp (* 0.8 (knob "amp" 0.5 0 1)))
 
-(def split-cutoff-midi (+ 40 36 (* 40 (midi-in "split" :cc :controller 71 :default 0.5))))
+(def split-cutoff-midi (+ 40 36 (* 40 (knob "split" 0.5 0 1))))
 
-(def res (* 0.95 (midi-in "res" :cc :controller 75 :default 0.6)))
+(def res (* 0.95 (knob "res" 0.6 0 1)))
 
-(def hpcutoff (mtof (+ 40 (* 90 (midi-in "hpcutoff" :cc :controller 76 :default 0)))))
-(def lpcutoff (mtof (+ 20 (* 110 (midi-in "lpcutoff" :cc :controller 77 :default 1)))))
+(def hpcutoff (mtof (+ 40 (* 90 (knob "hpcutoff" 0 0 1)))))
+(def lpcutoff (mtof (+ 20 (* 110 (knob "lpcutoff" 1 0 1)))))
 
 (def intervals [0 7 0 5 0 10
                 0 5 0 3 0 7
@@ -19,9 +19,9 @@
                 0 0 0 0 0 0
                 ])
 
-(def root-midi 50)
+(def root-midi (knob "root-midi" 40 30 70 1))
 
-(def metro (impulse 6))
+(def metro (impulse (knob "metro" 4 4 6 1)))
 
 (def metro-slo (impulse 0.1))
 

@@ -36,6 +36,7 @@ func NewAmplitude(attackTime, releaseTime float64, opts ...ugen.Option) ugen.UGe
 		// https://doc.sccode.org/Classes/Amplitude.html
 
 		in := cfg.InputSamples["in"]
+		_ = in[len(out)-1]
 		for i := range out {
 			val := math.Abs(in[i])
 			if val < prevIn {

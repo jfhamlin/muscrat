@@ -10,6 +10,7 @@
                                                  NewMin
                                                  NewAbs
                                                  NewExp
+                                                 NewLog2
                                                  NewPow
                                                  NewTanh
                                                  NewLinExp
@@ -19,6 +20,7 @@
                                                  NewMIDIFreq
                                                  NewImpulse
                                                  NewPulseDiv
+                                                 NewKnob
                                                  SimpleUGenFunc
                                                  WithInterp
                                                  WithDefaultDutyCycle
@@ -82,7 +84,9 @@
 (def BUFFER-SIZE github.com$jfhamlin$muscrat$pkg$conf.BufferSize)
 (def BUFFER-DUR (/ BUFFER-SIZE SAMPLE-RATE))
 (def SAMPLE-DUR (/ 1 SAMPLE-RATE))
-(def SAMPLE-FILE-PATHS github.com$jfhamlin$muscrat$pkg$conf.SampleFilePaths)
+
+(def ^:dynamic *sample-file-paths*
+  (atom (vec github.com$jfhamlin$muscrat$pkg$conf.SampleFilePaths)))
 
 (docgroup "Constants")
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -195,9 +199,10 @@
                                   (add-node! :out nil :args [i] :sink true))))]
     (doseq [[ch i] ch-inds]
       (let [gen (as-node ch)
-            sink (find-or-create-sink i)]
+            sink (find-or-create-sink i)
+            port (str "in" (count (:edges @*graph*)))]
         ;; port name doesn't matter for out nodes
-        (add-edge! gen sink (str "in" (count (:nodes @*graph*))))))))
+        (add-edge! gen sink port)))))
 
 (docgroup "Output")
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -205,136 +210,6 @@
 (defn- constant-node
   [x]
   (add-node! :const NewConstant :args [(double x)]))
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; Utilities
-
-(defn pow
-  "Returns b^p. If b or p are nodes, creates a new node that computes b^p. Else,
-  returns the result of b^p directly. pow extends exponentiation to
-  allow for a negative base with a non-integral exponent, returning
-  -((-b)^p) when b is negative."
-  [b p]
-  (if (some (partial is-node?) [b p])
-    (add-node! :pow NewPow :in-edges {"base" b "exp" p})
-    (if (neg? b)
-      (- (math.Pow (- b) p))
-      (math.Pow b p))))
-
-(defn sine
-  "Returns sin(theta). If theta is a node, creates a new node that
-  computes sin(theta). Else, returns the result of sin(theta)
-  directly."
-  [theta]
-  (if (is-node? theta)
-    (add-node! :sine github.com$jfhamlin$muscrat$pkg$ugen.NewSine :in-edges {:in theta})
-    (math.Sin theta)))
-
-(defn min
-  "Returns the minimum of xs. If any element of xs is a node, creates a new
-  node that computes the minimum of xs. Else, returns the minimum of xs"
-  [& xs]
-  (if (some is-node? xs)
-    (add-node! :min NewMin :in-edges (zipmap (map str (range (count xs))) xs))
-    (apply glojure.core/min xs)))
-
-(defn max
-  "Returns the maximum of xs. If any element of xs is a node, creates a new
-  node that computes the maximum of xs. Else, returns the maximum of xs"
-  [& xs]
-  (if (some is-node? xs)
-    (add-node! :max NewMax :in-edges (zipmap (map str (range (count xs))) xs))
-    (apply glojure.core/max xs)))
-
-(defn abs
-  "Returns the absolute value of x. If x is a node, creates a new node
-  that computes the absolute value of x. Else, returns the absolute
-  value of x directly."
-  [x]
-  (if (is-node? x)
-    (add-node! :abs NewAbs :in-edges {:in x})
-    (math.Abs x)))
-
-(defn exp
-  "Returns e^x. If x is a node, creates a new node that computes e^x.
-  Else, returns e^x directly."
-  [x]
-  (if (is-node? x)
-    (add-node! :exp NewExp :in-edges {:in x})
-    (math.Exp x)))
-
-(defn tanh
-  "Returns the hyperbolic tangent of x. If x is a node, creates a new
-  node that computes the hyperbolic tangent of x. Else, returns the
-  hyperbolic tangent of x directly."
-  [x]
-  (if (is-node? x)
-    (add-node! :tanh NewTanh :in-edges {:in x})
-    (math.Tanh x)))
-
-(defn linexp
-  "Maps x from the linear range [srclo, srchi] to the exponential
-  range [dstlo, dsthi]"
-  [x srclo srchi dstlo dsthi]
-  (add-node! :linexp NewLinExp :in-edges {:in x
-                                          :srclo srclo
-                                          :srchi srchi
-                                          :dstlo dstlo
-                                          :dsthi dsthi}))
-
-(defn copy-sign
-  "Returns x with the sign of s. If x or s are nodes, creates a new node
-  that computes x with the sign of s. Else, returns x with the sign of
-  s directly."
-  [x s]
-  (if (or (is-node? x) (is-node? s))
-    (add-node! :copy-sign NewCopySign :in-edges {"in" x "sign" s})
-    (math.Copysign x s)))
-
-(defn- freq-ratio
-  [x kind]
-  (add-node! :freq-ratio NewFreqRatio :args [kind] :in-edges {"in" x}))
-
-(defn dbamp
-  "Return the amplitude ratio corresponding to the given decibel value."
-  [db]
-  (if (is-node? db)
-    (freq-ratio db "decibels")
-    (pow 10 (/ db 20.0))))
-
-(defn cents
-  "Return the frequency ratio corresponding to the given number of
-  cents."
-  [x]
-  (if (is-node? x)
-    (freq-ratio x "cents")
-    (pow 2 (/ x 1200.0))))
-
-(defn semitones
-  "Return the frequency ratio corresponding to the given number of
-  semitones."
-  [x]
-  (if (is-node? x)
-    (freq-ratio x "semitones")
-    (pow 2 (/ x 12.0))))
-
-(defn octaves
-  "Return the frequency ratio corresponding to the given number of
-  octaves."
-  [x]
-  (if (is-node? x)
-    (freq-ratio x "octaves")
-    (pow 2 x)))
-
-(defn mtof
-  "Return the frequency corresponding to the given MIDI note number."
-  [note]
-  (if (is-node? note)
-    (add-node! :midifreq NewMIDIFreq :in-edges {"in" note})
-    (* 440.0 (pow 2 (/ (- note 69.0) 12.0)))))
-
-(docgroup "Utilities")
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Helper for custom sample generators
@@ -593,6 +468,151 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Utilities
+
+(defn pow
+  "Returns b^p. If b or p are nodes, creates a new node that computes b^p. Else,
+  returns the result of b^p directly. pow extends exponentiation to
+  allow for a negative base with a non-integral exponent, returning
+  -((-b)^p) when b is negative."
+  [b p]
+  (if (some (partial is-node?) [b p])
+    (add-node! :pow NewPow :in-edges {"base" b "exp" p})
+    (if (neg? b)
+      (- (math.Pow (- b) p))
+      (math.Pow b p))))
+
+(defn sine
+  "Returns sin(theta). If theta is a node, creates a new node that
+  computes sin(theta). Else, returns the result of sin(theta)
+  directly."
+  [theta]
+  (if (is-node? theta)
+    (add-node! :sine github.com$jfhamlin$muscrat$pkg$ugen.NewSine :in-edges {:in theta})
+    (math.Sin theta)))
+
+(defn min
+  "Returns the minimum of xs. If any element of xs is a node, creates a new
+  node that computes the minimum of xs. Else, returns the minimum of xs"
+  [& xs]
+  (if (some is-node? xs)
+    (add-node! :min NewMin :in-edges (zipmap (map str (range (count xs))) xs))
+    (apply glojure.core/min xs)))
+
+(defn max
+  "Returns the maximum of xs. If any element of xs is a node, creates a new
+  node that computes the maximum of xs. Else, returns the maximum of xs"
+  [& xs]
+  (if (some is-node? xs)
+    (add-node! :max NewMax :in-edges (zipmap (map str (range (count xs))) xs))
+    (apply glojure.core/max xs)))
+
+(defn abs
+  "Returns the absolute value of x. If x is a node, creates a new node
+  that computes the absolute value of x. Else, returns the absolute
+  value of x directly."
+  [x]
+  (if (is-node? x)
+    (add-node! :abs NewAbs :in-edges {:in x})
+    (math.Abs x)))
+
+(defn exp
+  "Returns e^x. If x is a node, creates a new node that computes e^x.
+  Else, returns e^x directly."
+  [x]
+  (if (is-node? x)
+    (add-node! :exp NewExp :in-edges {:in x})
+    (math.Exp x)))
+
+(defugen log2
+  "Returns the base-2 logarithm of x. If x is a node, creates a new node
+  that computes the base-2 logarithm of x. Else, returns the base-2 logarithm
+  of x directly."
+  [x 1]
+  (if (is-node? x)
+    (add-node! :exp NewLog2 :in-edges {:in x})
+    (math.Log2 x)))
+
+(defugen tanh
+  "Returns the hyperbolic tangent of x. If x is a node, creates a new
+  node that computes the hyperbolic tangent of x. Else, returns the
+  hyperbolic tangent of x directly."
+  [x 0]
+  (if (is-node? x)
+    (add-node! :tanh NewTanh :in-edges {:in x})
+    (math.Tanh x)))
+
+(defn linexp
+  "Maps x from the linear range [srclo, srchi] to the exponential
+  range [dstlo, dsthi]"
+  [x srclo srchi dstlo dsthi]
+  (add-node! :linexp NewLinExp :in-edges {:in x
+                                          :srclo srclo
+                                          :srchi srchi
+                                          :dstlo dstlo
+                                          :dsthi dsthi}))
+
+(defn copy-sign
+  "Returns x with the sign of s. If x or s are nodes, creates a new node
+  that computes x with the sign of s. Else, returns x with the sign of
+  s directly."
+  [x s]
+  (if (or (is-node? x) (is-node? s))
+    (add-node! :copy-sign NewCopySign :in-edges {"in" x "sign" s})
+    (math.Copysign x s)))
+
+(defn- freq-ratio
+  [x kind]
+  (add-node! :freq-ratio NewFreqRatio :args [kind] :in-edges {"in" x}))
+
+(defn dbamp
+  "Return the amplitude ratio corresponding to the given decibel value."
+  [db]
+  (if (is-node? db)
+    (freq-ratio db "decibels")
+    (pow 10 (/ db 20.0))))
+
+(defn cents
+  "Return the frequency ratio corresponding to the given number of
+  cents."
+  [x]
+  (if (is-node? x)
+    (freq-ratio x "cents")
+    (pow 2 (/ x 1200.0))))
+
+(defn semitones
+  "Return the frequency ratio corresponding to the given number of
+  semitones."
+  [x]
+  (if (is-node? x)
+    (freq-ratio x "semitones")
+    (pow 2 (/ x 12.0))))
+
+(defn octaves
+  "Return the frequency ratio corresponding to the given number of
+  octaves."
+  [x]
+  (if (is-node? x)
+    (freq-ratio x "octaves")
+    (pow 2 x)))
+
+(defugen mtof
+  "Return the frequency corresponding to the given MIDI note number."
+  [note 69]
+  (if (is-node? note)
+    (add-node! :midifreq NewMIDIFreq :in-edges {"in" note})
+    (* 440.0 (pow 2 (/ (- note 69.0) 12.0)))))
+
+(defn lcm
+  [& x]
+  (letfn [(gcd [a b] (if (zero? b) a (gcd b (mod a b))))
+          (lcm [a b] (/ (* a b) (gcd a b)))]
+    (reduce lcm x)))
+
+(docgroup "Utilities")
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Oscillators
 
 (def ^:private default-freq 440)
@@ -648,11 +668,13 @@
 
 (defugen impulse
   [freq default-freq
-   iphase nil]
+   iphase nil
+   sync nil] ;; TODO: implement sync
   (let [iphase (if iphase (as-node iphase))
         freq-node (as-node freq)
         node (add-node! :impulse NewImpulse)]
     (if iphase (add-edge! iphase node "iphase"))
+    (if sync (add-edge! sync node "sync"))
     (add-edge! freq-node node "w")
     node))
 
@@ -1048,52 +1070,72 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Sampler
 
-(defn find-sample-path
-  "find-sample-path searches the directory given by the env var
+(defn add-sample-path!
+  [& paths]
+  (swap! *sample-file-paths* #(apply conj % paths)))
+
+(def ^:private supported-sample-suffixes #{".wav" ".aiff" ".aif" ".flac" ".mp3"})
+
+(defn search-samples
+  [pat & pats]
+  (let [matches (atom [])
+        pats (cons pat pats)]
+    (letfn [(walk [s dir-entry err]
+              (when-not err
+                (let [ext (path$filepath.Ext s)
+                      [info err] (os.Stat s)]
+                  (cond
+                    err nil
+                    (not (contains? supported-sample-suffixes ext)) nil
+                    (.IsDir info) nil
+                    (->> pats
+                         (map name)
+                         (map #(re-pattern %))
+                         (map #(re-seq % s))
+                         (every? identity)) (do (swap! matches conj s)
+                                                nil)))))]
+      (doseq [dir @*sample-file-paths*]
+        (path$filepath.WalkDir dir walk))
+      @matches)))
+
+(defn find-sample
+  "find-sample searches the directories given by the env var
   MUSCRAT_SAMPLE_PATH for a sample file whose base name matches the
   given keyword. If the sample is not found, an error is thrown.
 
   Supports the following file extensions: .wav, .aiff, .aif, .flac,"
-  [kw]
-  (letfn [(file-exists? [file] (some? (first (os.Stat file))))]
-    (let [supported-suffixes [".wav" ".aiff" ".aif" ".flac" ".mp3"]
-          sample-path SAMPLE-FILE-PATHS
-          sample-path (if (empty? sample-path)
-                        (throw (errors.New "no sample paths defined"))
-                        sample-path)
-          sample-path (map #(strings.TrimRight % "/") sample-path)
-          matches (for [path sample-path
-                        suffix supported-suffixes
-                        file [(str path "/" (name kw) suffix)]
-                        :when (file-exists? file)]
-                    file)]
-      (if (empty? matches)
-        (throw (errors.New (str "sample not found: " kw)))
-        (first matches)))))
+  [pat & pats]
+  (let [matches (apply search-samples pat pats)]
+    (if (empty? matches)
+      (throw (errors.New (str "sample not found matching " (cons pat pats))))
+      (first matches))))
 
 (defn load-sample
   "Load an audio sample from a file into a buffer (slice of float64s) or
   a slice of buffers for multi-channel audio. The buffer will be
   resampled from the source to the engine's sample rate (available in
-  the SAMPLE-RATE var). See play-buf for an example of how to play a
+  the SAMPLE-RATE var). See smp for an example of how to play a
   loaded sample."
-  [path-or-kw]
-  (if (keyword? path-or-kw)
-    (load-sample (find-sample-path path-or-kw))
-    (LoadSample path-or-kw)))
+  [pat-or-pats]
+  (cond
+    (keyword? pat-or-pats) (load-sample [pat-or-pats])
+    (string? pat-or-pats) (LoadSample pat-or-pats)
+    :else (load-sample (apply find-sample pat-or-pats))))
 
-(defugen play-buf
+(defugen smp
   "Play a buffer (single-channel) or slice of buffers (multi-channel)."
   [^:noexpand buf-or-bufs nil
    rate 1
    trigger 1
    start-pos 0
    loop 0]
-  (let [buf-or-bufs (if (keyword? buf-or-bufs)
+  (let [buf-or-bufs (if (or (keyword? buf-or-bufs)
+                            (vector? buf-or-bufs)
+                            (string? buf-or-bufs))
                       (load-sample buf-or-bufs)
                       buf-or-bufs)]
       (when-not (pos? (count buf-or-bufs))
-        (throw (errors.New "play-buf requires a non-empty buffer or slice of buffers")))
+        (throw (errors.New "smp requires a non-empty buffer or slice of buffers")))
     (let [bufs (if (#(or (number? %) (keyword? %)) (first buf-or-bufs))
                  [buf-or-bufs] ;; wrap single buffer in a vector
                  buf-or-bufs)]
@@ -1101,7 +1143,7 @@
         (let [buf (if (keyword? buf)
                     (load-sample buf)
                     buf)]
-          (add-node! :play-buf NewSampler
+          (add-node! :smp NewSampler
                      :args [buf]
                      :in-edges {:trigger trigger
                                 :rate rate
@@ -1117,6 +1159,18 @@
 (defugen sound-in
   []
   (add-node! :in NewInputDevice))
+
+(defugen knob
+  [^:noexpand name nil
+   default 0
+   min-value -1
+   max-value 1
+   step nil
+   xform identity]
+  (let [rng (- max-value min-value)
+        step (or step (/ rng 100.0))
+        ugen (add-node! :knob NewKnob :args [(str name) default min-value max-value step])]
+    (xform ugen)))
 
 (defn qwerty-in
   [name & {:keys [voices]}]
@@ -1212,11 +1266,13 @@
 
 (defn step
   "Cycle through a sequence of values on each trigger."
-  [trig freqs]
+  [trig freqs & {:keys [sync]}]
   (let [node (add-node! :sequencer github.com$jfhamlin$muscrat$pkg$pattern.NewSequencer)
         trig (as-node trig)
-        freqs (map as-node freqs)]
+        freqs (map as-node freqs)
+        sync (if sync (as-node sync) nil)]
     (add-edge! trig node "trigger")
+    (when sync (add-edge! sync node "sync"))
     (doseq-idx [[freq i] freqs]
                (add-edge! freq node (str \$ i)))
     node))
@@ -1270,11 +1326,67 @@
 
 (defugen impulse-pattern
   [impulse 1 "The impulse signal to trigger the pattern."
-   ^:noexpand pattern (euclid 3 8) "The pattern to trigger on the impulse signal."]
-  (let [pat-seq (step impulse pattern)]
+   ^:noexpand pattern (euclid 3 8) "The pattern to trigger on the impulse signal."
+   sync nil]
+  (let [pat-seq (step impulse pattern :sync sync)]
     (* impulse pat-seq)))
 
 (docgroup "Patterns")
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Tidal Cycles-like
+
+(def ^{:dynamic true, :private true} *cps* nil)
+(def ^:dynamic *tctick* nil)
+
+(defn setcps!
+  [cps]
+  (pipeset! *cps* cps))
+
+(defn tcpat
+  [pattern]
+  (cond
+    (= pattern '_) 0
+    (not (coll? pattern)) 1
+    :else (let [sub-patterns (map tcpat pattern)
+                sub-patterns (map #(if (coll? %) % [%]) sub-patterns)
+                counts (map count sub-patterns)
+                lcm-steps (reduce lcm counts)
+                expanded (map (fn [pat cnt]
+                                ;; pad each element with 0s to make
+                                ;; the whole pat lcm-steps long
+                                (let [rem (- lcm-steps cnt)
+                                      rep (/ rem cnt)
+                                      pad (repeat rep 0)]
+                                  (map #(cons % pad) pat)))
+                              sub-patterns counts)]
+            (flatten expanded))))
+
+(defn tcvals
+  [value-pattern & {:keys [slow]}]
+  (let [slow (long (or slow 1)) ;; must be integral
+        cps (/ *cps* slow)
+        tctick (pulse-div *tctick* slow)
+        pattern (tcpat value-pattern)
+        values (filter #(not= % '_) (flatten value-pattern))
+        ticks (-> (impulse (* (count pattern) cps) :sync tctick)
+                  (impulse-pattern pattern :sync tctick))
+        value-steps (step ticks values :sync tctick)]
+    [value-steps ticks]))
+
+(defn tctrig
+  [trig-pattern & {:keys [slow]}]
+  (let [slow (long (or slow 1)) ;; must be integral
+        cps (/ *cps* slow)
+        tctick (pulse-div *tctick* slow)
+        pattern (tcpat trig-pattern)
+        values (filter #(not= % '_) (flatten trig-pattern))
+        ticks (-> (impulse (* (count pattern) cps) :sync tctick)
+                  (impulse-pattern pattern :sync tctick))]
+    ticks))
+
+(docgroup "Patterns - Tidal-like")
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -1330,4 +1442,70 @@
 (def chromatic (range 12))
 
 (docgroup "Scales")
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Scales
+
+(defn- fm-op
+  "Creates a simple FM 'operator' in the style of the Yamaha DX series."
+  [freq envelope input & {:keys [feedback]}]
+  (let [phase (phasor freq)
+        feedback (or feedback 0)
+        ;; log2 is used to scale the feedback amount
+        feedback (log2 (+ feedback 1))
+        has-feedback (or (not (number? feedback)) (> feedback 0))
+        fb (if has-feedback (pipe) 0)
+        osc (tri :phase (+ phase input fb)) ;; todo: sync with the trigger so that the phase is reset
+        out (* osc envelope)]
+    (if has-feedback (pipeset! fb (* feedback out)))
+    out))
+
+(defn fm-synth
+  "Create a simple FM synthesizer with the given configuration. The
+  configuration is a sequence of operator configurations, where each
+  operator configuration is a vector of the form:
+
+  [ratio amplitude envelope modulators feedback carrier]
+  - ratio: the frequency ratio of the operator
+  - amplitude: the amplitude of the operator
+  - envelope: the ADSR envelope configuration for the operator
+  - modulators: a sequence of indices of other operators to modulate
+    this operator
+  - feedback: the amount of feedback to apply to the operator
+  - carrier: a boolean indicating whether this operator is a carrier
+    (i.e. the output of the synth)
+
+  The synth will sum the outputs of all carrier operators and return
+  the result.
+
+  For example, to create a simple FM synth with two operators, the
+  first modulating the second:
+
+  ```clojure
+  (fm-synth [[1 1 [0.01 0.1 0.01 0.1] []  0 false]
+             [2 1 [0.01 0.1 0.01 0.1] [0] 0 true]]
+            gate freq)```"
+  [op-conf gate freq]
+  (let [ops (mapv (fn [[r a e m f c]]
+                    (let [input (if-not (empty? m) (pipe) 0)
+                          op (fm-op (* freq r)
+                                    (* a (env-adsr gate e))
+                                    input
+                                    :feedback f)]
+                      {:op op
+                       :mods m
+                       :input input
+                       :carrier c}))
+                  op-conf)]
+    ;; wire up the modulators
+    (doseq [{:keys [op mods input]} ops
+            :when (not (empty? mods))]
+      (let [in-sum (sum (map #(:op (nth ops %)) mods))]
+        (pipeset! input in-sum)))
+    (sum (->> ops
+              (filter :carrier)
+              (map :op)))))
+
+(docgroup "Synth")
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
