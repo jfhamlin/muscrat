@@ -51,9 +51,9 @@ export default (props) => {
       });
     });
 
-    GetNSPublics().then((nsPublics) => {
-      console.log("got publics", nsPublics);
-    });
+    /* GetNSPublics().then((nsPublics) => {
+     *   console.log("got publics", nsPublics);
+     * }); */
 
     // custom autocomplete
     const completionItemProvider = monaco.languages.registerCompletionItemProvider('clojure', {

@@ -114,9 +114,21 @@ func EvalScript(filename string) (res *graph.Graph, err error) {
 	lang.PushThreadBindings(getScriptThreadBindings(graphAtom))
 	defer lang.PopThreadBindings()
 
-	{ // initialize dynamic vars
-		initCPS := glj.Var("mrat.core", "init-cps!")
-		initCPS.Invoke()
+	{ // initialize other dynamic vars
+		pipeFn := glj.Var("mrat.core", "pipe")
+		impulse := glj.Var("mrat.core", "impulse")
+		setCPS := glj.Var("mrat.core", "setcps!")
+
+		pipe := pipeFn.Invoke()
+		lang.PushThreadBindings(lang.NewMap(
+			glj.Var("mrat.core", "*cps*"), pipe,
+			glj.Var("mrat.core", "*tctick*"), impulse.Invoke(pipe),
+		))
+
+		// default to 135 bpm
+		setCPS.Invoke(135.0 / 60.0 / 4.0)
+
+		defer lang.PopThreadBindings()
 	}
 
 	// get the absolute path to the script

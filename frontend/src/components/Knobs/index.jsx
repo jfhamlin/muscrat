@@ -3,6 +3,9 @@ import {
   useEffect,
 } from 'react';
 
+import { Knob as PRKnob } from 'primereact/knob';
+import { InputNumber } from 'primereact/inputnumber';
+
 import {
   GetKnobs,
 } from "../../../wailsjs/go/main/App";
@@ -15,26 +18,32 @@ import {
 const Knob = ({ knob }) => {
   const [value, setValue] = useState(knob.def);
 
+  const knobValueChange = (value) => {
+    // at most 4 decimal places
+    value = parseFloat(value.toFixed(4));
+    EventsEmit('knob-value-change', knob.id, new Number(value));
+    setValue(value);
+  }
+
+  // label is centered
   return (
-    <div>
-      <h2>{knob.name}</h2>
-      {/* input, focus on click */}
-      <input
-        type="range"
-        min={knob.min}
-        max={knob.max}
-        step={knob.step ?? 0.1}
-        value={value}
-        onChange={(e) => {
-          EventsEmit('knob-value-change', knob.id, new Number(e.target.value));
-          setValue(e.target.value);
-        }}
-        onClick={(e) => {
-          e.target.focus();
-        }}
-      />
-      {/* value */}
-      <div>{value}</div>
+    <div className="border border-primary p-2 m-2 noscroll overflow-hidden">
+      <h2 className="font-bold text-center">
+        {knob.name}
+      </h2>
+      <PRKnob value={value}
+              min={knob.min}
+              max={knob.max}
+              step={knob.step ?? 0.1}
+              size={80}
+              onChange={(e) => knobValueChange(e.value)} />
+      <div className="w-20">
+        <InputNumber value={value}
+                     min={knob.min}
+                     max={knob.max}
+                     step={knob.step ?? 0.1}
+                     onValueChange={(e) => knobValueChange(e.value)} />
+      </div>
     </div>
   )
 }
@@ -66,8 +75,10 @@ export default () => {
   }, []);
 
   return (
-    <div className="mx-2 my-2">
-      <h1>Knobs</h1>
+    <div className="mx-2 my-2 overflow-auto">
+      <h1 className="font-bold text-xl text-center">
+        Knobs
+      </h1>
       {knobs.map((knob) => (
         <Knob key={knob.id} knob={knob} />
       ))}

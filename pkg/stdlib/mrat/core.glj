@@ -1114,7 +1114,7 @@
   "Load an audio sample from a file into a buffer (slice of float64s) or
   a slice of buffers for multi-channel audio. The buffer will be
   resampled from the source to the engine's sample rate (available in
-  the SAMPLE-RATE var). See play-buf for an example of how to play a
+  the SAMPLE-RATE var). See smp for an example of how to play a
   loaded sample."
   [pat-or-pats]
   (cond
@@ -1122,7 +1122,7 @@
     (string? pat-or-pats) (LoadSample pat-or-pats)
     :else (load-sample (apply find-sample pat-or-pats))))
 
-(defugen play-buf
+(defugen smp
   "Play a buffer (single-channel) or slice of buffers (multi-channel)."
   [^:noexpand buf-or-bufs nil
    rate 1
@@ -1135,7 +1135,7 @@
                       (load-sample buf-or-bufs)
                       buf-or-bufs)]
       (when-not (pos? (count buf-or-bufs))
-        (throw (errors.New "play-buf requires a non-empty buffer or slice of buffers")))
+        (throw (errors.New "smp requires a non-empty buffer or slice of buffers")))
     (let [bufs (if (#(or (number? %) (keyword? %)) (first buf-or-bufs))
                  [buf-or-bufs] ;; wrap single buffer in a vector
                  buf-or-bufs)]
@@ -1143,7 +1143,7 @@
         (let [buf (if (keyword? buf)
                     (load-sample buf)
                     buf)]
-          (add-node! :play-buf NewSampler
+          (add-node! :smp NewSampler
                      :args [buf]
                      :in-edges {:trigger trigger
                                 :rate rate
@@ -1337,18 +1337,12 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Tidal Cycles-like
 
-(def ^{:dynamic true, :private true} *cps* (atom nil))
-(def ^:dynamic *tctick* (atom nil))
-
-(defn ^:private init-cps!
-  []
-  (reset! *cps* (pipe))
-  (pipeset! @*cps* (/ 135 60 4))
-  (reset! *tctick* (impulse @*cps*)))
+(def ^{:dynamic true, :private true} *cps* nil)
+(def ^:dynamic *tctick* nil)
 
 (defn setcps!
   [cps]
-  (pipeset! @*cps* cps))
+  (pipeset! *cps* cps))
 
 (defn tcpat
   [pattern]
@@ -1359,25 +1353,37 @@
                 sub-patterns (map #(if (coll? %) % [%]) sub-patterns)
                 counts (map count sub-patterns)
                 lcm-steps (reduce lcm counts)
-                expanded (map (fn [pat cnt] (concat pat (repeat (- lcm-steps cnt) 0)))
-                             sub-patterns counts)]
+                expanded (map (fn [pat cnt]
+                                ;; pad each element with 0s to make
+                                ;; the whole pat lcm-steps long
+                                (let [rem (- lcm-steps cnt)
+                                      rep (/ rem cnt)
+                                      pad (repeat rep 0)]
+                                  (map #(cons % pad) pat)))
+                              sub-patterns counts)]
             (flatten expanded))))
 
 (defn tcvals
-  [value-pattern]
-  (let [pattern (tcpat value-pattern)
+  [value-pattern & {:keys [slow]}]
+  (let [slow (long (or slow 1)) ;; must be integral
+        cps (/ *cps* slow)
+        tctick (pulse-div *tctick* slow)
+        pattern (tcpat value-pattern)
         values (filter #(not= % '_) (flatten value-pattern))
-        ticks (-> (impulse (* (count pattern) @*cps*) :sync @*tctick*)
-                  (impulse-pattern pattern :sync @*tctick*))
-        value-steps (step ticks values :sync @*tctick*)]
+        ticks (-> (impulse (* (count pattern) cps) :sync tctick)
+                  (impulse-pattern pattern :sync tctick))
+        value-steps (step ticks values :sync tctick)]
     [value-steps ticks]))
 
 (defn tctrig
-  [trig-pattern]
-  (let [pattern (tcpat trig-pattern)
+  [trig-pattern & {:keys [slow]}]
+  (let [slow (long (or slow 1)) ;; must be integral
+        cps (/ *cps* slow)
+        tctick (pulse-div *tctick* slow)
+        pattern (tcpat trig-pattern)
         values (filter #(not= % '_) (flatten trig-pattern))
-        ticks (-> (impulse (* (count pattern) @*cps*) :sync @*tctick*)
-                  (impulse-pattern pattern :sync @*tctick*))]
+        ticks (-> (impulse (* (count pattern) cps) :sync tctick)
+                  (impulse-pattern pattern :sync tctick))]
     ticks))
 
 (docgroup "Patterns - Tidal-like")
