@@ -3,10 +3,10 @@
 
 (def fade-in-time 60)
 
-(def metro (impulse 10))
+(def metro (impulse 8))
 
-(def burst (-> (pink-noise)
-               (* (env-adsr metro [0.001 0.001 1 0.001]))
+(def burst (-> (saw 50)
+               (* (env-adsr metro [0.001 0.001 1 0.1]))
                (* 1)))
 
 (def feedback (pipe))
@@ -14,14 +14,15 @@
 (def delay-filter
   (-> feedback
       (delayc 0.5 (step metro [0.0001 0.002 0.001 0.01 0.0015 0.0019]))
-      (lores 1000 0)
-      (* (sin 4 :mul 0.02 :add 0.98))))
+      (lores 400 0)
+      (* 0.98)))
 
 (pipeset! feedback (+ burst delay-filter))
 
 (play (-> feedback
-          wfold
-          (loshelf 20 :db -20)
-          (rhpf 1200)
-          (hishelf 12000 :db -90)
+          (* 0.1)
+          tanh
+;;          (loshelf 20 :db -20)
+          (rlpf 500 0.2)
+;;          (hishelf 12000 :db -90)
           limiter))

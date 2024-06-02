@@ -3,7 +3,7 @@
 
 (defugen kick
   [trig 0]
-  (let [[hi lo] [700 54]
+  (let [[hi lo] [(knob "high-freq" 700 100 2000) 54]
         freq (env-perc trig [0 0.13] :curve -6)
         freq (linexp freq 0 1 lo hi)
         ;; another little layer
@@ -18,4 +18,4 @@
     snd))
 
 
-(play (kick (impulse 2) :mul 0.5))
+(play (kick (impulse (knob "bps" 2 1 10)) :mul 0.5))

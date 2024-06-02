@@ -7,6 +7,6 @@
 
 (play (-> (sin freq :duty (sin 4.1 :mul 0.4 :add 0.5))
           (* metro)
-          (combc 2 0.01 3)
+          (combc 2 0.018 3)
           (rlpf (* freq 8) 1)
           (* 0.1)))

@@ -23,7 +23,7 @@
 (def melody-freq-seq (env 1 [4 16 32]
                           [melody-cf1-time
                            melody-cf2-dur]
-                          :interp :hold))
+                          :curve :hold))
 
 (def duty-env (env 1 [0.8 0.8 0.2 0.2] [30 2 100]))
 

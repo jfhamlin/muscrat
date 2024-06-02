@@ -1,11 +1,11 @@
 (ns examples.ihylpr
   "A cover of 'I heard you like polyrhythms' by Virtual Riot
   https://www.youtube.com/watch?v=SthcxWPXG_E"
-  (:require [mrat.core :refer :all]))
+  (:use [mrat.core]))
 
 (def bps 1.0)
 
-(def speed-factor 0.005)
+(def speed-factor (knob "speed-factor" 0.005 0.001 0.5 0.001))
 
 (def offset (choose (impulse (/ bps 10)) [-9 -5 0 3 7 12]))
 
@@ -24,7 +24,7 @@
 
 (defn synth
   [rate note]
-  (let [osc (sin (mtof note) :duty 0.2)
+  (let [osc (sin (mtof note) :duty 0.6)
         trig (impulse rate :iphase (.Float64 mrand))
         amp (env trig [0 1 1 0] [0.01 0.02 0.1])]
     (* osc amp)))
@@ -34,6 +34,6 @@
                 (pan2 (/ %1 (count notes)))) (range (count notes)) notes)
       (sum)
       (* (/ 4 (inc (count notes))))
-      (freeverb :room-size 0.5)))
+      (freeverb :room-size (knob "room-size" 0.5 0 1))))
 
 (play ihylpr)
