@@ -1039,6 +1039,29 @@
     [(* in lamp)
      (* in ramp)]))
 
+(defugen splay
+  "Splay spreads an array of channels across the stereo
+  field. Optional arguments are spread and center, and equal power
+  levelCompensation. The formula for the stereo position is
+  ((0 .. (n - 1)) * (2 / (n - 1)) - 1) * spread + center."
+  [^:noexpand in 0
+   spread 1
+   level 1
+   center 0
+   ^:noexpand levelComp true]
+  (let [n (count in)
+        n (max 2 n)
+        n1 (- n 1)
+        positions (-> (range n)
+                      (* (/ 2.0 n1))
+                      (- 1)
+                      (* spread)
+                      (+ center))
+        level (if levelComp
+                (* level (math.Sqrt (/ 1.0 n)))
+                level)]
+    (sum (pan2 in positions level))))
+
 (docgroup "Spatialization")
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -1375,13 +1398,26 @@
         value-steps (step ticks values :sync tctick)]
     [value-steps ticks]))
 
+(defn- zero-rest
+  "Replace 0s with '_ in a pattern."
+  [pattern]
+  (letfn [(replace [el]
+            (if (coll? el)
+              (zero-rest el)
+              (if (and (number? el) (zero? el))
+                '_
+                el)))]
+    (map replace pattern)))
+
 (defn tctrig
   [trig-pattern & {:keys [slow]}]
   (let [slow (long (or slow 1)) ;; must be integral
         cps (/ *cps* slow)
         tctick (pulse-div *tctick* slow)
+        trig-pattern (zero-rest trig-pattern) ;; replace 0s with '_
         pattern (tcpat trig-pattern)
-        values (filter #(not= % '_) (flatten trig-pattern))
+        flat-pat (flatten trig-pattern)
+        values (filter #(not= % '_) flat-pat)
         ticks (-> (impulse (* (count pattern) cps) :sync tctick)
                   (impulse-pattern pattern :sync tctick))]
     ticks))

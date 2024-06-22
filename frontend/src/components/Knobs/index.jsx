@@ -79,9 +79,15 @@ export default () => {
       <h1 className="font-bold text-xl text-center">
         Knobs
       </h1>
-      {knobs.map((knob) => (
-        <Knob key={knob.id} knob={knob} />
-      ))}
+      {knobs.length === 0 &&
+        <div className="text-center w-60">
+          Use the <pre className="inline">knob</pre> function in your code to create knobs.
+        </div>}
+      <div className="flex flex-wrap justify-center w-60">
+        {knobs.map((knob) => (
+          <Knob key={knob.id} knob={knob} />
+        ))}
+      </div>
     </div>
   )
 }

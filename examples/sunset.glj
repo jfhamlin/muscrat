@@ -1,5 +1,5 @@
 (ns examples.sunset
-  (:require [mrat.core :refer :all]))
+  (:use [mrat.core]))
 
 (def melody-amp (* 0.3 (knob "melody" 0.5 0 1)))
 (def drone-amp (knob "drone" 0.6 0 1))
@@ -19,18 +19,18 @@
                 0 0 0 0 0 0
                 ])
 
-(def root-midi (knob "root-midi" 40 30 70 1))
+(def root-midi (knob "root-midi" 50 30 70 1))
 
-(def metro (impulse (knob "metro" 4 4 6 1)))
+(def metro (impulse (knob "metro" 6 4 6 1)))
 
 (def metro-slo (impulse 0.1))
 
 (def freq (step metro (map (comp mtof #(+ root-midi
                                                   (choose metro [0 0 0 0 0 0 0 0 0 0
-                                                                 7 7 7 7 7 7
-                                                                 -12 -12 -12
-                                                                 -5 -5
-                                                                 24 36
+                                                               7 7 7 7 7 7
+                                                               -12 -12 -12
+                                                               -5 -5
+                                                               24 36
                                                                  ]) %)) intervals)))
 
 (def hi-pad

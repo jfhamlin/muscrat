@@ -144,6 +144,7 @@ func (a *App) SaveFile(fileName string, content string) (string, error) {
 					Pattern:     "*.glj",
 				},
 			},
+			CanCreateDirectories: true,
 		})
 		if err != nil {
 			return "", err

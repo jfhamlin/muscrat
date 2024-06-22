@@ -21,19 +21,19 @@
 
 (def rand-source (math$rand.NewSource 214))
 (def mrand (math$rand.New rand-source))
+(def duty (knob "duty" 0.6 0 1))
 
 (defn synth
   [rate note]
-  (let [osc (sin (mtof note) :duty 0.6)
+  (let [osc (sin (mtof note) :duty duty)
         trig (impulse rate :iphase (.Float64 mrand))
         amp (env trig [0 1 1 0] [0.01 0.02 0.1])]
     (* osc amp)))
 
 (def ihylpr
-  (-> (map #(-> (synth (/ bps (+ 1 (* speed-factor %1))) %2)
-                (pan2 (/ %1 (count notes)))) (range (count notes)) notes)
-      (sum)
-      (* (/ 4 (inc (count notes))))
+  (-> (map #(synth (/ bps (+ 1 (* speed-factor %1))) %2) (range (count notes)) notes)
+      splay
+      (* (dbamp (knob "dbs" 0 -50 0)))
       (freeverb :room-size (knob "room-size" 0.5 0 1))))
 
 (play ihylpr)

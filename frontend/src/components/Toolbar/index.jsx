@@ -62,7 +62,7 @@ export default (props) => {
 
   const handleNewClick = () => {
     const DEFAULT_CONTENT = `(ns user
-  (:require [mrat.core :refer :all]))`;
+  (:use [mrat.core]))`;
     buffersStore.updateBuffer(null, DEFAULT_CONTENT, true);
     buffersStore.selectBuffer(null);
   };

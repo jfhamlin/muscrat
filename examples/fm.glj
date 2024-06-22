@@ -4,22 +4,13 @@
 (def impulse-rate 6)
 (def gate (lfpulse impulse-rate :duty 0.2))
 
-(def freq
-  (let [offset (step gate [0 0 0 0 0 0 12 12 12 24])]
-    (step gate
-          (->> locrian
-               (map #(+ A2 % offset))
-               (map mtof)))))
-
 (def op-conf
   ;; freq-ratio    amp  adsr               mod-indexes        feedback carrier
-  [[1              0.8   [0.001 0.15 1   0.15] [1]              0.1    true]
+  [[1              0.8   [0.001 0.15 1   0.15] [1 2]              0.1    true]
    [2              0.5   [0.01  0.15 0.1 0.15] [2]              0.0    false]
    [7              0.3   [0.01  0.15 1   0.01] nil              0.4    false]
    [0.5              1   [0.1   0.15 0.5 0.001] [1 2]     (knob "fb" 0 0 1)    true]
    ])
-
-(println (double (/ BUFFER-SIZE SAMPLE-RATE)))
 
 (def trig (impulse 6))
 
@@ -29,7 +20,7 @@
 
 (def sig
   (-> (fm-synth op-conf trig (step trig (map (comp mtof #(+ % 2)) [C3 E3 B4 E3 C3 E3 G3])))
-      (combc 0.5 (knob "delay" 0.25 0.1 1) 3)
+      (combc 0.5 (knob "delay" 0.25 0.01 1) 3)
       (* 0.75)
       tanh
       (* 0.3)
