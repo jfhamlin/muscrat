@@ -73,14 +73,10 @@ type (
 )
 
 func NewServer() *Server {
-	out := make(chan [][]float64, 1)
 	return &Server{
 		gain:          1,
 		targetGain:    1,
-		outputChannel: out,
-		runner: graph.NewRunner(ugen.SampleConfig{
-			SampleRateHz: conf.SampleRate,
-		}, out),
+		outputChannel: make(chan [][]float64, 1),
 	}
 }
 
@@ -91,8 +87,11 @@ func (s *Server) Start(ctx context.Context) error {
 		return fmt.Errorf("server already started")
 	}
 	s.started = true
-
 	s.ctx = ctx
+	s.runner = graph.NewRunner(ctx,
+		ugen.SampleConfig{
+			SampleRateHz: conf.SampleRate,
+		}, s.outputChannel)
 
 	if err := audio.Open(); err != nil {
 		return err

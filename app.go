@@ -47,7 +47,7 @@ func NewApp() *App {
 func (a *App) startup(ctx context.Context) {
 	a.ctx = ctx
 
-	a.srv.Start(context.Background())
+	a.srv.Start(ctx)
 
 	// send at ~15 times per second, in multiples of conf.BufferSize
 	maxBuffersSamples := conf.SampleRate / 15

@@ -183,6 +183,7 @@ func RegisterImports(_register func(string, interface{})) {
 	_register("github.com/jfhamlin/muscrat/pkg/ugen.NewFMA", github_com_jfhamlin_muscrat_pkg_ugen.NewFMA)
 	_register("github.com/jfhamlin/muscrat/pkg/ugen.NewFMAStatic", github_com_jfhamlin_muscrat_pkg_ugen.NewFMAStatic)
 	_register("github.com/jfhamlin/muscrat/pkg/ugen.NewFreqRatio", github_com_jfhamlin_muscrat_pkg_ugen.NewFreqRatio)
+	_register("github.com/jfhamlin/muscrat/pkg/ugen.NewHydra", github_com_jfhamlin_muscrat_pkg_ugen.NewHydra)
 	_register("github.com/jfhamlin/muscrat/pkg/ugen.NewImpulse", github_com_jfhamlin_muscrat_pkg_ugen.NewImpulse)
 	_register("github.com/jfhamlin/muscrat/pkg/ugen.NewKnob", github_com_jfhamlin_muscrat_pkg_ugen.NewKnob)
 	_register("github.com/jfhamlin/muscrat/pkg/ugen.NewLatch", github_com_jfhamlin_muscrat_pkg_ugen.NewLatch)
@@ -214,6 +215,7 @@ func RegisterImports(_register func(string, interface{})) {
 	_register("github.com/jfhamlin/muscrat/pkg/ugen.WithRand", github_com_jfhamlin_muscrat_pkg_ugen.WithRand)
 	_register("github.com/jfhamlin/muscrat/pkg/ugen.WithSeed", github_com_jfhamlin_muscrat_pkg_ugen.WithSeed)
 	_register("github.com/jfhamlin/muscrat/pkg/ugen.ZapGremlins", github_com_jfhamlin_muscrat_pkg_ugen.ZapGremlins)
+	_register("github.com/jfhamlin/muscrat/pkg/ugen.Zeros", github_com_jfhamlin_muscrat_pkg_ugen.Zeros)
 
 	// package github.com/jfhamlin/muscrat/pkg/wavtabs
 	////////////////////////////////////////

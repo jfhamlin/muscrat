@@ -99,7 +99,7 @@ function App() {
           </div>
         </div>
         <div className="flex flex-col flex-1 h-full overflow-hidden">
-          {/* <HydraView /> */}
+          <HydraView />
           <Toolbar />
           <Editor />
           {/* horizontal line */}

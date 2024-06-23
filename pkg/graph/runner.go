@@ -15,6 +15,8 @@ import (
 
 type (
 	Runner struct {
+		ctx context.Context
+
 		sampleConfig ugen.SampleConfig
 
 		g  *Graph
@@ -87,12 +89,13 @@ var (
 	}()
 )
 
-func NewRunner(cfg ugen.SampleConfig, out chan [][]float64) *Runner {
+func NewRunner(ctx context.Context, cfg ugen.SampleConfig, out chan [][]float64) *Runner {
 	nextOut := make([][]float64, 2)
 	for i := range nextOut {
 		nextOut[i] = make([]float64, conf.BufferSize)
 	}
 	return &Runner{
+		ctx:          ctx,
 		sampleConfig: cfg,
 		epochChan:    make(chan runEpoch),
 		nextOut:      nextOut,
@@ -131,7 +134,7 @@ func (r *Runner) SetGraph(g *Graph) {
 		}
 	}
 
-	q.Start(context.Background())
+	q.Start(r.ctx)
 
 	r.g = g
 	prevRS := r.rs
@@ -306,7 +309,7 @@ func (r *Runner) newRunState(g *Graph) *runState {
 			} else {
 				node.gen = graphNode.Construct()
 				if s, ok := node.gen.(ugen.Starter); ok {
-					s.Start(context.Background())
+					s.Start(r.ctx)
 				}
 			}
 			node.value = make([]float64, conf.BufferSize)
