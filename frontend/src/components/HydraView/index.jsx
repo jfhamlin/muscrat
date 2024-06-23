@@ -9,10 +9,39 @@ import { EventsOn } from '../../../wailsjs/runtime';
 
 import Hydra from 'hydra-synth';
 
+// updates resolution of canvas to match its size
+const ResizableCanvas = ({ setCanvas, ...props }) => {
+  const canvasRef = useRef(null);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) {
+      return;
+    }
+
+    const resize = () => {
+      const devicePixelRatio = window.devicePixelRatio || 1;
+      canvas.width = devicePixelRatio * canvas.clientWidth;
+      canvas.height = devicePixelRatio * canvas.clientHeight;
+    };
+
+    resize();
+    window.addEventListener("resize", resize);
+    return () => window.removeEventListener("resize", resize);
+  }, []);
+
+  useEffect(() => {
+    setCanvas(canvasRef.current);
+  }, [setCanvas]);
+
+  return <canvas ref={canvasRef} {...props} />;
+};
+
 export default () => {
   const [hydra, setHydra] = useState(null);
 
-  const [graph, setGraph] = useState(["solid"]);
+  const [expr, setExpr] = useState(["solid"]);
+  const [vars, setVars] = useState(new Set())
 
   const mappings = useRef({});
 
@@ -27,8 +56,9 @@ export default () => {
   }, []);
 
   useEffect(() => {
-    return EventsOn("hydra.graph", (graph) => {
-      setGraph(graph);
+    return EventsOn("hydra.expr", (expr) => {
+      setExpr(expr.expr);
+      setVars(new Set(expr.vars));
     });
   }, []);
   useEffect(() => {
@@ -42,18 +72,13 @@ export default () => {
       return;
     }
 
-    console.log("new hydra graph", graph);
+    console.log("new hydra expr", expr);
     const synth = hydra.synth;
-    if (!graph) {
-      synth.stop();
-      return;
-    }
 
     let evalMapping, evalCall, evalExpr;
 
     evalMapping = (name) => {
-      // if mappings has the key, use it, otherwise use the synth
-      if (mappings.current[name]) {
+      if (vars.has(name)) {
         return () => mappings.current[name] ?? 0;
       }
       return synth[name];
@@ -68,7 +93,6 @@ export default () => {
           }
           return chained;
         default:
-          console.log("calling", call[0]);
           return self[call[0]].apply(self, call.slice(1).map((arg) => evalExpr(synth, arg)));
       }
     };
@@ -86,14 +110,14 @@ export default () => {
     };
 
     try {
-      evalExpr(synth, graph);
+      evalExpr(synth, expr);
     } catch (e) {
-      console.error("error setting graph", e);
+      console.error("error setting expr", e);
     }
-  }, [hydra, graph]);
+  }, [hydra, expr]);
 
   return <>
-    <canvas className="w-full h-full"
+    <canvas className="w-full h-full bg-black"
             ref={setCanvas} />
   </>;
 };

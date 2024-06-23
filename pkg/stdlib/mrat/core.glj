@@ -1569,7 +1569,7 @@
                                @xformed)
                  :else expr))]
        (add-node! :hydra NewHydra
-                  :args [(xform render-cmd)]
+                  :args [(xform render-cmd) (map name (keys mappings))]
                   :sink true
                   :in-edges mappings)))))
 

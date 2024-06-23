@@ -10,18 +10,20 @@ type (
 	// NewHydra creates a new Hydra unit generator. It's a false ugen that
 	// returns zero samples. It's used to update the Hydra synthesizer
 	hydra struct {
-		graph any
+		Expr any      `json:"expr"`
+		Vars []string `json:"vars"`
 	}
 )
 
-func NewHydra(graph any) UGen {
+func NewHydra(expr any, vars []string) UGen {
 	return &hydra{
-		graph: graph,
+		Expr: expr,
+		Vars: vars,
 	}
 }
 
 func (h *hydra) Start(ctx context.Context) error {
-	go runtime.EventsEmit(ctx, "hydra.graph", h.graph)
+	go runtime.EventsEmit(ctx, "hydra.expr", h)
 	return nil
 }
 
