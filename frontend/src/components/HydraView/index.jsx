@@ -12,7 +12,7 @@ import Hydra from 'hydra-synth';
 export default () => {
   const [hydra, setHydra] = useState(null);
 
-  const [graph, setGraph] = useState([]);
+  const [graph, setGraph] = useState(["solid"]);
 
   const mappings = useRef({});
 
@@ -45,24 +45,51 @@ export default () => {
     console.log("new hydra graph", graph);
     const synth = hydra.synth;
     if (!graph) {
-      synth.out();
+      synth.stop();
       return;
     }
 
-    const processArg = (arg) => {
-      // if a string, it refers to a mapping
-      if (typeof arg === "string") {
-        return () => mappings.current[arg] ?? 0;
+    let evalMapping, evalCall, evalExpr;
+
+    evalMapping = (name) => {
+      // if mappings has the key, use it, otherwise use the synth
+      if (mappings.current[name]) {
+        return () => mappings.current[name] ?? 0;
       }
-      return arg;
+      return synth[name];
+    };
+    evalCall = (self, call) => {
+      switch (call[0]) {
+        case "..":
+          // special form, chaining method calls
+          let chained = evalExpr(self, call[1]);
+          for (let i = 2; i < call.length; i++) {
+            chained = evalCall(chained, call[i]);
+          }
+          return chained;
+        default:
+          console.log("calling", call[0]);
+          return self[call[0]].apply(self, call.slice(1).map((arg) => evalExpr(synth, arg)));
+      }
+    };
+    evalExpr = (self, expr) => {
+      // if it's an array, it's a function
+      if (Array.isArray(expr)) {
+        return evalCall(self, expr);
+      }
+      // if it's a string, it's a mapping
+      if (typeof expr === "string") {
+        return evalMapping(expr);
+      }
+      // otherwise, it's a constant
+      return expr;
     };
 
-    // graph will look something like
-    // [["osc", 200, 0.5, 0], ["scrollX", 0.5, 1], ["add", "o0"], ["contrast", 10], ["color", (s) => 0.5*Math.sin(2*Math.PI*s.time)+1, 0.1, 1], ["out"]
-    let node = synth;
-    graph.reduce((prev, curr) => {
-      node = node[curr[0]].apply(node, curr.slice(1).map(processArg));
-    }, synth)
+    try {
+      evalExpr(synth, graph);
+    } catch (e) {
+      console.error("error setting graph", e);
+    }
   }, [hydra, graph]);
 
   return <>

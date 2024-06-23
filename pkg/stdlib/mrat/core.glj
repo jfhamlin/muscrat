@@ -1554,22 +1554,24 @@
   "Create a new Hydra graph."
   ([graph] (hydra graph {}))
   ([graph mappings]
-   (letfn [(xform [expr]
-             (cond
-               (keyword? expr) (if (contains? mappings expr)
-                                 (name expr)
-                                 (do (println "hydra warning: unbound reference" expr)
-                                     0))
-               ;; translate to a slice of xformed exprs
-               (vector? expr) (let [xformed (atom (go/make (go/slice-of go/any)))]
-                                (doseq [e expr]
-                                  (reset! xformed (go/append @xformed (xform e))))
-                                @xformed)
-               :else expr))]
-     (add-node! :hydra NewHydra
-                :args [(xform graph)]
-                :sink true
-                :in-edges mappings))))
+   (let [render-cmd (:render graph)]
+     (letfn [(xform [expr]
+               (cond
+                 (keyword? expr) (if (contains? mappings expr)
+                                   (name expr)
+                                   (do (println "hydra warning: unbound reference" expr)
+                                       0))
+                 (symbol? expr) (str expr)
+                 ;; translate to a slice of xformed exprs
+                 (seq? expr) (let [xformed (atom (go/make (go/slice-of go/any)))]
+                               (doseq [e expr]
+                                 (reset! xformed (go/append @xformed (xform e))))
+                               @xformed)
+                 :else expr))]
+       (add-node! :hydra NewHydra
+                  :args [(xform render-cmd)]
+                  :sink true
+                  :in-edges mappings)))))
 
 (docgroup "Hydra")
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
