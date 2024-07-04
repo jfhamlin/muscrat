@@ -7,7 +7,7 @@ toolchain go1.21.9
 require (
 	github.com/ebitengine/purego v0.7.0
 	github.com/fsnotify/fsnotify v1.6.0
-	github.com/glojurelang/glojure v0.2.4
+	github.com/glojurelang/glojure v0.2.5
 	github.com/go-audio/audio v1.0.0
 	github.com/go-audio/wav v1.1.0
 	github.com/gordonklaus/portaudio v0.0.0-20221027163845-7c3b689db3cc
@@ -16,7 +16,7 @@ require (
 	github.com/mewkiz/flac v1.0.10
 	github.com/oov/audio v0.0.0-20171004131523-88a2be6dbe38
 	github.com/stretchr/testify v1.8.4
-	github.com/wailsapp/wails/v2 v2.8.0
+	github.com/wailsapp/wails/v2 v2.9.1
 	gitlab.com/gomidi/midi/v2 v2.0.30
 	gonum.org/v1/gonum v0.14.0
 	gonum.org/v1/plot v0.10.1
@@ -64,12 +64,12 @@ require (
 	github.com/wailsapp/mimetype v1.4.1 // indirect
 	go4.org/intern v0.0.0-20230525184215-6c62f75575cb // indirect
 	go4.org/unsafe/assume-no-moving-gc v0.0.0-20231121144256-b99613f794b6 // indirect
-	golang.org/x/crypto v0.18.0 // indirect
+	golang.org/x/crypto v0.23.0 // indirect
 	golang.org/x/exp v0.0.0-20230522175609-2e198f4a06a1 // indirect
 	golang.org/x/image v0.12.0 // indirect
-	golang.org/x/net v0.20.0 // indirect
+	golang.org/x/net v0.25.0 // indirect
 	golang.org/x/sys v0.20.0 // indirect
-	golang.org/x/text v0.14.0 // indirect
+	golang.org/x/text v0.15.0 // indirect
 	gopkg.in/check.v1 v1.0.0-20200227125254-8fa46927fb4f // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )

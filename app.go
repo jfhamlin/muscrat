@@ -55,26 +55,27 @@ func (a *App) startup(ctx context.Context) {
 	maxBuffersSamples = (maxBuffersSamples/conf.BufferSize + 1) * conf.BufferSize
 
 	pubsub.Subscribe("samples", func(event string, data any) {
-		if samples, ok := data.([][]float64); ok {
-			a.mtx.Lock()
-			if len(a.channelBuffers) != len(samples) {
-				a.channelBuffers = make([][]float64, len(samples))
+		samples, ok := data.([][]float64)
+		if !ok {
+			return
+		}
+
+		if len(a.channelBuffers) != len(samples) {
+			a.channelBuffers = make([][]float64, len(samples))
+		}
+		for i := range samples {
+			a.channelBuffers[i] = append(a.channelBuffers[i], samples[i]...)
+		}
+		if len(a.channelBuffers[0]) >= maxBuffersSamples {
+			cpy := make([][]float64, len(a.channelBuffers))
+			for i := range a.channelBuffers {
+				cpy[i] = make([]float64, len(a.channelBuffers[i]))
+				copy(cpy[i], a.channelBuffers[i])
 			}
-			for i := range samples {
-				a.channelBuffers[i] = append(a.channelBuffers[i], samples[i]...)
+			go runtime.EventsEmit(ctx, "samples", cpy)
+			for i := range a.channelBuffers {
+				a.channelBuffers[i] = a.channelBuffers[i][:0]
 			}
-			if len(a.channelBuffers[0]) >= maxBuffersSamples {
-				cpy := make([][]float64, len(a.channelBuffers))
-				for i := range a.channelBuffers {
-					cpy[i] = make([]float64, len(a.channelBuffers[i]))
-					copy(cpy[i], a.channelBuffers[i])
-				}
-				go runtime.EventsEmit(ctx, "samples", cpy)
-				for i := range a.channelBuffers {
-					a.channelBuffers[i] = a.channelBuffers[i][:0]
-				}
-			}
-			a.mtx.Unlock()
 		}
 	})
 

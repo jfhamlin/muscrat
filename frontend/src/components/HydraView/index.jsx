@@ -5,48 +5,26 @@ import React, {
   useRef,
 } from 'react';
 
-import { EventsOn } from '../../../wailsjs/runtime';
+import {
+  EventsOn,
+  EventsEmit,
+} from '../../../wailsjs/runtime';
 
 import Hydra from 'hydra-synth';
-
-// updates resolution of canvas to match its size
-const ResizableCanvas = ({ setCanvas, ...props }) => {
-  const canvasRef = useRef(null);
-
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) {
-      return;
-    }
-
-    const resize = () => {
-      const devicePixelRatio = window.devicePixelRatio || 1;
-      canvas.width = devicePixelRatio * canvas.clientWidth;
-      canvas.height = devicePixelRatio * canvas.clientHeight;
-    };
-
-    resize();
-    window.addEventListener("resize", resize);
-    return () => window.removeEventListener("resize", resize);
-  }, []);
-
-  useEffect(() => {
-    setCanvas(canvasRef.current);
-  }, [setCanvas]);
-
-  return <canvas ref={canvasRef} {...props} />;
-};
 
 export default () => {
   const [hydra, setHydra] = useState(null);
 
-  const [expr, setExpr] = useState(["solid"]);
+  const [expr, setExpr] = useState({render: ["solid"]});
   const [vars, setVars] = useState(new Set())
+
+  const [canvasSize, setCanvasSize] = useState();
 
   const mappings = useRef({});
 
   const setCanvas = useCallback((canvas) => {
     if (canvas) {
+      setCanvasSize([canvas.width, canvas.height]);
       setHydra(new Hydra({
         canvas,
         detectAudio: false,
@@ -68,6 +46,15 @@ export default () => {
   }, []);
 
   useEffect(() => {
+    if (!hydra || !canvasSize) {
+      return;
+    }
+
+    console.log(hydra);
+    hydra.synth.setResolution(4*canvasSize[0], 4*canvasSize[1]);
+  }, [hydra, canvasSize]);
+
+  useEffect(() => {
     if (!hydra) {
       return;
     }
@@ -85,6 +72,8 @@ export default () => {
     };
     evalCall = (self, call) => {
       switch (call[0]) {
+        case "__lookup":
+          return evalMapping(call[1]);
         case "..":
           // special form, chaining method calls
           let chained = evalExpr(self, call[1]);
@@ -101,20 +90,35 @@ export default () => {
       if (Array.isArray(expr)) {
         return evalCall(self, expr);
       }
-      // if it's a string, it's a mapping
-      if (typeof expr === "string") {
-        return evalMapping(expr);
-      }
       // otherwise, it's a constant
       return expr;
     };
 
     try {
-      evalExpr(synth, expr);
+      const sources = expr.sources ?? {};
+      for (const [name, source] of Object.entries(sources)) {
+        evalExpr(synth[name], source);
+      }
+      evalExpr(synth, expr.render);
     } catch (e) {
+      EventsEmit("console.log", {
+        level: "error",
+        message: e.message,
+        data: e.stack,
+      });
       console.error("error setting expr", e);
     }
   }, [hydra, expr]);
+
+  /* if (canvasSize) {
+   *   return <>
+   *     <canvas className="w-full h-full bg-black"
+   *             ref={setCanvas}
+   *             style={{width: `${canvasSize[0]}px`, height: `${canvasSize[1]}px`}}
+   *             width={2*canvasSize[0]}
+   *             height={2*canvasSize[1]} />
+   *   </>;
+   * } */
 
   return <>
     <canvas className="w-full h-full bg-black"

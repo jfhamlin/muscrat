@@ -1554,22 +1554,34 @@
   "Create a new Hydra graph."
   ([graph] (hydra graph {}))
   ([graph mappings]
-   (let [render-cmd (:render graph)]
+   (let [render-cmd (:render graph)
+         sources (get graph :sources {})
+         expr-map (go/make (go/map-of go/string go/any))
+         src-map (go/make (go/map-of go/string go/any))]
      (letfn [(xform [expr]
                (cond
                  (keyword? expr) (if (contains? mappings expr)
                                    (name expr)
                                    (do (println "hydra warning: unbound reference" expr)
                                        0))
-                 (symbol? expr) (str expr)
+                 (symbol? expr) (xform (list "__lookup" (str expr)))
                  ;; translate to a slice of xformed exprs
                  (seq? expr) (let [xformed (atom (go/make (go/slice-of go/any)))]
-                               (doseq [e expr]
+                               ;; first element is the command
+                               ;; add it as a string
+                               (reset! xformed (go/append @xformed (str (first expr))))
+                               ;; the rest of the elements are the arguments
+                               ;; xform each one and add it to the slice
+                               (doseq [e (rest expr)]
                                  (reset! xformed (go/append @xformed (xform e))))
                                @xformed)
                  :else expr))]
+       (go/set-map-index expr-map "render" (xform render-cmd))
+       (doseq [[src expr] sources]
+         (go/set-map-index src-map (name src) (xform expr)))
+       (go/set-map-index expr-map "sources" src-map)
        (add-node! :hydra NewHydra
-                  :args [(xform render-cmd) (map name (keys mappings))]
+                  :args [expr-map (map name (keys mappings))]
                   :sink true
                   :in-edges mappings)))))
 
