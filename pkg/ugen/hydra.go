@@ -33,7 +33,12 @@ func (h *hydra) Gen(ctx context.Context, cfg SampleConfig, out []float64) {
 	mappings := make(map[string]float64)
 	idx := len(out) - 1
 	for k, v := range cfg.InputSamples {
-		mappings[k] = v[idx]
+		val := v[idx]
+		// if NaN, zero it
+		if val != val {
+			val = 0
+		}
+		mappings[k] = val
 	}
 	go runtime.EventsEmit(ctx, "hydra.mapping", mappings)
 	return

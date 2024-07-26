@@ -110,16 +110,6 @@ export default () => {
     }
   }, [hydra, expr]);
 
-  /* if (canvasSize) {
-   *   return <>
-   *     <canvas className="w-full h-full bg-black"
-   *             ref={setCanvas}
-   *             style={{width: `${canvasSize[0]}px`, height: `${canvasSize[1]}px`}}
-   *             width={2*canvasSize[0]}
-   *             height={2*canvasSize[1]} />
-   *   </>;
-   * } */
-
   return <>
     <canvas className="w-full h-full bg-black"
             ref={setCanvas} />
