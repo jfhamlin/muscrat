@@ -74,20 +74,24 @@ export default () => {
     });
   }, []);
 
+  const style = {};
+  if (knobs.length === 0) {
+    // upright text
+    style.writingMode = 'vertical-rl';
+    style.textOrientation = 'upright';
+  }
+
   return (
-    <div className="mx-2 my-2 overflow-auto">
+    <div className="mx-2 my-2 overflow-auto" style={style}>
       <h1 className="font-bold text-xl text-center">
         Knobs
       </h1>
-      {knobs.length === 0 &&
-        <div className="text-center w-60">
-          Use the <pre className="inline">knob</pre> function in your code to create knobs.
-        </div>}
-      <div className="flex flex-wrap justify-center w-60">
-        {knobs.map((knob) => (
-          <Knob key={knob.id} knob={knob} />
-        ))}
-      </div>
+      {knobs.length === 0 ? null :
+       <div className="flex flex-wrap justify-center w-60">
+         {knobs.map((knob) => (
+           <Knob key={knob.id} knob={knob} />
+         ))}
+       </div>}
     </div>
   )
 }

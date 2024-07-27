@@ -7,7 +7,7 @@ const {
 } = createContext();
 
 const DEFAULT_CODE = `(ns user
-  (:require [mrat.core :refer :all]))
+  (:use [mrat.core]))
 
 (play (sin 200))
 `;
