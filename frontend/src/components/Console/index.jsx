@@ -4,7 +4,7 @@ import {
   useRef,
 } from 'react';
 
-import { EventsOn } from '../../../wailsjs/runtime';
+import { Events } from "@wailsio/runtime";
 
 import Heading from '../Heading';
 
@@ -92,7 +92,7 @@ export default () => {
   const ref = useRef(null);
 
   useEffect(() => {
-    return EventsOn('console.log', (data) => {
+    return Events.On('console.log', (data) => {
       setEvents((prev) => {
         const last = prev[prev.length - 1];
         if (last && JSON.stringify(last.event) === JSON.stringify(data)) {

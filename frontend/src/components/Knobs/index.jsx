@@ -8,12 +8,9 @@ import { InputNumber } from 'primereact/inputnumber';
 
 import {
   GetKnobs,
-} from "../../../wailsjs/go/main/App";
+} from "../../../bindings/github.com/jfhamlin/muscrat/muscratservice";
 
-import {
-  EventsOn,
-  EventsEmit,
-} from '../../../wailsjs/runtime';
+import { Events } from "@wailsio/runtime";
 
 const Knob = ({ knob }) => {
   const [value, setValue] = useState(knob.def);
@@ -21,7 +18,7 @@ const Knob = ({ knob }) => {
   const knobValueChange = (value) => {
     // at most 4 decimal places
     value = parseFloat(value.toFixed(4));
-    EventsEmit('knob-value-change', knob.id, new Number(value));
+    Events.Emit('knob-value-change', knob.id, new Number(value));
     setValue(value);
   }
 
@@ -68,7 +65,7 @@ export default () => {
       sortKnobs(data);
       setKnobs(data);
     });
-    EventsOn('knobs-changed', (data) => {
+    Events.On('knobs-changed', (data) => {
       sortKnobs(data);
       setKnobs(data);
     });

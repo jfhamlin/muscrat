@@ -5,10 +5,7 @@ import React, {
   useRef,
 } from 'react';
 
-import {
-  EventsOn,
-  EventsEmit,
-} from '../../../wailsjs/runtime';
+import { Events } from "@wailsio/runtime";
 
 import Hydra from 'hydra-synth';
 
@@ -34,13 +31,13 @@ export default () => {
   }, []);
 
   useEffect(() => {
-    return EventsOn("hydra.expr", (expr) => {
+    return Events.On("hydra.expr", (expr) => {
       setExpr(expr.expr);
       setVars(new Set(expr.vars));
     });
   }, []);
   useEffect(() => {
-    return EventsOn("hydra.mapping", (mapping) => {
+    return Events.On("hydra.mapping", (mapping) => {
       mappings.current = mapping;
     });
   }, []);
@@ -101,7 +98,7 @@ export default () => {
       }
       evalExpr(synth, expr.render);
     } catch (e) {
-      EventsEmit("console.log", {
+      Events.Emit("console.log", {
         level: "error",
         message: e.message,
         data: e.stack,

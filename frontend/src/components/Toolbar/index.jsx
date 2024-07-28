@@ -3,7 +3,7 @@ import {
   PlayFile,
   SaveFile,
   Silence,
-} from "../../../wailsjs/go/main/App";
+} from "../../../bindings/github.com/jfhamlin/muscrat/muscratservice";
 
 import {
   useBuffersStore,

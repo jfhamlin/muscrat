@@ -8,7 +8,7 @@ import {
   OpenFileDialog,
   SaveFile,
   GetNSPublics,
-} from "../../../wailsjs/go/main/App";
+} from "../../../bindings/github.com/jfhamlin/muscrat/muscratservice";
 
 import Editor from '@monaco-editor/react';
 

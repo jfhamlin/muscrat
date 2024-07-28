@@ -1,13 +1,12 @@
 import {
+  GetSampleRate,
+} from "../bindings/github.com/jfhamlin/muscrat/muscratservice";
+import { Events } from "@wailsio/runtime";
+
+import {
   useState,
   useEffect,
 } from 'react';
-
-import { EventsOn } from '../wailsjs/runtime';
-
-import {
-  GetSampleRate,
-} from "../wailsjs/go/main/App";
 
 import logo from './assets/images/muscrat.svg';
 
@@ -52,7 +51,8 @@ function App() {
 
     let nextBufferTime = audioResources.context.currentTime;
 
-    const unsubscribe = EventsOn("samples", (samples) => {
+    const unsubscribe = Events.On("samples", (evt) => {
+      const samples = evt.data;
       const samplesChannel0 = Float32Array.from(samples[0]);
       const samplesChannel1 = Float32Array.from(samples[1]);
 
