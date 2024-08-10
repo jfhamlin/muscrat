@@ -3,7 +3,7 @@ package ugen
 import (
 	"context"
 
-	"github.com/wailsapp/wails/v2/pkg/runtime"
+	"github.com/jfhamlin/muscrat/pkg/pubsub"
 )
 
 type (
@@ -23,7 +23,7 @@ func NewHydra(expr any, vars []string) UGen {
 }
 
 func (h *hydra) Start(ctx context.Context) error {
-	go runtime.EventsEmit(ctx, "hydra.expr", h)
+	go pubsub.Publish("hydra.expr", h)
 	return nil
 }
 
@@ -40,6 +40,6 @@ func (h *hydra) Gen(ctx context.Context, cfg SampleConfig, out []float64) {
 		}
 		mappings[k] = val
 	}
-	go runtime.EventsEmit(ctx, "hydra.mapping", mappings)
+	go pubsub.Publish("hydra.mapping", mappings)
 	return
 }

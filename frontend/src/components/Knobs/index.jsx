@@ -18,14 +18,17 @@ const Knob = ({ knob }) => {
   const knobValueChange = (value) => {
     // at most 4 decimal places
     value = parseFloat(value.toFixed(4));
-    Events.Emit('knob-value-change', knob.id, new Number(value));
+    Events.Emit({
+      name: 'knob-value-change',
+      data: [knob.id, new Number(value)],
+    });
     setValue(value);
   }
 
   // label is centered
   return (
     <div className="border border-primary p-2 m-2 noscroll overflow-hidden">
-      <h2 className="font-bold text-center">
+      <h2 className="font-bold text-center text-black">
         {knob.name}
       </h2>
       <PRKnob value={value}
@@ -65,30 +68,26 @@ export default () => {
       sortKnobs(data);
       setKnobs(data);
     });
-    Events.On('knobs-changed', (data) => {
+    Events.On('knobs-changed', (evt) => {
+      const data = evt.data;
       sortKnobs(data);
       setKnobs(data);
     });
   }, []);
 
-  const style = {};
-  if (knobs.length === 0) {
-    // upright text
-    style.writingMode = 'vertical-rl';
-    style.textOrientation = 'upright';
-  }
-
   return (
-    <div className="mx-2 my-2 overflow-auto" style={style}>
-      <h1 className="font-bold text-xl text-center">
+    <div className="mx-2 my-2 overflow-hidden w-full h-full">
+      <h1 className="font-bold text-xl text-center fixed w-full left-0 top-0 my-1">
         Knobs
       </h1>
-      {knobs.length === 0 ? null :
-       <div className="flex flex-wrap justify-center w-60">
-         {knobs.map((knob) => (
-           <Knob key={knob.id} knob={knob} />
-         ))}
-       </div>}
+      <div className="mt-5 overflow-auto">
+        {knobs.length === 0 ? null :
+         <div className="flex flex-wrap justify-center">
+           {knobs.map((knob) => (
+             <Knob key={knob.id} knob={knob} />
+           ))}
+         </div>}
+      </div>
     </div>
   )
 }

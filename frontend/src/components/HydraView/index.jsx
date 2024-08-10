@@ -15,41 +15,44 @@ export default () => {
   const [expr, setExpr] = useState({render: ["solid"]});
   const [vars, setVars] = useState(new Set())
 
-  const [canvasSize, setCanvasSize] = useState();
-
   const mappings = useRef({});
 
   const setCanvas = useCallback((canvas) => {
-    if (canvas) {
-      setCanvasSize([canvas.width, canvas.height]);
-      setHydra(new Hydra({
-        canvas,
-        detectAudio: false,
-        autoLoop: true,
-      }));
+    if (!canvas) {
+      return;
     }
+    const h = new Hydra({
+      canvas,
+      detectAudio: false,
+      autoLoop: true,
+    });
+    h.setResolution(window.innerWidth, window.innerHeight);
+    setHydra(h);
   }, []);
 
   useEffect(() => {
-    return Events.On("hydra.expr", (expr) => {
-      setExpr(expr.expr);
-      setVars(new Set(expr.vars));
+    return window.addEventListener("resize", (e)=>{
+      if (!hydra) {
+        return;
+      }
+      // set canvas size to window size
+      hydra.setResolution(window.innerWidth, window.innerHeight);
+    });
+  }, [hydra]);
+
+  useEffect(() => {
+    return Events.On("hydra.expr", (evt) => {
+      const data = evt.data;
+      setExpr(data.expr);
+      setVars(new Set(data.vars));
     });
   }, []);
   useEffect(() => {
-    return Events.On("hydra.mapping", (mapping) => {
+    return Events.On("hydra.mapping", (evt) => {
+      const mapping = evt.data;
       mappings.current = mapping;
     });
   }, []);
-
-  useEffect(() => {
-    if (!hydra || !canvasSize) {
-      return;
-    }
-
-    console.log(hydra);
-    hydra.synth.setResolution(4*canvasSize[0], 4*canvasSize[1]);
-  }, [hydra, canvasSize]);
 
   useEffect(() => {
     if (!hydra) {
@@ -107,8 +110,8 @@ export default () => {
     }
   }, [hydra, expr]);
 
-  return <>
+  return <div className="w-full h-full">
     <canvas className="w-full h-full bg-black"
             ref={setCanvas} />
-  </>;
+  </div>;
 };

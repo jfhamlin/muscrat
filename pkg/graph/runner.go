@@ -9,8 +9,13 @@ import (
 	"sync"
 
 	"github.com/glojurelang/glojure/pkg/lang"
+
+	"github.com/jfhamlin/muscrat/internal/pkg/tracer"
 	"github.com/jfhamlin/muscrat/pkg/conf"
 	"github.com/jfhamlin/muscrat/pkg/ugen"
+
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 )
 
 type (
@@ -174,8 +179,23 @@ func (r *Runner) Run(ctx context.Context) {
 		default:
 		}
 
-		if err := q.RunJobs(ctx); err != nil {
+		// if more than 5 nodes, trace
+		runCtx := ctx
+		var span trace.Span
+		if r.rs != nil && len(r.rs.nodes) > 5 {
+			t := tracer.Tracer()
+			if t != nil {
+				runCtx, span = t.Start(ctx, "run")
+			}
+		}
+		if err := q.RunJobs(runCtx); err != nil {
+			if span != nil {
+				span.End()
+			}
 			break
+		}
+		if span != nil {
+			span.End()
 		}
 
 		// copy the output buffer to the output channel
@@ -375,6 +395,20 @@ func prepCyclesDFS(rs *runState, nodeID runNodeID, visited map[runNodeID]struct{
 func (rn *runNode) run(ctx context.Context, cfg ugen.SampleConfig) {
 	if rn.gen == nil {
 		return
+	}
+
+	prevSpan := trace.SpanFromContext(ctx)
+
+	if prevSpan != nil {
+		t := tracer.Tracer()
+		if t != nil {
+			_, span := t.Start(ctx, "runNode.run")
+			defer span.End()
+
+			workerID := ctx.Value("worker_id").(int)
+			span.SetAttributes(attribute.Int("node_id", int(rn.id)),
+				attribute.Int("worker_id", workerID))
+		}
 	}
 
 	clear(rn.value)

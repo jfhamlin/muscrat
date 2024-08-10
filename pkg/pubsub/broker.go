@@ -29,7 +29,8 @@ func NewBroker() *Broker {
 }
 
 // Subscribe adds a listener for the given event. The returned
-// function can be used to unsubscribe the listener.
+// function can be used to unsubscribe the listener. If event is the
+// empty string, subscribes to all events.
 func (b *Broker) Subscribe(event string, cb ListenerFunc) (unsubscribe func()) {
 	newListener := &listener{fn: cb}
 
@@ -60,10 +61,17 @@ func (b *Broker) Subscribe(event string, cb ListenerFunc) (unsubscribe func()) {
 
 // Publish publishes the given event and data to all listeners.
 func (b *Broker) Publish(event string, data any) {
+	if event == "" {
+		panic("pubsub: empty event")
+	}
+
 	b.lock.RLock()
 	defer b.lock.RUnlock()
 
 	for _, l := range b.listeners[event] {
+		l.fn(event, data)
+	}
+	for _, l := range b.listeners[""] {
 		l.fn(event, data)
 	}
 }

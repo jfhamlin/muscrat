@@ -51,10 +51,6 @@ export default (props) => {
       });
     });
 
-    /* GetNSPublics().then((nsPublics) => {
-     *   console.log("got publics", nsPublics);
-     * }); */
-
     // custom autocomplete
     const completionItemProvider = monaco.languages.registerCompletionItemProvider('clojure', {
       provideCompletionItems: (model, position, context, token) => {
@@ -149,7 +145,7 @@ export default (props) => {
     <>
       <div className="h-full">
         <Editor options={options}
-                height="50vh"
+                height="100vh"
                 defaultLanguage="clojure"
                 path={selectedBufferName}
                 defaultValue={code}

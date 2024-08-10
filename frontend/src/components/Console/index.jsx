@@ -92,7 +92,9 @@ export default () => {
   const ref = useRef(null);
 
   useEffect(() => {
-    return Events.On('console.log', (data) => {
+    return Events.On('console.log', (evt) => {
+      const data = evt.data;
+
       setEvents((prev) => {
         const last = prev[prev.length - 1];
         if (last && JSON.stringify(last.event) === JSON.stringify(data)) {

@@ -21,9 +21,7 @@ import Toolbar from "./components/Toolbar";
 import VolumeMeter from "./components/VolumeMeter";
 import Spectrogram from "./components/Spectrogram";
 import Oscilloscope from "./components/Oscilloscope";
-import HydraView from "./components/HydraView";
 import Docs from "./components/Docs";
-import Knobs from "./components/Knobs";
 
 const createAudioResources = () => {
   const audioContext = new AudioContext();
@@ -81,7 +79,7 @@ function App() {
 
   return (
     <BuffersProvider createStore={createBuffersStore}>
-      <div className="flex flex-row w-screen h-screen overflow-hidden">
+      <div className="flex flex-row w-screen h-screen overflow-hidden bg-white">
         <div className="flex flex-col items-center h-full mx-1">
           <img src={logo} className="w-32 max-w-32 my-4" alt="logo" />
           <div className="flex flex-col w-96 flex-grow overflow-hidden mb-1">
@@ -99,14 +97,12 @@ function App() {
           </div>
         </div>
         <div className="flex flex-col flex-1 h-full overflow-hidden">
-          {/* <HydraView /> */}
           <Toolbar />
           <Editor />
           {/* horizontal line */}
           <div className="border-t border-gray-300" />
-          <Docs />
+          {/* <Docs /> */}
         </div>
-        <Knobs />
       </div>
     </BuffersProvider>
   )

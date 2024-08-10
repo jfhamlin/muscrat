@@ -1,5 +1,6 @@
 
 # environment variables
+
 MUSCRAT_SAMPLE_PATH ?= ./data/samples
 MUSCRAT_STDLIB_PATH ?= ./pkg/stdlib
 
@@ -7,7 +8,7 @@ MUSCRAT_STDLIB_PATH ?= ./pkg/stdlib
 dev: wails
 	@MUSCRAT_SAMPLE_PATH=$(MUSCRAT_SAMPLE_PATH) \
 	 MUSCRAT_STDLIB_PATH=$(MUSCRAT_STDLIB_PATH) \
-	 wails dev
+	 wails3 dev
 
 .PHONY: app
 app: wails
@@ -19,7 +20,7 @@ gen:
 
 .PHONY: wails
 wails:
-	@which wails 2>&1 > /dev/null || go install github.com/wailsapp/wails/v2/cmd/wails@latest
+	@which wails3 2>&1 > /dev/null || go install github.com/wailsapp/wails/v3/cmd/wails3@latest
 
 .PHONY: clean
 clean:

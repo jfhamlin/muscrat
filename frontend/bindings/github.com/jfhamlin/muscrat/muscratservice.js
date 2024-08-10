@@ -93,6 +93,14 @@ export function Silence() {
     return $resultPromise;
 }
 
+/**
+ * @returns {Promise<void> & { cancel(): void }}
+ */
+export function ToggleHydraWindow() {
+    let $resultPromise = /** @type {any} */($Call.ByID(2234515234));
+    return $resultPromise;
+}
+
 // Private type creation functions
 const $$createType0 = ugen$0.Knob.createFrom;
 const $$createType1 = $Create.Nullable($$createType0);

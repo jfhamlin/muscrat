@@ -5,10 +5,10 @@
 
 pkgs.mkShell {
   nativeBuildInputs = [
-    pkgs.go_1_21
+    pkgs.go_1_22
     pkgs.nodejs
 
-    pkgs.pkgconfig
+    pkgs.pkg-config
 
     frameworks.Security
     frameworks.Cocoa

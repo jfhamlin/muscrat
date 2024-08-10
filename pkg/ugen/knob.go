@@ -43,14 +43,14 @@ const (
 )
 
 var (
-	knobLock   sync.Mutex
+	knobLock   sync.RWMutex
 	nextKnobID uint64
 	knobs      = map[uint64]*Knob{}
 )
 
 func GetKnobs() []*Knob {
-	knobLock.Lock()
-	defer knobLock.Unlock()
+	knobLock.RLock()
+	defer knobLock.RUnlock()
 
 	knobsList := make([]*Knob, 0, len(knobs))
 	for _, knob := range knobs {
@@ -80,12 +80,7 @@ func NewKnob(name string, def, min, max, step float64) *Knob {
 }
 
 func (k *Knob) Start(ctx context.Context) error {
-	knobLock.Lock()
-	defer knobLock.Unlock()
-
-	knobs[k.ID] = k
-
-	k.unsubscribe = pubsub.Subscribe(KnobValueChangeEvent, func(event string, data any) {
+	unsubscribe := pubsub.Subscribe(KnobValueChangeEvent, func(event string, data any) {
 		update := data.(KnobUpdate)
 		if update.ID != k.ID {
 			return
@@ -95,8 +90,12 @@ func (k *Knob) Start(ctx context.Context) error {
 		k.valueBits.Store(bits)
 	})
 
-	pubsub.Publish(KnobsChangedEvent, nil)
+	knobLock.Lock()
+	defer knobLock.Unlock()
 
+	knobs[k.ID] = k
+	k.unsubscribe = unsubscribe
+	go pubsub.Publish(KnobsChangedEvent, nil)
 	return nil
 }
 
@@ -106,7 +105,7 @@ func (k *Knob) Stop(ctx context.Context) error {
 
 	delete(knobs, k.ID)
 
-	pubsub.Publish(KnobsChangedEvent, nil)
+	go pubsub.Publish(KnobsChangedEvent, nil)
 
 	if k.unsubscribe != nil {
 		k.unsubscribe()

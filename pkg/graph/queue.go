@@ -14,6 +14,7 @@ type (
 		numWorkers int
 		wg         sync.WaitGroup
 		stop       func()
+		ctx        context.Context
 
 		remainingItems atomic.Int32
 		// sent when all jobs are done
@@ -139,6 +140,8 @@ func (q *Queue) Stop() {
 }
 
 func (q *Queue) RunJobs(ctx context.Context) error {
+	q.ctx = ctx
+
 	numItems := len(q.items)
 	if numItems == 0 {
 		return nil
@@ -161,9 +164,6 @@ func (q *Queue) RunJobs(ctx context.Context) error {
 }
 
 func (q *Queue) runWorker(ctx context.Context, id int) {
-	runtime.LockOSThread()
-	defer runtime.UnlockOSThread()
-
 	defer func() {
 		q.signalAll() // wake up all other workers
 		q.wg.Done()
@@ -200,7 +200,7 @@ func (q *Queue) runWorker(ctx context.Context, id int) {
 			continue
 		}
 		backoff = maxBackoff
-		item.Run(ctx, q)
+		item.Run(ctx, q, id)
 		if newVal := q.remainingItems.Add(-1); newVal == 0 {
 			q.jobsDone <- struct{}{}
 		}
@@ -227,8 +227,8 @@ func (qi *QueueItem) AddSuccessor(successor *QueueItem) {
 	successor.activationLimit++
 }
 
-func (qi *QueueItem) Run(ctx context.Context, q *Queue) {
-	qi.job(ctx)
+func (qi *QueueItem) Run(ctx context.Context, q *Queue, workerID int) {
+	qi.job(context.WithValue(q.ctx, "worker_id", workerID))
 	qi.updateSuccessors(q)
 	qi.reset()
 }
