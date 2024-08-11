@@ -19,6 +19,7 @@ const Root = () => {
       break;
     default:
       component = <App />;
+      break;
   }
   return (
     <React.StrictMode>
