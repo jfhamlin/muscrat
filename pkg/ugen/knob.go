@@ -91,25 +91,25 @@ func (k *Knob) Start(ctx context.Context) error {
 	})
 
 	knobLock.Lock()
-	defer knobLock.Unlock()
-
 	knobs[k.ID] = k
 	k.unsubscribe = unsubscribe
-	go pubsub.Publish(KnobsChangedEvent, nil)
+	knobLock.Unlock()
+
+	pubsub.Publish(KnobsChangedEvent, nil)
 	return nil
 }
 
 func (k *Knob) Stop(ctx context.Context) error {
 	knobLock.Lock()
-	defer knobLock.Unlock()
-
 	delete(knobs, k.ID)
+	unsubscribe := k.unsubscribe
+	knobLock.Unlock()
 
-	go pubsub.Publish(KnobsChangedEvent, nil)
-
-	if k.unsubscribe != nil {
-		k.unsubscribe()
+	if unsubscribe != nil {
+		unsubscribe()
 	}
+	pubsub.Publish(KnobsChangedEvent, nil)
+
 	return nil
 }
 

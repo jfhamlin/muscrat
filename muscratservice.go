@@ -273,8 +273,6 @@ func (a *MuscratService) ToggleHydraWindow() {
 	defer a.mtx.Unlock()
 
 	if a.hydraWindow != nil {
-		a.hydraWindow.Close()
-		a.hydraWindow = nil
 		return
 	}
 
