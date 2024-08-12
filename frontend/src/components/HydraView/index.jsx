@@ -9,6 +9,68 @@ import { Events } from "@wailsio/runtime";
 
 import Hydra from 'hydra-synth';
 
+import Cerberus from '../../lib/cerberus';
+
+const testCerb = (cerb) => {
+  cerb.scene().add(
+    cerb.dodecahedron().translate(2, 0, 0).color(0.2, 0, 1),
+    cerb.sphere()
+        .scale(0.5),
+    cerb.box()
+        .scale()
+        .translate(2)
+        .rotate(0, 0, 0, 0, 0, 0.1)
+        .color(1, 0.2, ({ time }) => 0.5 + 0.5*Math.sin(Math.PI * time)),
+    cerb.box()
+        .translate(-2, 0, 0)
+        .color(0, 0, 1)
+        .rotate(0,
+                ({ time }) => 0.1 * Math.PI * time,
+                0),
+    cerb.torus(0.5, 0.1)
+        .color(1, 0, 0.1)
+        .rotate(0, 0, 0, 0.5),
+    cerb.torusKnot(1, 0.1, 128, 16, 5, 7)
+        .color(0.1, 1, 0.1),
+    cerb.pointLight(0xffffff, 200, 100)
+        .translate(5, 5, 5),
+    cerb.ambientLight(0x404040, 2)
+        .color(({ time }) => 2*Math.sin(Math.PI * time), 0, 0),
+  ).render(cerb.camera()
+               .translate(0, 0, 5)
+               .rotate(0, 0, 0, 0.01, 0.1, 0.01)
+               .lookAt(2, 0, 0));
+};
+
+const CerberusView = () => {
+  const [cerb, setCerb] = useState(null);
+  const [canvas, setCanvas] = useState(null);
+
+  useEffect(() => {
+    if (!canvas) {
+      return;
+    }
+
+    const cerb = new Cerberus({
+      canvas,
+    });
+
+    setCerb(cerb);
+
+    testCerb(cerb);
+
+    return () => cerb.dispose();
+
+  }, [canvas]);
+
+  return (
+    <>
+      <canvas className="w-full h-full bg-white"
+              ref={setCanvas} />
+    </>
+  );
+};
+
 export default () => {
   const [hydra, setHydra] = useState(null);
 
@@ -28,6 +90,11 @@ export default () => {
     });
     h.setResolution(window.innerWidth, window.innerHeight);
     setHydra(h);
+
+    const cerb = new Cerberus();
+    testCerb(cerb);
+    cerb.setResolution(window.innerWidth, window.innerHeight);
+    h.cerberus = cerb;
   }, []);
 
   useEffect(() => {
@@ -37,6 +104,7 @@ export default () => {
       }
       // set canvas size to window size
       hydra.setResolution(window.innerWidth, window.innerHeight);
+      hydra.cerberus.setResolution(window.innerWidth, window.innerHeight);
     });
   }, [hydra]);
 
@@ -59,7 +127,6 @@ export default () => {
       return;
     }
 
-    console.log("new hydra expr", expr);
     const synth = hydra.synth;
 
     let evalMapping, evalCall, evalExpr;
@@ -95,6 +162,11 @@ export default () => {
     };
 
     try {
+      console.log(hydra.cerberus.getCanvas());
+      synth.s1.init({
+        src: hydra.cerberus.getCanvas(),
+      });
+
       const sources = expr.sources ?? {};
       for (const [name, source] of Object.entries(sources)) {
         evalExpr(synth[name], source);
@@ -111,6 +183,9 @@ export default () => {
   }, [hydra, expr]);
 
   return <div className="w-full h-full">
+    {/* <div>
+        <CerberusView />
+        </div> */}
     <canvas className="w-full h-full bg-black"
             ref={setCanvas} />
   </div>;

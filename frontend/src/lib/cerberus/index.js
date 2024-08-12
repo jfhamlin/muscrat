@@ -37,8 +37,6 @@ const getConstructorArgs = (cls) => {
 class Cerberus {
   constructor(opts = {}) {
     const canvas = opts.canvas || document.createElement('canvas');
-
-    // temp set resolution
     canvas.width = window.innerWidth;
     canvas.height = window.innerHeight;
 
@@ -49,10 +47,11 @@ class Cerberus {
     });
     this._renderer.setSize(canvas.width, canvas.height);
 
-    this._objects = [];
-
     this._synthTime = 0; // time in milliseconds
     this._lastTime = undefined; // last render timestamp
+
+    this._scenes = [];
+    this._renderingScenes = [];
 
     const classNameToFnName = (className, suffix) => {
       const fnName = className.charAt(0).toLowerCase() + className.slice(1);
@@ -76,7 +75,6 @@ class Cerberus {
         this[fnName] = (...ctorArgs) => {
           const geometry = new cls(...ctorArgs);
           const mesh = new Object3D(new THREE.Mesh(geometry, DEFAULT_MATERIAL));
-          this._objects.push(mesh);
           return mesh;
         };
       }
@@ -96,12 +94,21 @@ class Cerberus {
           }
           this[fnName] = (...ctorArgs) => {
             const light = new Object3D(new cls(...ctorArgs));
-            this._objects.push(light);
             return light;
           }
         }
       }
     }
+  }
+
+  getCanvas() {
+    return this._canvas;
+  }
+
+  setResolution(width, height) {
+    this._canvas.width = width;
+    this._canvas.height = height;
+    this._renderer.setSize(width, height);
   }
 
   camera(fov = 75) {
@@ -113,14 +120,58 @@ class Cerberus {
 
   scene() {
     const scene = new Scene(this);
-    this._objects.push(scene);
+    this._scenes.push(scene);
     return scene;
   }
 
   dispose() {
     console.log('disposing');
+    this._scenes.forEach((scene) => scene.dispose());
     this._renderer.dispose();
-    this._objects.forEach((obj) => obj.dispose());
+  }
+
+  _startRendering(scene) {
+    if (this._renderingScenes.includes(scene)) {
+      return;
+    }
+
+    this._renderingScenes.push(scene);
+    if (this._renderingScenes.length > 1) {
+      return;
+    }
+
+    const doRender = (now) => {
+      if (this._renderingScenes.length === 0) {
+        return;
+      }
+
+      if (!this._lastTime) {
+        this._lastTime = now;
+      } else {
+        this._synthTime += now - this._lastTime;
+        this._lastTime = now;
+      }
+
+      // tick in seconds!
+      const timeSecs = this._synthTime / 1000;
+      for (const scene of this._renderingScenes) {
+        scene.tick(timeSecs);
+        scene._show(); // need to decouple this from the single canvas
+      }
+
+      if (this._renderingScenes.length > 0) {
+        requestAnimationFrame(doRender);
+      }
+    }
+
+    requestAnimationFrame(doRender);
+  }
+
+  _stopRendering(scene) {
+    const idx = this._renderingScenes.indexOf(scene);
+    if (idx !== -1) {
+      this._renderingScenes.splice(idx, 1);
+    }
   }
 }
 
@@ -130,7 +181,7 @@ class Scene {
     this._scene = new THREE.Scene();
     this._objects = [];
 
-    this._rendering = false;
+    this._camera = undefined;
   }
 
   add(/* any number of Object3D instances */) {
@@ -142,13 +193,17 @@ class Scene {
   }
 
   tick(time) {
+    if (this._camera) {
+      this._camera.tick(time);
+    }
+
     for (const obj of this._objects) {
       obj.tick(time);
     }
   }
 
   render(camera) {
-    if (this._rendering) {
+    if (this._camera) {
       return;
     }
 
@@ -157,36 +212,22 @@ class Scene {
       camera._obj.position.z = 5;
     }
 
-    this._rendering = true;
-    this._cerb._lastTime = undefined;
+    this._camera = camera;
 
-    const doRender = (now) => {
-      if (!this._cerb._lastTime) {
-        this._cerb._lastTime = now;
-      } else {
-        this._cerb._synthTime += now - this._cerb._lastTime;
-        this._cerb._lastTime = now;
-      }
+    this._cerb._startRendering(this);
+  }
 
-      // tick in seconds!
-      const timeSecs = this._cerb._synthTime / 1000;
-      this.tick(timeSecs);
-      camera.tick(timeSecs);
-      this._cerb._renderer.render(this._scene, camera._obj);
-
-      if (this._rendering) {
-        requestAnimationFrame(doRender);
-      }
-    };
-
-    requestAnimationFrame(doRender);
+  _show() {
+    this._cerb._renderer.render(this._scene, this._camera._obj);
   }
 
   stop() {
-    this._rendering = false;
+    this._cerb._stopRendering(this);
   }
 
   dispose() {
+    this.stop();
+
     this._scene.dispose();
   }
 }
@@ -237,10 +278,6 @@ class Object3D {
   }
 
   dispose() {}
-
-  isLight() {
-    return this._obj instanceof THREE.Light;
-  }
 }
 
 const funcs = [{
