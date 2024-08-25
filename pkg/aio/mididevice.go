@@ -2,6 +2,7 @@ package aio
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"math"
 	"regexp"
@@ -349,4 +350,43 @@ func (c *MIDIControl) Gen(ctx context.Context, cfg ugen.SampleConfig, out []floa
 	for i := range out {
 		out[i] = float64(c.controller.Load()) / 127
 	}
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
+func (me *MIDIEnvelope) MarshalJSON() ([]byte, error) {
+	messageMap := map[string]any{}
+
+	switch me.Message.Type() {
+	case midi.NoteOnMsg:
+		var channel, key, velocity uint8
+		me.Message.GetNoteOn(&channel, &key, &velocity)
+		messageMap["type"] = "noteOn"
+		messageMap["channel"] = channel
+		messageMap["key"] = key
+		messageMap["velocity"] = velocity
+	case midi.NoteOffMsg:
+		var channel, key, velocity uint8
+		me.Message.GetNoteOff(&channel, &key, &velocity)
+		messageMap["type"] = "noteOff"
+		messageMap["channel"] = channel
+		messageMap["key"] = key
+		messageMap["velocity"] = velocity
+	case midi.ControlChangeMsg:
+		var channel, controller, value uint8
+		me.Message.GetControlChange(&channel, &controller, &value)
+		messageMap["type"] = "controlChange"
+		messageMap["channel"] = channel
+		messageMap["controller"] = controller
+		messageMap["value"] = value
+	default:
+		messageMap["type"] = "unknown"
+	}
+
+	messageJSON, err := json.Marshal(messageMap)
+	if err != nil {
+		return nil, err
+	}
+
+	return []byte(fmt.Sprintf(`{"deviceId":%d,"deviceName":"%s","message":%s}`, me.DeviceID, me.DeviceName, messageJSON)), nil
 }

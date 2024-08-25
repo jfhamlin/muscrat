@@ -14,16 +14,72 @@ import { Events } from "@wailsio/runtime";
 
 const Knob = ({ knob }) => {
   const [value, setValue] = useState(knob.def);
+  const [midiSub, setMidiSub] = useState(null);
 
-  const knobValueChange = (value) => {
-    // at most 4 decimal places
-    value = parseFloat(value.toFixed(4));
+  const updateKnobValue = (value) => {
     Events.Emit({
       name: 'knob-value-change',
       data: [knob.id, new Number(value)],
     });
     setValue(value);
   }
+
+  const knobValueChange = (value) => {
+    // at most 4 decimal places
+    updateKnobValue(parseFloat(value.toFixed(4)));
+  }
+
+  const subscribeMidi = () => {
+    // wait for midi message
+    setMidiSub({waiting: true});
+  }
+
+  useEffect(() => {
+    if (!midiSub) {
+      return;
+    }
+
+    if (midiSub.waiting) {
+      const sub = Events.On('midi', (evt) => {
+        const data = evt.data;
+        const message = data.message;
+        if (message.type !== 'controlChange') {
+          return;
+        }
+        const deviceId = data.deviceId;
+        const { channel, controller, value } = message;
+        setMidiSub({
+          waiting: false,
+          deviceId: deviceId,
+          channel: channel,
+          controller: controller,
+          initialValue: value,
+        });
+      });
+      return sub;
+    } else {
+      const sub = Events.On('midi', (evt) => {
+        const data = evt.data;
+        const message = data.message;
+        if (message.type !== 'controlChange') {
+          return;
+        }
+        const { channel, controller, value } = message;
+        if (midiSub.channel !== channel || midiSub.controller !== controller) {
+          return;
+        }
+        const newValue = knob.min + (value / 127) * (knob.max - knob.min);
+        updateKnobValue(newValue);
+
+        /* const diff = value - midiSub.initialValue;
+         * const newValue = value + diff;
+         * knobValueChange(newValue); */
+      });
+      return sub;
+    }
+  }, [midiSub]);
+
+  // component should flash if waiting for midi
 
   // label is centered
   return (
@@ -42,8 +98,13 @@ const Knob = ({ knob }) => {
                      min={knob.min}
                      max={knob.max}
                      step={knob.step ?? 0.1}
+                     maxFractionDigits={4}
                      onValueChange={(e) => knobValueChange(e.value)} />
       </div>
+      <button className={"bg-primary text-white p-1 m-1" + (midiSub?.waiting ? " animate-pulse" : "")}
+              onClick={subscribeMidi}>
+        MIDI
+      </button>
     </div>
   )
 }
@@ -68,7 +129,7 @@ export default () => {
       sortKnobs(data);
       setKnobs(data);
     });
-    Events.On('knobs-changed', (evt) => {
+    return Events.On('knobs-changed', (evt) => {
       const data = evt.data;
       sortKnobs(data);
       setKnobs(data);

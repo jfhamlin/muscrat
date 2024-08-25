@@ -1575,6 +1575,11 @@
                                (doseq [e (rest expr)]
                                  (reset! xformed (go/append @xformed (xform e))))
                                @xformed)
+                 ;; translate to a map of xformed keys and values
+                 (map? expr) (let [xformed (go/make (go/map-of go/string go/any))]
+                               (doseq [[k v] expr]
+                                 (go/set-map-index xformed (name k) (xform v)))
+                               xformed)
                  :else expr))]
        (go/set-map-index expr-map "render" (xform render-cmd))
        (doseq [[src expr] sources]

@@ -164,6 +164,9 @@ func (q *Queue) RunJobs(ctx context.Context) error {
 }
 
 func (q *Queue) runWorker(ctx context.Context, id int) {
+	runtime.LockOSThread()
+	defer runtime.UnlockOSThread()
+
 	defer func() {
 		q.signalAll() // wake up all other workers
 		q.wg.Done()

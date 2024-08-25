@@ -8,8 +8,6 @@ import * as THREE from 'three';
 
 const TWO_PI = 2 * Math.PI;
 
-// MeshBasicMaterial
-
 const DEFAULT_MATERIAL = new THREE.MeshLambertMaterial({
   color: 0xf0f0f0,
 });
@@ -43,15 +41,19 @@ class Cerberus {
     this._canvas = canvas;
     this._renderer = new THREE.WebGLRenderer({
       canvas,
+      context: opts.glContext,
+      alpha: true,
       antialias: true,
     });
     this._renderer.setSize(canvas.width, canvas.height);
+    this._renderer.shadowMap.enabled = true;
+    this._renderer.shadowMap.type = THREE.BasicShadowMap;
 
     this._synthTime = 0; // time in milliseconds
     this._lastTime = undefined; // last render timestamp
 
     this._scenes = [];
-    this._renderingScenes = [];
+    this._renderingScene = undefined;
 
     const classNameToFnName = (className, suffix) => {
       const fnName = className.charAt(0).toLowerCase() + className.slice(1);
@@ -125,23 +127,24 @@ class Cerberus {
   }
 
   dispose() {
-    console.log('disposing');
     this._scenes.forEach((scene) => scene.dispose());
     this._renderer.dispose();
   }
 
   _startRendering(scene) {
-    if (this._renderingScenes.includes(scene)) {
+    if (this._renderingScene === scene) {
       return;
     }
 
-    this._renderingScenes.push(scene);
-    if (this._renderingScenes.length > 1) {
-      return;
+    if (this._renderingScene) {
+      this._renderingScene.dispose();
+      this._renderingScene = undefined;
     }
+
+    this._renderingScene = scene;
 
     const doRender = (now) => {
-      if (this._renderingScenes.length === 0) {
+      if (!this._renderingScene) {
         return;
       }
 
@@ -154,24 +157,13 @@ class Cerberus {
 
       // tick in seconds!
       const timeSecs = this._synthTime / 1000;
-      for (const scene of this._renderingScenes) {
-        scene.tick(timeSecs);
-        scene._show(); // need to decouple this from the single canvas
-      }
+      this._renderingScene.tick(timeSecs);
+      this._renderingScene._show();
 
-      if (this._renderingScenes.length > 0) {
-        requestAnimationFrame(doRender);
-      }
+      requestAnimationFrame(doRender);
     }
 
     requestAnimationFrame(doRender);
-  }
-
-  _stopRendering(scene) {
-    const idx = this._renderingScenes.indexOf(scene);
-    if (idx !== -1) {
-      this._renderingScenes.splice(idx, 1);
-    }
   }
 }
 
@@ -221,14 +213,8 @@ class Scene {
     this._cerb._renderer.render(this._scene, this._camera._obj);
   }
 
-  stop() {
-    this._cerb._stopRendering(this);
-  }
-
   dispose() {
-    this.stop();
-
-    this._scene.dispose();
+    this._objects.forEach((obj) => obj.dispose());
   }
 }
 
@@ -277,7 +263,17 @@ class Object3D {
     }
   }
 
-  dispose() {}
+  dispose() {
+    if (this._obj.dispose) {
+      this._obj.dispose();
+    }
+    if (this._obj.material) {
+      this._obj.material.dispose();
+    }
+    if (this._obj.geometry) {
+      this._obj.geometry.dispose();
+    }
+  }
 }
 
 const funcs = [{
@@ -297,9 +293,33 @@ const funcs = [{
   type: 'material',
   apply: (time, obj, r = 1, g = 1, b = 1) => {
     if (obj.isLight) {
+      // skip if already equal
+      if (obj.color.r === r &&
+          obj.color.g === g &&
+          obj.color.b === b) {
+        return;
+      }
       obj.color = new THREE.Color(r, g, b);
     } else {
+      // skip if already equal
+      if (obj.material.color.r === r &&
+          obj.material.color.g === g &&
+          obj.material.color.b === b) {
+        return;
+      }
       obj.material.color = new THREE.Color(r, g, b);
+    }
+  },
+}, {
+  name: 'shadow',
+  type: 'material',
+  apply: (time, obj, cast = true, receive = true) => {
+    if (obj.isLight) {
+      obj.castShadow = cast;
+      obj.shadow.bias = -0.001;
+    } else {
+      obj.castShadow = cast;
+      obj.receiveShadow = receive;
     }
   },
 }, {

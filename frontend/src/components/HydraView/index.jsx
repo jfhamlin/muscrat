@@ -42,35 +42,6 @@ const testCerb = (cerb) => {
                .lookAt(2, 0, 0));
 };
 
-const CerberusView = () => {
-  const [cerb, setCerb] = useState(null);
-  const [canvas, setCanvas] = useState(null);
-
-  useEffect(() => {
-    if (!canvas) {
-      return;
-    }
-
-    const cerb = new Cerberus({
-      canvas,
-    });
-
-    setCerb(cerb);
-
-    testCerb(cerb);
-
-    return () => cerb.dispose();
-
-  }, [canvas]);
-
-  return (
-    <>
-      <canvas className="w-full h-full bg-white"
-              ref={setCanvas} />
-    </>
-  );
-};
-
 export default () => {
   const [hydra, setHydra] = useState(null);
 
@@ -92,9 +63,8 @@ export default () => {
     setHydra(h);
 
     const cerb = new Cerberus();
-    testCerb(cerb);
     cerb.setResolution(window.innerWidth, window.innerHeight);
-    h.cerberus = cerb;
+    h.synth.cerberus = () => cerb;
   }, []);
 
   useEffect(() => {
@@ -104,7 +74,7 @@ export default () => {
       }
       // set canvas size to window size
       hydra.setResolution(window.innerWidth, window.innerHeight);
-      hydra.cerberus.setResolution(window.innerWidth, window.innerHeight);
+      hydra.synth.cerberus().setResolution(window.innerWidth, window.innerHeight);
     });
   }, [hydra]);
 
@@ -148,8 +118,19 @@ export default () => {
             chained = evalCall(chained, call[i]);
           }
           return chained;
+        case "do":
+          // special form, execute a list of expressions
+          for (let i = 1; i < call.length; i++) {
+            const res = evalExpr(self, call[i]);
+            if (i === call.length - 1) {
+              // return the last result
+              return res;
+            }
+          }
         default:
-          return self[call[0]].apply(self, call.slice(1).map((arg) => evalExpr(synth, arg)));
+          const args = call.slice(1).map((arg) => evalExpr(synth, arg));
+          console.log("calling", call[0], "with", args);
+          return self[call[0]].apply(self, args);
       }
     };
     evalExpr = (self, expr) => {
@@ -157,16 +138,20 @@ export default () => {
       if (Array.isArray(expr)) {
         return evalCall(self, expr);
       }
+      // if it's a map, evaluate each value
+      if (typeof expr === "object") {
+        const evaluated = {};
+        for (const [key, value] of Object.entries(expr)) {
+          evaluated[key] = evalExpr(self, value);
+        }
+        return evaluated;
+      }
+
       // otherwise, it's a constant
       return expr;
     };
 
     try {
-      console.log(hydra.cerberus.getCanvas());
-      synth.s1.init({
-        src: hydra.cerberus.getCanvas(),
-      });
-
       const sources = expr.sources ?? {};
       for (const [name, source] of Object.entries(sources)) {
         evalExpr(synth[name], source);
@@ -183,9 +168,6 @@ export default () => {
   }, [hydra, expr]);
 
   return <div className="w-full h-full">
-    {/* <div>
-        <CerberusView />
-        </div> */}
     <canvas className="w-full h-full bg-black"
             ref={setCanvas} />
   </div>;

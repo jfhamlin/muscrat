@@ -10,6 +10,13 @@ pkgs.mkShell {
 
     pkgs.pkg-config
 
+    # for node-canvas
+    pkgs.pixman
+    pkgs.python39
+    pkgs.cairo
+    pkgs.pango
+    # end node-canvas
+
     frameworks.Security
     frameworks.Cocoa
     frameworks.WebKit
