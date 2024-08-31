@@ -119,7 +119,6 @@ func (a *MuscratService) startup(app *application.App) {
 		})
 	})
 
-	// TODO: forward all events from pubsub to wails event
 	pubsub.Subscribe("", func(event string, data any) {
 		switch event {
 		case "samples", ugen.KnobsChangedEvent, "console.log", "knob-value-change":
