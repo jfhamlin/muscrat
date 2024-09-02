@@ -2,6 +2,7 @@
   (:import (github.com$glojurelang$glojure$pkg$lang *Ratio *BigInt)
            (github.com$jfhamlin$muscrat$pkg$ugen NewConstant
                                                  NewSum
+                                                 NewMovingAverage
                                                  NewProduct
                                                  NewFMA
                                                  NewFMAStatic
@@ -55,7 +56,6 @@
                                                     NewHiShelf
                                                     NewPeakEQ
                                                     NewDelay
-                                                    NewTapeDelay
                                                     NewWaveFolder
                                                     NewClip)
            (github.com$jfhamlin$muscrat$pkg$sampler NewSampler
@@ -610,6 +610,19 @@
           (lcm [a b] (/ (* a b) (gcd a b)))]
     (reduce lcm x)))
 
+(defugen moving-avg
+  "Calculates a running average over a window of samples. The window size is
+   given as a duration."
+  [in 0
+   dur 0.001
+   max-dur 0.01]
+  (let [in-node (as-node in)
+        dur-node (as-node dur)
+        node (add-node! :moving-avg NewMovingAverage
+                        :args [max-dur]
+                        :in-edges {"in" in-node "dur" dur-node})]
+    node))
+
 (docgroup "Utilities")
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -966,17 +979,6 @@
    max-delay-time 0.2
    delay-time 0.2]
   (-delay in max-delay-time delay-time InterpCubic))
-
-(defugen tape-delayl
-  "Tape delay line with linear interpolation. This generator simulates
-  a tape read head such that changes to the delay value are not
-  instantaneous - the 'tape' is sped up or slowed down to reach the
-  target delay time."
-  [in 0
-   delay-time 0.2]
-  (add-node! :tape-delay NewTapeDelay
-             :in-edges {:$0 in
-                        :delay delay-time}))
 
 (defn- comb-feedback
   [delay-time decay-time]
@@ -1482,7 +1484,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; Scales
+;; Synths
 
 (defn- fm-op
   "Creates a simple FM 'operator' in the style of the Yamaha DX series."
@@ -1543,6 +1545,40 @@
     (sum (->> ops
               (filter :carrier)
               (map :op)))))
+
+(defugen supersaw
+  "SuperSaw (Roland JP-8000 and JP-8080)
+
+  Ported from https://gist.github.com/audionerd/fe50790b7601cba65ddd855caffb05ad"
+  [freq 440
+   mix 0.75
+   detune 0.75]
+  (letfn [(detune-curve [x]
+            (+ (* 10028.7312891634 (pow x 11))
+               (* -50818.8652045924 (pow x 10))
+               (* 111363.4808729368 (pow x 9))
+               (* -138150.6761080548 (pow x 8))
+               (* 106649.6679158292 (pow x 7))
+               (* -53046.9642751875 (pow x 6))
+               (* 17019.9518580080 (pow x 5))
+               (* -3425.0836591318 (pow x 4))
+               (* 404.2703938388 (pow x 3))
+               (* -24.1878824391 (pow x 2))
+               (* 0.6717417634 x)
+               0.0030115596))
+          (center-gain [x] (+ (* -0.55366 x) 0.99785))
+          (side-gain [x] (+ (* -0.73764 (pow x 2)) (* 1.2841 x) 0.044372))]
+    (let [center (saw freq :iphase (math$rand.Float64))
+          detune-factor (* freq (detune-curve detune))
+          freqs [(+ freq (* detune-factor 0.11002313))
+                 (+ freq (* detune-factor 0.06288439))
+                 (+ freq (* detune-factor 0.01952356))
+                 (+ freq (* detune-factor 0.01991221))
+                 (+ freq (* detune-factor 0.06216538))
+                 (+ freq (* detune-factor 0.10745242))]
+          side (sum (map #(saw % :iphase (math$rand.Float64)) freqs))
+          sig (+ (* center (center-gain mix)) (* side (side-gain mix)))]
+      sig)))
 
 (docgroup "Synth")
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
