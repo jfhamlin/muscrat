@@ -9,8 +9,6 @@ import (
 	"github.com/wailsapp/wails/v3/pkg/application"
 	"github.com/wailsapp/wails/v3/pkg/events"
 
-	"github.com/jfhamlin/muscrat/internal/pkg/tracer"
-
 	// pprof
 	"net/http"
 	_ "net/http/pprof"
@@ -32,9 +30,6 @@ var assets embed.FS
 
 func main() {
 	fmt.Println("Starting muscrat")
-
-	tracer.Init()
-	defer tracer.Shutdown()
 
 	muscratService := NewMuscratService()
 
