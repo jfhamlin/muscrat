@@ -77,7 +77,7 @@ export default (props) => {
       <div>
         <Editor options={options}
                 width="100%"
-                height="50vh"
+                height="90vh"
                 defaultLanguage="clojure"
                 path={selectedBufferName}
                 defaultValue={code}

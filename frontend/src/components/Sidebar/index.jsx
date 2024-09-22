@@ -13,6 +13,7 @@ import Oscilloscope from "../Oscilloscope";
 import VolumeMeter from "../VolumeMeter";
 import Spectrogram from "../Spectrogram";
 import Console from "../Console";
+import Timer from "../Timer";
 
 import logo from '../../assets/images/muscrat.svg';
 
@@ -137,6 +138,7 @@ export default () => {
         <div className="flex flex-col flex-grow overflow-hidden mb-1">
           <VolumeMeter />
         </div>
+        <Timer />
       </div>
     );
   }

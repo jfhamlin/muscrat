@@ -28,7 +28,7 @@ function App() {
           <Editor />
           {/* horizontal line */}
           <div className="border-t border-gray-300" />
-          <Docs />
+          {/* <Docs /> */}
         </div>
       </div>
     </BuffersProvider>

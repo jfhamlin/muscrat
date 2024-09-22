@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"math"
 	"os"
 	"sync"
 
@@ -77,6 +78,29 @@ func (a *MuscratService) startup(app *application.App) {
 			go app.Events.Emit(&application.WailsEvent{
 				Name: "samples",
 				Data: cpy,
+			})
+
+			// publish RMS and max values for each channel
+			rms := make([]float64, len(a.channelBuffers))
+			max := make([]float64, len(a.channelBuffers))
+			for i := range a.channelBuffers {
+				sum := 0.0
+				maxVal := 0.0
+				for _, v := range a.channelBuffers[i] {
+					sum += v * v
+					if v > maxVal {
+						maxVal = v
+					}
+				}
+				rms[i] = math.Sqrt(sum / float64(len(a.channelBuffers[i])))
+				max[i] = maxVal
+			}
+			go app.Events.Emit(&application.WailsEvent{
+				Name: "volume",
+				Data: map[string]any{
+					"rms":  rms,
+					"peak": max,
+				},
 			})
 
 			for i := range a.channelBuffers {

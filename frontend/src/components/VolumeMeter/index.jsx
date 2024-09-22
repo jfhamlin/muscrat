@@ -4,58 +4,82 @@ import React, {
   createRef,
 } from 'react';
 
-const VolumeMeter = ({ analyser }) => {
-  const meterRef = createRef();
+import { Events } from "@wailsio/runtime";
+
+const VolumeMeter = ({ }) => {
+  const rmsMeterRefL = createRef();
+  const rmsMeterRefR = createRef();
+  const peakMeterRefL = createRef();
+  const peakMeterRefR = createRef();
 
   useEffect(() => {
-    if (!analyser) {
-      return;
-    }
-
-    const dataArray = new Float32Array(analyser.frequencyBinCount);
-
-    let stop = false;
-
-    let lastVolume = 0;
-    const calculateVolume = () => {
-      if (stop) {
-        return;
-      }
-      analyser.getFloatFrequencyData(dataArray);
-      const maxIndex = dataArray.indexOf(Math.max(...dataArray));
-
-      const sum = dataArray.reduce((acc, value) => acc + value * value, 0);
-      const average = Math.sqrt(sum / dataArray.length);
-
-      const updateCoeff = 0.2;
-      const volume = (1 - updateCoeff) * lastVolume + updateCoeff * average;
-      lastVolume = volume;
+    const unsubscribe = Events.On('volume', (volume) => {
+      const [rmsL, rmsR] = volume.data.rms;
+      const [peakL, peakR] = volume.data.peak;
 
       // set height
-      meterRef.current.style.height = `${Math.min(100, Math.max(0, 100 + volume - 100))}%`;
+      rmsMeterRefL.current.style.height = `${Math.min(100, rmsL * 100)}%`;
+      rmsMeterRefR.current.style.height = `${Math.min(100, rmsR * 100)}%`;
 
-      requestAnimationFrame(calculateVolume);
-    };
+      peakMeterRefL.current.style.height = `${Math.min(100, peakL * 100)}%`;
+      peakMeterRefR.current.style.height = `${Math.min(100, peakR * 100)}%`;
 
-    requestAnimationFrame(calculateVolume);
+      // set color based on volume
+      const getColor = (value) => {
+        if (value < 0.6) {
+          return 'green';
+        } else if (value < 0.85) {
+          return 'yellow';
+        } else {
+          return 'red';
+        }
+      }
 
-    return () => {
-      stop = true;
-    };
-  }, [analyser])
+      rmsMeterRefL.current.style.backgroundColor = getColor(rmsL);
+      rmsMeterRefR.current.style.backgroundColor = getColor(rmsR);
+      peakMeterRefL.current.style.backgroundColor = getColor(peakL);
+      peakMeterRefR.current.style.backgroundColor = getColor(peakR);
+    });
+    return unsubscribe;
+  }, [])
 
   const barColor = 'green';
 
   return (
-    <div style={{ width: '20px', height: '200px', border: '1px solid #000', position: 'relative' }}>
-      <div ref={meterRef}
-        style={{
-        position: 'absolute',
-        bottom: 0,
-        width: '100%',
-        backgroundColor: barColor,
-        transition: 'height 0.2s ease-out, background-color 0.2s ease-out' // Smooth transition for changes
-      }}></div>
+    // align items to the bottom of the container
+    <div className="flex flex-row h-full items-end bg-gray-200">
+      <div className="flex h-full items-end border border-black w-7">
+        <div ref={rmsMeterRefL}
+             className="border-t border-black w-full"
+             style={{
+               backgroundColor: barColor,
+               transition: 'height 0.2s ease-out, background-color 0.1s ease-out' // Smooth transition for changes
+             }}></div>
+      </div>
+      <div className="flex h-full items-end border border-black border-l-0 w-1">
+        <div ref={peakMeterRefL}
+             className="border-t border-black w-1"
+             style={{
+               backgroundColor: barColor,
+               transition: 'height 0.2s ease-out, background-color 0.2s ease-out' // Smooth transition for changes
+             }} />
+      </div>
+      <div className="flex h-full items-end border border-black border-l-0 w-7">
+        <div ref={rmsMeterRefR}
+             className="border-t border-black w-full"
+             style={{
+               backgroundColor: barColor,
+               transition: 'height 0.2s ease-out, background-color 0.2s ease-out' // Smooth transition for changes
+             }}></div>
+      </div>
+      <div className="flex h-full items-end border border-black border-l-0 w-1">
+        <div ref={peakMeterRefR}
+             className="border-t border-black w-1"
+             style={{
+               backgroundColor: barColor,
+               transition: 'height 0.2s ease-out, background-color 0.2s ease-out' // Smooth transition for changes
+             }} />
+      </div>
     </div>
   );
 };

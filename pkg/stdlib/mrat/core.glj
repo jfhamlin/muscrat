@@ -515,7 +515,7 @@
   [x]
   (if (is-node? x)
     (add-node! :abs NewAbs :in-edges {:in x})
-    (math.Abs x)))
+    (math.Abs (double x))))
 
 (defn exp
   "Returns e^x. If x is a node, creates a new node that computes e^x.
