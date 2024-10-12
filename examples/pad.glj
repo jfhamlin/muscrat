@@ -1,0 +1,43 @@
+(ns user
+  (:require [mrat.core :refer :all]))
+
+(defn pad
+  [gate freq]
+  (let [cnt 16
+        offs (map semitones (repeatedly cnt #(noise-quad 8 :mul 0.3)))
+        freqs (* freq offs (->> (cycle [1 2]) (take cnt)))
+        cutoff (env gate [1000 1000 100] [0 8] :curve :exp)
+        amp (env-asr gate [1 1 8])]
+    (-> (saw freqs)
+        sum
+        (rlpf cutoff)
+        (peakeq (* 8 freq) 0.1 8)
+        (* amp))))
+
+(def root (knob "root" 39 10 60 1))
+(def frequencies
+  (mtof (map #(+ root %) [3 7 12 14 15 24 26])))
+
+(defn ping
+  [gate freq]
+  (let [off (semitones (noise-quad 0.3 :mul 0.1))
+        freq (* freq off)
+        amp (env-perc gate [0.5 3])]
+    (-> (sin freq)
+        (* amp))))
+
+(def ping-metro (noise 2))
+(def ping-snd (ping ping-metro (* 4 (choose ping-metro frequencies))))
+
+(play (-> (map #(pad % (choose % frequencies)) (repeatedly 8 #(noise 1/4)))
+          sum
+          (* 0.3)
+          (+ ping-snd)
+          (freeverb :room-size 0.8)
+          (peakeq 3000 1 (+ -10 (* 5 (noise-quad [16 16]))))
+          (peakeq 240 0.1 (+ -8 (noise-quad [16 16])))
+          (peakeq 460 0.1 (+ -8 (noise-quad [16 16])))
+          (peakeq 820 0.1 (+ -8 (noise-quad [16 16])))
+          (loshelf 100 1 10)
+          (* 0.3)
+          limiter))

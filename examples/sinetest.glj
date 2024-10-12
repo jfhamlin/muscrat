@@ -1,0 +1,78 @@
+(ns user
+  (:use [mrat.core]))
+
+(defugen kick
+  [trig 0
+   freq-hi 700
+   freq-lo 54]
+  (let [[hi lo] [freq-hi freq-lo]
+        freq (env-perc trig [0 0.13] :curve -6)
+        freq (linexp freq 0 1 lo hi)
+        ;; another little layer
+        freq (* freq (+ 1 (env-perc trig [0.001 0.01])))
+        ;; hey why not one more
+        freq (* freq (+ 1 (* 0.1 (env-perc trig [0.02 0.02]))))
+        snd (sin freq)
+        snd (* snd (+ 1 (env-perc trig [0 0.01])))
+        snd (tanh snd)
+        snd (* snd (env trig [0 1 1 0] [0.001 0.1 0.3] :curve -4))
+        snd (* snd (dbamp -2))]
+    snd))
+
+(def metro32 (impulse (knob "metro" 12 8 20)))
+(def metro16 (pulse-div metro32 2))
+(def metro8 (pulse-div metro16 2))
+(def metro4 (pulse-div metro8 2))
+(def metro2 (pulse-div metro4 2))
+
+(def kick-snd (-> (kick metro4 :freq-hi (step metro4 [2500 5000 1000]))))
+(def kick-amp (amplitude kick-snd))
+
+(play kick-snd)
+
+(def hh-pat
+  (impulse-pattern metro16 
+                  [1 0 0 0,
+                   1 0 0 1,
+                   1 0 1 0,
+                   1 0 0 0,
+                   ;;;;;
+                   1 0 0 0,
+                   1 0 1 1,
+                   1 0 1 1,
+                   1 1 1 1,]))
+
+(play (-> (pink-noise)
+          (bpf 8000 (knob "bpf sharpness" 0.5 0.1 1) :mul 5)
+          tanh
+          (* (env-perc hh-pat [0.009 0.05] :curve [4 -4]))))
+
+(def op-conf
+  [[1   1  [0.01 0.1   1   0.1]   [1 2]  0.0 true]
+   [(knob "freq rat" 2 1 3) 1 [0.01 0.1   0.5   0.1]   nil (knob "fb" 0.2 0 1) false]
+   [2   1 [0.001 0.01 0.5 0.05]   nil    0.2 false]
+   ])
+
+(def synth-notes [C2 Eb2 Eb2 G3 Bb2 F3 A4 F4 Eb3 C3])
+
+(def synth-pat (impulse-pattern metro16
+                                [1 0 1 0,
+                                 0 0 1 1,
+                                 1 0 0 1,
+                                 1 0 1 1,
+                                 1 0 1 0,
+                                 0 0 1 1,
+                                 1 0 0 1,
+                                 1 0 1 0,
+                                 ]))
+
+(play (-> (fm-synth op-conf synth-pat
+                    (step synth-pat synth-notes))
+          (rlpf (knob "lp cutoff" 70 20 130 :xform mtof)
+                (knob "lp rq" 0.6 0.05 1))
+          (rhpf (knob "hp cutoff" 10 5 100 :xform mtof)
+                (knob "hp rq" 1 0.05 1))
+          (* 2)
+          tanh
+          (* 0.8)
+          (* (- 1 kick-amp))))

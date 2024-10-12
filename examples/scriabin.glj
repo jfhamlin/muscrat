@@ -56,7 +56,7 @@
 (def release 0.1)
 (defn mkenv
   [metro dur]
-  (env metro [0 1 0.8 0] [attack (- dur attack release) release]))
+  (env metro [0 1 0.8 0] [attack (- dur attack release) release] :curve [-2 2 2]))
 
 (def envelope (mkenv metro dur))
 (def envelope-bass (mkenv metro-bass dur-bass))
@@ -66,6 +66,8 @@
                 (lores (* root (semitones 7)) 0.8)
                 (* envelope))
         sig-bass (-> (sin (* root-bass (semitones (sin 6 :mul 0.1))) :duty 0.8)
+                     (* 4)
+                     tanh
                      (lores (* root-bass 3) 0.9)
                      (* envelope-bass))]
     (-> (+ sig (* (dbamp -5) sig-bass))

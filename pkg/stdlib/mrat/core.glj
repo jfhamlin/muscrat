@@ -1366,6 +1366,12 @@
 (def ^{:dynamic true, :private true} *cps* nil)
 (def ^:dynamic *tctick* nil)
 
+(defn- tccoll?
+  [coll]
+  (and (coll? coll)
+       (not (map? coll))
+       (not (set? coll))))
+
 (defn setcps!
   [cps]
   (pipeset! *cps* cps))
@@ -1374,9 +1380,9 @@
   [pattern]
   (cond
     (= pattern '_) 0
-    (not (coll? pattern)) 1
+    (not (tccoll? pattern)) 1
     :else (let [sub-patterns (map tcpat pattern)
-                sub-patterns (map #(if (coll? %) % [%]) sub-patterns)
+                sub-patterns (map #(if (tccoll? %) % [%]) sub-patterns)
                 counts (map count sub-patterns)
                 lcm-steps (reduce lcm counts)
                 expanded (map (fn [pat cnt]
@@ -1405,7 +1411,7 @@
   "Replace 0s with '_ in a pattern."
   [pattern]
   (letfn [(replace [el]
-            (if (coll? el)
+            (if (tccoll? el)
               (zero-rest el)
               (if (and (number? el) (zero? el))
                 '_
@@ -1424,6 +1430,22 @@
         ticks (-> (impulse (* (count pattern) cps) :sync tctick)
                   (impulse-pattern pattern :sync tctick))]
     ticks))
+
+(defmacro tcsmp
+  [form]
+  (letfn [(map-pat [fun pat]
+            (if (not (coll? pat))
+              (fun pat)
+              (map (partial map-pat fun) pat)))]
+    (let [syms (remove #{'_} (flatten form))
+          sym-or-_ (fn [sym] [sym (map-pat #(if (= % sym) 1 '_) form)])
+          sym-pats (into {} (map sym-or-_ syms))
+          sym-lets (map (fn [[sym pat]]
+                          `(let [tick# (tctrig '~pat)]
+                             (smp ~(vec (strings.Split (str sym) ":"))
+                                  :trigger tick#)))
+                        sym-pats)]
+      `(+ ~@sym-lets))))
 
 (docgroup "Patterns - Tidal-like")
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

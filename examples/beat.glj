@@ -1,0 +1,23 @@
+(ns user
+  (:require [mrat.core :refer :all]))
+
+(def cycles-per-sec 0.75)
+
+(defn cycle-pat
+  [pat]
+  (let [imp (impulse (* cycles-per-sec (count pat)))]
+    (impulse-pattern imp pat)))
+
+(def metro (cycle-pat (euclid 7 12)))
+(play (-> (smp :elec_mid_snare :trigger metro :loop false :rate 1)
+          (bpf 2000 0.3 :mul 0.7)))
+
+(def metro2 (cycle-pat (euclid 5 7)))
+(play (-> (smp :elec_lo_snare :trigger metro2 :loop false :rate 1)
+          (bpf 600 0.2 :mul 0.6)))
+
+(def metro2 (cycle-pat (euclid 4 4)))
+(play (-> (smp :drum_heavy_kick :trigger metro2 :loop false :rate 1 :mul 0.6)))
+
+(play (-> (saw 200 :mul 0.2)
+          (rlpf 1000)))

@@ -1,0 +1,15 @@
+(ns user
+  (:use [mrat.core]))
+
+(def trig (impulse (knob "freq" 5 1 10)))
+
+(def note (rrand 40 100 trig))
+
+(play (sin (mtof note) :mul 0.25))
+
+(hydra {:sources '{:s0 (initImage "https://raw.githubusercontent.com/jfhamlin/muscrat/main/frontend/src/assets/images/muscrat.svg")}
+        :render '(.. (osc 5 1 0.5)
+                     (mult (.. (src s0)
+                               (invert)) 100)
+;;                     (pixelate 50 50)
+                     (out))})

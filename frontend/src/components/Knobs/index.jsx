@@ -101,10 +101,17 @@ const Knob = ({ knob }) => {
                      maxFractionDigits={4}
                      onValueChange={(e) => knobValueChange(e.value)} />
       </div>
-      <button className={"bg-primary text-white p-1 m-1" + (midiSub?.waiting ? " animate-pulse" : "")}
+      <button className={"bg-primary p-1 m-1" +
+                          (midiSub?.waiting ? " animate-pulse" : "") +
+                          (midiSub ? " text-red-500" : " text-white")}
               onClick={subscribeMidi}>
         MIDI
       </button>
+      {/* if midi is connected, show X button to disconnect */}
+      {midiSub ? <button className="bg-primary text-white p-1 m-1"
+                         onClick={() => setMidiSub(null)}>
+        X
+      </button> : null}
     </div>
   )
 }

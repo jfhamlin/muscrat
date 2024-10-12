@@ -17,7 +17,7 @@
                       E5 D5 B4 A4 G4 F#4
                       E4 D4 B3    G3
                       E3 D3 B2    G2
-                      E2 B1
+                      E2    B1
                       E1]))
 
 (def rand-source (math$rand.NewSource 414)) ;; 214

@@ -1,0 +1,48 @@
+(ns user
+  (:require [mrat.core :refer :all]
+            [mrat.abc :as abc]))
+
+(setcps! (/ 250 60 4))
+
+(defn synth
+  [gate freq]
+  (let [amp (env-perc gate [0.01 0.05] :curve [2 -2])]
+    (-> (saw freq) ;;saw freq :duty (knob "duty" 1 0 1) :mul 2)
+        (+ (sqr (* 2 freq) :mul 0.3 :duty 0.1))
+        tanh
+        (* 0.8)
+        (rlpf (knob "cutoff" 80 50 120 :xform mtof) (knob "rq" 1 0.1 1))
+        (* amp)
+        limiter)))
+
+(def bass-pat
+  (impulse-pattern (metro 8)
+                  [1 0 1 0 1 0 1 0,
+                   1 0 1 0 1 0 1 0,
+                   0 0 1 1 0 1 0 1,
+                   1 0 1 0 1 0 1 0]))
+
+;; C C C C            | C C C C
+;;             z _D/2 _D _D _D/2  | _E _E _B. _B.
+
+(def bass-root Bb2)
+(def step1 (knob "step1" 1 0 2 0.05))
+(def step2 (knob "step2" 2 0 2 0.05))
+(def step3 (knob "step3" -1 -2 0 0.05))
+(def bass-notes [0 0 0 0, 0 0 0 0,
+                 step1 step1 step1 step1,
+                 step2 step2 step3 step3])
+(def bass-freqs (->> bass-notes (map #(+ bass-root %)) (map mtof)))
+
+(mrat.core/add-sample-path! "/Users/jfhamlin/Projects/muscrat-projects/samples")
+
+(play (synth bass-pat (step bass-pat bass-freqs)))
+
+(play (-> (smp [:BASE "1"] :trigger (metro 2) :mul 0.4 :rate 0.8)
+          (rlpf 500)))
+;;(play (smp :hat :trigger (metro 8) :mul 0.4))
+;;(play (smp [:CLAP "5"] :trigger (pulse-div (metro 1) 2) :mul 0.4))
+;;(play (smp :crow :trigger (metro 1) :mul 0.2))
+
+(play (sin Bb4 :mul 0.2))
+;;(play (sin (mtof (step (metro 1) [Bb3 Bb3 C4 D4])) :mul 0.2))

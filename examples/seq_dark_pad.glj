@@ -19,9 +19,9 @@
 
 (def s (step trig (map mtof [E2 G2 F#2 A2 C2 B2])))
 
-(play (sum
-       (map #(-> (pad trig (* s %) (dbamp -35))
-                 (delayl 1 (* 0.01 (math$rand.Float64)))
-                 (lores (* 4 s) 0.8)
-                 (freeverb :room-size 0.6))
-            ivals)))
+(play (-> (sum
+          (map #(-> (pad trig (* s %) (dbamp -35))
+                    (delayl 1 (* 0.01 (math$rand.Float64))))
+               ivals))
+          (lores (* 4 s) 0.8)
+          (freeverb :room-size 0.6)))

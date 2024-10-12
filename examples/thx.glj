@@ -1,0 +1,28 @@
+(ns thx
+  (:use [mrat.core]))
+
+(def sweep-dur 10)
+(def hold-dur 5)
+(def fade-dur 0.5)
+
+(def notes [D0 D1 A1 D2 A2 D3 A3 D4 A4 D5 F#5])
+(def t (line 0 1 sweep-dur))
+(def rnd (math$rand.New (math$rand.NewSource 0)))
+(defn synth [note]
+  (let [dst-freq (mtof note)
+    src-freq (-> (.Float64 rnd) (* 200) (+ 200))
+    freq (+ (* t dst-freq) (* (- 1 t) src-freq))
+    freq (* freq (semitones (sin 4 :mul 0.1)))
+    freqs (map #(* freq (cents %)) [-20 0 20])]
+    (-> (saw freqs)
+    sum
+    (/ (count freqs)))))
+
+(-> (map synth notes)
+    sum
+    (rlpf (line 400 11000 sweep-dur))
+    (/ (count notes))
+    (* (env 1 [0 1 1 0] [0.1 (+ sweep-dur hold-dur) fade-dur]))
+    (freeverb :room-size 0.75)
+    (pan2 (sin 0.5 :mul (line 0.5 0 sweep-dur)))
+    play)

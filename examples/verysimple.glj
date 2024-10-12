@@ -1,0 +1,7 @@
+(ns user
+  (:require [mrat.core :refer :all]))
+
+(def freq (choose (impulse 8) [80 100 200 160]))
+
+(play (-> (saw freq :mul 0.1)
+          (rlpf (* 4 freq) 0.2)))

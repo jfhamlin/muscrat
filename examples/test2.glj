@@ -1,0 +1,36 @@
+(ns user
+  (:require [mrat.core :refer :all]))
+
+(def bps (knob "bps" 6 1 10))
+(def pat (euclid 5 9))
+(println "pattern:" pat)
+(def master-metro (impulse bps))
+(def metro (impulse-pattern master-metro pat))
+
+(def melody-metro metro)
+
+(play (-> (smp :drum_snare_soft :trigger metro :mul 0.6)))
+
+(play (-> (smp :elec_tick :trigger (pulse-div metro 4) :mul 0.6)))
+
+(play (-> (smp :drum_heavy_kick :trigger (impulse (/ bps 4)))))
+
+(println C3 "->" (mtof A4))
+(def notes [Ab4 C4 Eb3 D2 D5 Bb5 G4 A4 B4 C4 G4 C5 D5])
+(play (-> (saw (mtof (+ 12 (step melody-metro notes))) :mul 2)
+          (tanh)
+          (* 0.25)
+          (rlpf (let [cutoff (knob "cutoff" 400 100 10000)]
+                  (env melody-metro [20 cutoff cutoff 20] [0.05 0.09 0.05]))
+                0.1)
+          (* (env-perc melody-metro [0.01 0.1]))
+          (combc 1 (knob "delay" 0.25 0.01 1) 3)))
+
+(def crow-metro (pulse-div master-metro 30))
+
+(def crow-rate-mul
+  (knob "crow mult" 1 0.1 2))
+
+(def crow-rate (* crow-rate-mul (choose crow-metro [1 0.5 0.25 0.76])))
+
+(play (-> (smp :misc_crow :rate crow-rate :trigger crow-metro)))

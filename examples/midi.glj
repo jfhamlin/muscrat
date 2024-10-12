@@ -1,0 +1,65 @@
+(ns user
+  (:use [mrat.core]))
+
+(def voices (midi-in "keyboard" :note :voices 8))
+
+(defn synth
+  [gate note]
+  (let [freq (mtof note)
+        sig (saw freq :sync gate)
+        sig (+ sig (sqr (* freq (semitones 7)) :mul 0.25 :sync gate))
+        amp (env gate [0 1 1 0] [0.01 0.02 0.1] :release-node 2 :curve [-4 4 4])
+        loc (* 2 freq)
+        hic (* 8 freq)
+        lfo (sin 5 :mul 7 :sync gate)
+        cutoff (env gate [loc hic (* loc (semitones lfo))] [0.4 0.6] :curve [-2 2])]
+    (-> (* sig amp)
+        (rlpf cutoff)
+        (combc 1 0.2 1))))
+
+(def snd (-> (map #(synth (:onoff %) (:note %)) voices)
+             sum
+             (freeverb :room-size 0.9)
+             (* 0.1)))
+(play snd)
+
+(def noise-freq 200)
+(def noise-freq (-> (midi-in "rain-freq" :cc :controller 70) (* 1000) (+ 50)))
+(doseq [seed (range 10)]
+  (let [trig (noise noise-freq :add -0.9)
+        seed1 (* 2 seed)
+        seed2 (* 3 seed)
+        seed3 (* 4 seed)
+        drop-sig (sin (rrand 500 2000 trig seed)
+                      :mul (+ 0.7 (* 0.5 (sin (rrand 500 2000 trig seed1) :mul (rrand 0 1 trig seed2)))))
+        amp (env-perc trig [0.01 (rrand 0.1 0.5 trig seed3)] :curve -8)]
+    (-> drop-sig
+        (* amp)
+        (rlpf 1500)
+        (combc 1 0.5 1)
+        (freeverb :room-size 0.7)
+        (* (noise-quad 0.1 :add 0.5 :mul 0.5))
+        (* 0.02)
+        play)))
+
+(def snd-amp (amplitude snd))
+(def avg-note (-> (map #(* (:note %) (:onoff %)) voices) sum (* (/ 1 (sum (map :onoff voices))))))
+(hydra {:render '(.. (src o0)
+                     (modulateHue (.. (src o0)
+                                      (rotate 0 0.001)
+                                      (scale 1.1)) 1)
+                     (layer (.. (osc osc-freq 0.001 avg-note)
+                                (kaleid 200)
+                                (mask (shape 200 sz 0.01))))
+                     (modulatePixelate (.. (voronoi cells 0.1 0.2)
+                                           (colorama)
+                                           (scrollX cells)
+                                           (scroll 0 0 0.01 0.01)
+                                           (rotate 0 0.01))
+                                       100)
+                     (out))}
+       {:sz (* 1.25 snd-amp)
+        :osc-freq (* 10 snd-amp)
+        :cells (+ (* 0.015 noise-freq) 8)
+        :avg-note (* 0.05 (- avg-note B2))
+        :color (* 1.5 snd-amp)})

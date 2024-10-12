@@ -1,0 +1,24 @@
+(ns user
+  (:use [mrat.core]))
+
+(def trig (impulse (knob "rate" 1 1 10)))
+
+(def amp (env-perc trig [0.01 0.1] :curve [6 -4]))
+
+(-> (sin 200 :mul 0.1)
+    (* amp)
+    play)
+
+(hydra '{:render (.. (osc 3 0.01 0.4)
+                     (color 1.2 1.2 1.3)
+                     (saturate sat)
+                     (modulateRepeat (osc 2) 1 2 4 3)
+                     (modulateKaleid (osc 12 0.05 0) 1)
+                     (luma 0.4)
+                     (rotate 4 0.1 0)
+                     (modulate o0 mod-amt)
+                     (scale 1)
+                     (diff o1)
+                     (out))}
+         {:mod-amt (* 0.1 amp)
+          :sat (* 20 amp)})
