@@ -73,11 +73,15 @@ func RegisterImports(_register func(string, interface{})) {
 
 	// package github.com/jfhamlin/muscrat/pkg/effects
 	////////////////////////////////////////
+	_register("github.com/jfhamlin/muscrat/pkg/effects.DelayLine", reflect.TypeOf((*github_com_jfhamlin_muscrat_pkg_effects.DelayLine)(nil)).Elem())
+	_register("github.com/jfhamlin/muscrat/pkg/effects.*DelayLine", reflect.TypeOf((*github_com_jfhamlin_muscrat_pkg_effects.DelayLine)(nil)))
+	_register("github.com/jfhamlin/muscrat/pkg/effects.NewAllPass", github_com_jfhamlin_muscrat_pkg_effects.NewAllPass)
 	_register("github.com/jfhamlin/muscrat/pkg/effects.NewAmplitude", github_com_jfhamlin_muscrat_pkg_effects.NewAmplitude)
 	_register("github.com/jfhamlin/muscrat/pkg/effects.NewBPF", github_com_jfhamlin_muscrat_pkg_effects.NewBPF)
 	_register("github.com/jfhamlin/muscrat/pkg/effects.NewBitcrusher", github_com_jfhamlin_muscrat_pkg_effects.NewBitcrusher)
 	_register("github.com/jfhamlin/muscrat/pkg/effects.NewClip", github_com_jfhamlin_muscrat_pkg_effects.NewClip)
 	_register("github.com/jfhamlin/muscrat/pkg/effects.NewDelay", github_com_jfhamlin_muscrat_pkg_effects.NewDelay)
+	_register("github.com/jfhamlin/muscrat/pkg/effects.NewDelayLine", github_com_jfhamlin_muscrat_pkg_effects.NewDelayLine)
 	_register("github.com/jfhamlin/muscrat/pkg/effects.NewFreeverb", github_com_jfhamlin_muscrat_pkg_effects.NewFreeverb)
 	_register("github.com/jfhamlin/muscrat/pkg/effects.NewHiShelf", github_com_jfhamlin_muscrat_pkg_effects.NewHiShelf)
 	_register("github.com/jfhamlin/muscrat/pkg/effects.NewLimiter", github_com_jfhamlin_muscrat_pkg_effects.NewLimiter)

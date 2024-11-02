@@ -17,6 +17,8 @@ const VolumeMeter = ({ }) => {
       const [rmsL, rmsR] = volume.data.rms;
       const [peakL, peakR] = volume.data.peak;
 
+      if (!rmsMeterRefL.current) return;
+
       // set height
       rmsMeterRefL.current.style.height = `${Math.min(100, rmsL * 100)}%`;
       rmsMeterRefR.current.style.height = `${Math.min(100, rmsR * 100)}%`;
@@ -46,7 +48,6 @@ const VolumeMeter = ({ }) => {
   const barColor = 'green';
 
   return (
-    // align items to the bottom of the container
     <div className="flex flex-row h-full items-end bg-gray-200">
       <div className="flex h-full items-end border border-black w-7">
         <div ref={rmsMeterRefL}

@@ -21,6 +21,14 @@ func NewSampler(buf []float64) ugen.UGen {
 		rates := cfg.InputSamples["rate"]
 		loops := cfg.InputSamples["loop"]
 		startIndex := cfg.InputSamples["start-pos"]
+		endIndex := cfg.InputSamples["end-pos"]
+
+		lastIdx := len(out) - 1
+		_ = trigs[lastIdx]
+		_ = rates[lastIdx]
+		_ = loops[lastIdx]
+		_ = startIndex[lastIdx]
+		_ = endIndex[lastIdx]
 
 		for i := range out {
 			if !lastTrig && trigs[i] > 0 {
@@ -31,11 +39,18 @@ func NewSampler(buf []float64) ugen.UGen {
 
 			rate := rates[i]
 
+			end := endIndex[i]
+			if end == 0 {
+				end = 1
+			} else if end > sampleLen {
+				end = sampleLen
+			}
+
 			if stopped {
 				continue
 			}
 
-			if index >= sampleLen {
+			if index >= end {
 				out[i] = 0
 			} else {
 				// cubic interpolation
@@ -65,7 +80,7 @@ func NewSampler(buf []float64) ugen.UGen {
 			if index < 0 {
 				index = float64(len(buf) - 1)
 			}
-			if index >= sampleLen {
+			if index >= end {
 				index = startIndex[i]
 				if loops[i] <= 0 {
 					stopped = true

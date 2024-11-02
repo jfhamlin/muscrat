@@ -5,9 +5,7 @@ import {
 } from 'react';
 
 
-export default () => {
-  const [startTime, setStartTime] = useState();
-
+export default ({ startTime, setStartTime }) => {
   const timeRef = createRef();
 
   // display the time since the start time
@@ -36,7 +34,7 @@ export default () => {
   }, [startTime]);
 
   return (
-    <div>
+    <div className="select-none">
       <div ref={timeRef} />
       <button
         onClick={() => {

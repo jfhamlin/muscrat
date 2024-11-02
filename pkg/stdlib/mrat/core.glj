@@ -56,6 +56,7 @@
                                                     NewHiShelf
                                                     NewPeakEQ
                                                     NewDelay
+                                                    NewAllPass
                                                     NewWaveFolder
                                                     NewClip)
            (github.com$jfhamlin$muscrat$pkg$sampler NewSampler
@@ -103,6 +104,27 @@
   "Generate a new unique id."
   []
   (str (swap! next-id inc)))
+
+(defmacro -<
+  "Threads the result of the expression through each of the
+   forms.
+
+   (-< exp
+      ((fn1 ...) (fn2 ...))
+      ...)
+
+   is equivalent to
+
+   (let [x exp]
+     (-> x (fn1 ...) (fn2 ...))
+     ..."
+  [exp & forms]
+  (let [exp-sym (gensym)
+        res-sym (gensym)]
+    `(let [~exp-sym ~exp
+           ~res-sym ~(mapv (fn [form] `(-> ~exp-sym ~@form))
+                           forms)]
+       ~res-sym)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Graph
@@ -980,6 +1002,17 @@
    delay-time 0.2]
   (-delay in max-delay-time delay-time InterpCubic))
 
+(defugen allpass
+  "Allpass filter with no interpolation."
+  [in 0
+   max-delay-time 0.2
+   delay-time 0.2
+   decay-time 1]
+  (add-node! :allpass NewAllPass :args [max-delay-time]
+             :in-edges {:in in
+                        :delaytime delay-time
+                        :decaytime decay-time}))
+
 (defn- comb-feedback
   [delay-time decay-time]
   (if (or (and (not (is-node? delay-time)) (zero? delay-time))
@@ -1154,6 +1187,7 @@
    rate 1
    trigger 1
    start-pos 0
+   end-pos nil
    loop 0]
   (let [buf-or-bufs (if (or (keyword? buf-or-bufs)
                             (vector? buf-or-bufs)
@@ -1164,7 +1198,8 @@
         (throw (errors.New "smp requires a non-empty buffer or slice of buffers")))
     (let [bufs (if (#(or (number? %) (keyword? %)) (first buf-or-bufs))
                  [buf-or-bufs] ;; wrap single buffer in a vector
-                 buf-or-bufs)]
+                 buf-or-bufs)
+          end-pos (or end-pos (count (first bufs)))]
       (for [buf bufs]
         (let [buf (if (keyword? buf)
                     (load-sample buf)
@@ -1174,6 +1209,7 @@
                      :in-edges {:trigger trigger
                                 :rate rate
                                 :start-pos start-pos
+                                :end-pos end-pos
                                 :loop (or loop 0)}))))))
 
 (docgroup "Sampler")
@@ -1501,6 +1537,18 @@
 (def melodic-minor [0 2 3 5 7 9 11])
 
 (def chromatic (range 12))
+
+(defn scale
+  "Generate the MIDI notes for a scale starting at the given root note."
+  ([root intervals] (scale root intervals 1))
+  ([root intervals num-octaves]
+   (when (not (number? root))
+     (throw (fmt.Errorf "root must be a MIDI note number, got %T" root)))
+   (let [num-octaves (int num-octaves)
+         notes-one-octave (map #(+ root %) intervals)
+         octave-notes (for [octave (range num-octaves)]
+                        (+ (* 12 octave) notes-one-octave))]
+     (flatten octave-notes))))
 
 (docgroup "Scales")
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

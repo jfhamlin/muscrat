@@ -86,13 +86,16 @@ const AudioVisualizers = () => {
 export default () => {
   const [expanded, setExpanded] = useState(false);
 
+  // For the timer
+  const [startTime, setStartTime] = useState();
+
   const toggleExpanded = () => {
     setExpanded((expanded) => !expanded);
   };
 
   // header has the logo and an svg button to expand (or collapse) the body
   const header = (
-    <div className="flex flex-row items-center justify-between w-full mt-4">
+    <div className="flex flex-row items-center justify-between w-full mt-4 select-none">
       <img src={logo} className="w-32 max-w-32 my-4" alt="logo" />
       <button onClick={toggleExpanded} className="p-2 focus:outline-none">
         {expanded ? (
@@ -138,7 +141,7 @@ export default () => {
         <div className="flex flex-col flex-grow overflow-hidden mb-1">
           <VolumeMeter />
         </div>
-        <Timer />
+        <Timer startTime={startTime} setStartTime={setStartTime} />
       </div>
     );
   }

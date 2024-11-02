@@ -83,7 +83,7 @@ const Knob = ({ knob }) => {
 
   // label is centered
   return (
-    <div className="border border-primary p-2 m-2 noscroll overflow-hidden">
+    <div className="border border-primary p-2 m-2 noscroll overflow-hidden select-none">
       <h2 className="font-bold text-center text-black">
         {knob.name}
       </h2>
@@ -144,7 +144,7 @@ export default () => {
   }, []);
 
   return (
-    <div className="mx-2 my-2 overflow-hidden w-full h-full">
+    <div className="mx-2 my-2 overflow-hidden w-full h-full select-none">
       <h1 className="font-bold text-xl text-center fixed w-full left-0 top-0 my-1">
         Knobs
       </h1>

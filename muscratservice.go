@@ -28,7 +28,9 @@ type (
 		hydraWindow *application.WebviewWindow
 		knobsWindow *application.WebviewWindow
 
-		mtx sync.Mutex
+		windowMtx sync.Mutex
+
+		playMtx sync.Mutex
 	}
 
 	OpenFileDialogResponse struct {
@@ -110,8 +112,8 @@ func (a *MuscratService) startup(app *application.App) {
 	})
 
 	pubsub.Subscribe(ugen.KnobsChangedEvent, func(event string, data any) {
-		a.mtx.Lock()
-		defer a.mtx.Unlock()
+		a.windowMtx.Lock()
+		defer a.windowMtx.Unlock()
 
 		a.updateKnobsWindow()
 
@@ -207,8 +209,8 @@ func (a *MuscratService) SaveFile(fileName string, content string) (string, erro
 // PlayFile plays a file. The file is re-evaluated whenever it
 // changes.
 func (a *MuscratService) PlayFile(fileName string) error {
-	a.mtx.Lock()
-	defer a.mtx.Unlock()
+	a.playMtx.Lock()
+	defer a.playMtx.Unlock()
 
 	a.stopFile()
 
@@ -230,8 +232,8 @@ func (a *MuscratService) PlayFile(fileName string) error {
 }
 
 func (a *MuscratService) Silence() {
-	a.mtx.Lock()
-	defer a.mtx.Unlock()
+	a.playMtx.Lock()
+	defer a.playMtx.Unlock()
 
 	a.stopFile()
 
@@ -284,16 +286,16 @@ func (a *MuscratService) updateKnobsWindow() {
 		MinHeight:        300,
 	})
 	a.knobsWindow.On(events.Common.WindowClosing, func(e *application.WindowEvent) {
-		a.mtx.Lock()
-		defer a.mtx.Unlock()
+		a.windowMtx.Lock()
+		defer a.windowMtx.Unlock()
 
 		a.knobsWindow = nil
 	})
 }
 
 func (a *MuscratService) ToggleHydraWindow() {
-	a.mtx.Lock()
-	defer a.mtx.Unlock()
+	a.windowMtx.Lock()
+	defer a.windowMtx.Unlock()
 
 	if a.hydraWindow != nil {
 		return
@@ -310,8 +312,8 @@ func (a *MuscratService) ToggleHydraWindow() {
 		URL:              "/hydra",
 	})
 	a.hydraWindow.On(events.Common.WindowClosing, func(e *application.WindowEvent) {
-		a.mtx.Lock()
-		defer a.mtx.Unlock()
+		a.windowMtx.Lock()
+		defer a.windowMtx.Unlock()
 
 		a.hydraWindow = nil
 	})

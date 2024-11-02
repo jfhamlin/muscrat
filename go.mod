@@ -6,7 +6,7 @@ toolchain go1.22.5
 
 require (
 	github.com/fsnotify/fsnotify v1.7.0
-	github.com/glojurelang/glojure v0.2.5
+	github.com/glojurelang/glojure v0.2.6
 	github.com/go-audio/audio v1.0.0
 	github.com/go-audio/wav v1.1.0
 	github.com/gordonklaus/portaudio v0.0.0-20221027163845-7c3b689db3cc
