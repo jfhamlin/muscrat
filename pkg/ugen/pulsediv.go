@@ -6,7 +6,7 @@ import (
 )
 
 func NewPulseDiv(start float64) UGen {
-	count := int64(math.Floor(start + 0.5))
+	count := int(math.Floor(start + 0.5))
 	lastTrig := 0.0
 	return UGenFunc(func(ctx context.Context, cfg SampleConfig, out []float64) {
 		trig := cfg.InputSamples["trigger"]
@@ -18,7 +18,7 @@ func NewPulseDiv(start float64) UGen {
 		for i := range out {
 			if trig[i] > 0 && lastTrig <= 0 {
 				count++
-				if count >= int64(div[i]) {
+				if count >= int(div[i]) {
 					out[i] = 1
 					count = 0
 				} else {
