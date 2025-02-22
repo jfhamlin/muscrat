@@ -7,4 +7,6 @@ export {
     MuscratService
 };
 
-export * from "./models.js";
+export {
+    OpenFileDialogResponse
+} from "./models.js";
