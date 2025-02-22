@@ -1199,18 +1199,21 @@
     (let [bufs (if (#(or (number? %) (keyword? %)) (first buf-or-bufs))
                  [buf-or-bufs] ;; wrap single buffer in a vector
                  buf-or-bufs)
-          end-pos (or end-pos (count (first bufs)))]
-      (for [buf bufs]
-        (let [buf (if (keyword? buf)
-                    (load-sample buf)
-                    buf)]
-          (add-node! :smp NewSampler
-                     :args [buf]
-                     :in-edges {:trigger trigger
-                                :rate rate
-                                :start-pos start-pos
-                                :end-pos end-pos
-                                :loop (or loop 0)}))))))
+          end-pos (or end-pos (count (first bufs)))
+          result (for [buf bufs]
+                   (let [buf (if (keyword? buf)
+                               (load-sample buf)
+                               buf)]
+                     (add-node! :smp NewSampler
+                                :args [buf]
+                                :in-edges {:trigger trigger
+                                           :rate rate
+                                           :start-pos start-pos
+                                           :end-pos end-pos
+                                           :loop (or loop 0)})))]
+      (if (= 1 (count result))
+        (first result)
+        result))))
 
 (docgroup "Sampler")
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -1435,7 +1438,7 @@
   [value-pattern & {:keys [slow]}]
   (let [slow (long (or slow 1)) ;; must be integral
         cps (/ *cps* slow)
-        tctick (pulse-div *tctick* slow)
+        tctick (pulse-div *tctick* slow slow)
         pattern (tcpat value-pattern)
         values (filter #(not= % '_) (flatten value-pattern))
         ticks (-> (impulse (* (count pattern) cps) :sync tctick)
@@ -1458,7 +1461,7 @@
   [trig-pattern & {:keys [slow]}]
   (let [slow (long (or slow 1)) ;; must be integral
         cps (/ *cps* slow)
-        tctick (pulse-div *tctick* slow)
+        tctick (pulse-div *tctick* slow slow)
         trig-pattern (zero-rest trig-pattern) ;; replace 0s with '_
         pattern (tcpat trig-pattern)
         flat-pat (flatten trig-pattern)
