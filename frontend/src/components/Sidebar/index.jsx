@@ -44,7 +44,7 @@ const AudioVisualizers = () => {
     let nextBufferTime = audioResources.context.currentTime;
 
     const unsubscribe = Events.On("samples", (evt) => {
-      const samples = evt.data;
+      const samples = evt.data[0];
       const samplesChannel0 = Float32Array.from(samples[0]);
       const samplesChannel1 = Float32Array.from(samples[1]);
 

@@ -65,7 +65,7 @@ func main() {
 		URL:              "/",
 	})
 	// exit when the main window is closed
-	mainWindow.On(events.Common.WindowClosing, func(e *application.WindowEvent) {
+	mainWindow.RegisterHook(events.Common.WindowClosing, func(e *application.WindowEvent) {
 		app.Quit()
 	})
 

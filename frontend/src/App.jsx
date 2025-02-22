@@ -1,7 +1,6 @@
 import {
   GetSampleRate,
 } from "../bindings/github.com/jfhamlin/muscrat/muscratservice";
-import { Events } from "@wailsio/runtime";
 
 import {
   useState,

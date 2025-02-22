@@ -80,14 +80,14 @@ export default () => {
 
   useEffect(() => {
     return Events.On("hydra.expr", (evt) => {
-      const data = evt.data;
+      const data = evt.data[0];
       setExpr(data.expr);
       setVars(new Set(data.vars));
     });
   }, []);
   useEffect(() => {
     return Events.On("hydra.mapping", (evt) => {
-      const mapping = evt.data;
+      const mapping = evt.data[0];
       mappings.current = mapping;
     });
   }, []);

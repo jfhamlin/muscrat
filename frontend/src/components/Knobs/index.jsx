@@ -41,7 +41,7 @@ const Knob = ({ knob }) => {
 
     if (midiSub.waiting) {
       const sub = Events.On('midi', (evt) => {
-        const data = evt.data;
+        const data = evt.data[0];
         const message = data.message;
         if (message.type !== 'controlChange') {
           return;
@@ -59,7 +59,7 @@ const Knob = ({ knob }) => {
       return sub;
     } else {
       const sub = Events.On('midi', (evt) => {
-        const data = evt.data;
+        const data = evt.data[0];
         const message = data.message;
         if (message.type !== 'controlChange') {
           return;
@@ -137,7 +137,7 @@ export default () => {
       setKnobs(data);
     });
     return Events.On('knobs-changed', (evt) => {
-      const data = evt.data;
+      const data = evt.data[0];
       sortKnobs(data);
       setKnobs(data);
     });

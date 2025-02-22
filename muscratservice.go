@@ -77,10 +77,7 @@ func (a *MuscratService) startup(app *application.App) {
 				cpy[i] = make([]float64, len(a.channelBuffers[i]))
 				copy(cpy[i], a.channelBuffers[i])
 			}
-			go app.Events.Emit(&application.WailsEvent{
-				Name: "samples",
-				Data: cpy,
-			})
+			go app.EmitEvent("samples", cpy)
 
 			// publish RMS and max values for each channel
 			rms := make([]float64, len(a.channelBuffers))
@@ -97,12 +94,9 @@ func (a *MuscratService) startup(app *application.App) {
 				rms[i] = math.Sqrt(sum / float64(len(a.channelBuffers[i])))
 				max[i] = maxVal
 			}
-			go app.Events.Emit(&application.WailsEvent{
-				Name: "volume",
-				Data: map[string]any{
-					"rms":  rms,
-					"peak": max,
-				},
+			go app.EmitEvent("volume", map[string]any{
+				"rms":  rms,
+				"peak": max,
 			})
 
 			for i := range a.channelBuffers {
@@ -119,15 +113,12 @@ func (a *MuscratService) startup(app *application.App) {
 
 		// send the new knobs to the UI
 		go func() {
-			app.Events.Emit(&application.WailsEvent{
-				Name: "knobs-changed",
-				Data: ugen.GetKnobs(),
-			})
+			app.EmitEvent("knobs-changed", ugen.GetKnobs())
 		}()
 	})
 
 	// forward knob value changes from the UI to the pubsub
-	app.Events.On("knob-value-change", func(evt *application.WailsEvent) {
+	app.OnEvent("knob-value-change", func(evt *application.CustomEvent) {
 		data := evt.Data.([]any)
 		id := data[0].(float64)
 		value := data[1].(float64)
@@ -139,20 +130,14 @@ func (a *MuscratService) startup(app *application.App) {
 	})
 
 	pubsub.Subscribe("console.log", func(event string, data any) {
-		go app.Events.Emit(&application.WailsEvent{
-			Name: "console.log",
-			Data: data,
-		})
+		go app.EmitEvent("console.log", data)
 	})
 
 	pubsub.Subscribe("", func(event string, data any) {
 		switch event {
 		case "samples", ugen.KnobsChangedEvent, "console.log", "knob-value-change":
 		default:
-			app.Events.Emit(&application.WailsEvent{
-				Name: event,
-				Data: data,
-			})
+			app.EmitEvent(event, data)
 		}
 	})
 }
@@ -285,7 +270,7 @@ func (a *MuscratService) updateKnobsWindow() {
 		MinWidth:         300,
 		MinHeight:        300,
 	})
-	a.knobsWindow.On(events.Common.WindowClosing, func(e *application.WindowEvent) {
+	a.knobsWindow.RegisterHook(events.Common.WindowClosing, func(e *application.WindowEvent) {
 		a.windowMtx.Lock()
 		defer a.windowMtx.Unlock()
 
@@ -311,7 +296,7 @@ func (a *MuscratService) ToggleHydraWindow() {
 		BackgroundColour: application.NewRGB(27, 38, 54),
 		URL:              "/hydra",
 	})
-	a.hydraWindow.On(events.Common.WindowClosing, func(e *application.WindowEvent) {
+	a.hydraWindow.RegisterHook(events.Common.WindowClosing, func(e *application.WindowEvent) {
 		a.windowMtx.Lock()
 		defer a.windowMtx.Unlock()
 

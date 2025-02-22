@@ -13,9 +13,10 @@ const VolumeMeter = ({ }) => {
   const peakMeterRefR = createRef();
 
   useEffect(() => {
-    const unsubscribe = Events.On('volume', (volume) => {
-      const [rmsL, rmsR] = volume.data.rms;
-      const [peakL, peakR] = volume.data.peak;
+    const unsubscribe = Events.On('volume', (event) => {
+      const data = event.data[0];
+      const [rmsL, rmsR] = data.rms;
+      const [peakL, peakR] = data.peak;
 
       if (!rmsMeterRefL.current) return;
 

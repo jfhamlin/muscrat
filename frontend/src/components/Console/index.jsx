@@ -93,7 +93,7 @@ export default () => {
 
   useEffect(() => {
     return Events.On('console.log', (evt) => {
-      const data = evt.data;
+      const data = evt.data[0];
 
       setEvents((prev) => {
         const last = prev[prev.length - 1];
