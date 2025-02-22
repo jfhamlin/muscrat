@@ -16,30 +16,27 @@
         limiter)))
 
 (def bass-pat
-  (impulse-pattern (metro 8)
+  (impulse-pattern (impulse 8)
                   [1 0 1 0 1 0 1 0,
                    1 0 1 0 1 0 1 0,
                    0 0 1 1 0 1 0 1,
                    1 0 1 0 1 0 1 0]))
 
-;; C C C C            | C C C C
-;;             z _D/2 _D _D _D/2  | _E _E _B. _B.
-
 (def bass-root Bb2)
-(def step1 (knob "step1" 1 0 2 0.05))
-(def step2 (knob "step2" 2 0 2 0.05))
+(def step1 (knob "step1" 0.5 0 2 0.05))
+(def step2 (knob "step2" 1.5 0 2 0.05))
 (def step3 (knob "step3" -1 -2 0 0.05))
 (def bass-notes [0 0 0 0, 0 0 0 0,
                  step1 step1 step1 step1,
                  step2 step2 step3 step3])
 (def bass-freqs (->> bass-notes (map #(+ bass-root %)) (map mtof)))
 
-(mrat.core/add-sample-path! "/Users/jfhamlin/Projects/muscrat-projects/samples")
+(add-sample-path! "/Users/jfhamlin/Projects/muscrat-projects/samples")
 
 (play (synth bass-pat (step bass-pat bass-freqs)))
 
-(play (-> (smp [:BASE "1"] :trigger (metro 2) :mul 0.4 :rate 0.8)
-          (rlpf 500)))
+(play (-> (smp [:BASE "3"] :trigger (impulse 2) :mul 0.4)
+          (rlpf 1000)))
 ;;(play (smp :hat :trigger (metro 8) :mul 0.4))
 ;;(play (smp [:CLAP "5"] :trigger (pulse-div (metro 1) 2) :mul 0.4))
 ;;(play (smp :crow :trigger (metro 1) :mul 0.2))
