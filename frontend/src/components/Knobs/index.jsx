@@ -145,9 +145,6 @@ export default () => {
 
   return (
     <div className="mx-2 my-2 overflow-hidden w-full h-full select-none">
-      <h1 className="font-bold text-xl text-center fixed w-full left-0 top-0 my-1">
-        Knobs
-      </h1>
       <div className="mt-5 overflow-auto">
         {knobs.length === 0 ? null :
          <div className="flex flex-wrap justify-center">

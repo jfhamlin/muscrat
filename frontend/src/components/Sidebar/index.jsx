@@ -14,6 +14,7 @@ import VolumeMeter from "../VolumeMeter";
 import Spectrogram from "../Spectrogram";
 import Console from "../Console";
 import Timer from "../Timer";
+import TabBar from "../TabBar";
 
 import logo from '../../assets/images/muscrat.svg';
 
@@ -83,7 +84,7 @@ const AudioVisualizers = () => {
   );
 };
 
-export default () => {
+const old = () => {
   const [expanded, setExpanded] = useState(false);
 
   // For the timer
@@ -158,4 +159,19 @@ export default () => {
       </div>
     </div>
   );
-}
+};
+
+import Knob from "../Knob";
+
+export default () => {
+  const [selectedTab, setSelectedTab] = useState("params");
+
+  return (
+    <div className="ml-2 mr-5 pt-[6px]">
+      <TabBar options={["params", "graph"]}
+              selected={selectedTab}
+              onSelect={setSelectedTab} />
+      {selectedTab === "params" && <Knob label="cutoff" size={80} value={12} min={0} max={1} />}
+    </div>
+  );
+};

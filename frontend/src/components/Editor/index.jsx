@@ -84,6 +84,11 @@ export default (props) => {
   }, []);
 
   const options = {
+    padding: {
+      top: 10,
+    },
+    folding: false,
+    lineNumbersMinChars: 3,
     minimap: {
       enabled: false,
     },
@@ -94,7 +99,7 @@ export default (props) => {
     <>
       <div className="flex flex-col h-full">
         <div className="flex">
-          <div className="text-xs text-gray-500 border-t border-r border-gray-300/25 flex-shrink min-w-[2rem] bg-background-secondary px-2 pt-1">
+          <div className="text-xs text-gray-500 border-t border-r border-gray-300/25 flex-shrink min-w-[2rem] bg-background-secondary px-2 pb-1 pt-1 rounded-t">
             {selectedBufferName ?? '<new>'}{selectedBuffer?.dirty ? "*" : ""}
           </div>
           <div className="border-b border-gray-300/25 flex-grow" />

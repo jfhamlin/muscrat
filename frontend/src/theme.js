@@ -5,4 +5,7 @@ export const tailwindTheme = {
     secondary: '#26203D',
     tertiary: '#483D6B',
   },
+  accent: {
+    primary: '#FFC36A',
+  },
 };

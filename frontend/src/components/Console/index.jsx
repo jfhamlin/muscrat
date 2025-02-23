@@ -113,17 +113,10 @@ export default () => {
   }, []);
 
   return (
-    <div className="bg-gray-800 rounded-lg flex flex-col h-full relative">
-      {/* Position over the console, centered at top */}
-      <Heading>
-        {/* flex and center items vertically */}
-        <div className="flex items-center justify-between">
-          <h1 className="mr-1">
-            Console
-          </h1>
-          <ClearButton onClick={() => setEvents([])} />
-        </div>
-      </Heading>
+    <div className="flex flex-col h-full flex-grow">
+      <div className="flex items-center justify-between">
+        <ClearButton onClick={() => setEvents([])} />
+      </div>
       <div ref={ref} className="flex-grow overflow-auto">
         {events.map(({ event, count }, i) => (
           <Event key={i} event={event} count={count} />
