@@ -1,11 +1,13 @@
 import {
-  GetSampleRate,
-} from "../bindings/github.com/jfhamlin/muscrat/muscratservice";
-
-import {
   useState,
   useEffect,
 } from 'react';
+
+import Splitter, { SplitDirection } from '@devbookhq/splitter'
+
+import {
+  GetSampleRate,
+} from "../bindings/github.com/jfhamlin/muscrat/muscratservice";
 
 import {
   BuffersProvider,
@@ -20,13 +22,15 @@ import Docs from "./components/Docs";
 function App() {
   return (
     <BuffersProvider createStore={createBuffersStore}>
-      <div className="flex flex-row w-screen h-screen overflow-hidden bg-white">
-        <Sidebar />
+      <div className="flex flex-row w-screen h-screen overflow-hidden bg-background-primary select-none cursor-default">
         <div className="flex flex-col flex-1 h-full overflow-hidden">
           <Toolbar />
-          <Editor />
-          {/* horizontal line */}
-          <div className="border-t border-gray-300" />
+          <Splitter direction={SplitDirection.Vertical}>
+            <div className="h-full">
+              <Editor />
+            </div>
+            <div className="bg-red-500">whatever forever</div>
+          </Splitter>
           {/* <Docs /> */}
         </div>
       </div>

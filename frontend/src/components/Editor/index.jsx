@@ -2,6 +2,7 @@ import {
   useRef,
   useState,
   useEffect,
+  useCallback,
 } from 'react';
 
 import {
@@ -10,11 +11,26 @@ import {
   GetNSPublics,
 } from "../../../bindings/github.com/jfhamlin/muscrat/muscratservice";
 
-import Editor from '@monaco-editor/react';
+import Editor, { loader } from '@monaco-editor/react';
 
 import {
   useBuffersStore,
 } from "../../contexts/buffers";
+
+import { tailwindTheme } from "../../theme";
+
+const theme = {
+  base: 'vs-dark',
+  inherit: true,
+  rules: [],
+  colors: {
+    'editor.background': tailwindTheme.background.secondary,
+  },
+}
+
+loader.init().then((monaco) => {
+  monaco.editor.defineTheme('muscrat', theme);
+});
 
 export default (props) => {
   const buffersStore = useBuffersStore();
@@ -47,23 +63,25 @@ export default (props) => {
     buffersStore.updateBuffer(selectedBufferName, value);
   };
 
-  // resize the editor when the window is resized
-  useEffect(() => {
-    if (!editor) {
-      return;
-    }
+  const editorContainerRef = useCallback((container) => {
+    if (!container) return;
 
-    // strategy from
-    // https://berezuzu.medium.com/resizable-monaco-editor-3e922ad54e4
-    const handleResize = () => {
-      editor.layout({ width: 0, height: 0 });
-    };
+    console.log("editorContainerRef", container);
 
-    window.addEventListener('resize', handleResize);
-    return () => {
-      window.removeEventListener('resize', handleResize);
-    };
-  }, [editor]);
+    const resizeObserver = new ResizeObserver(() => {
+      console.log("resize");
+      if (!container || !editor) {
+        return;
+      }
+      const { width, height } = container.getBoundingClientRect();
+      if (width === 0 || height === 0) {
+        return;
+      }
+      // set the editor to the size of the container
+      editor.layout({ width, height });
+    });
+    resizeObserver.observe(container);
+  }, []);
 
   const options = {
     minimap: {
@@ -74,18 +92,22 @@ export default (props) => {
   // monaco editor layout is a pain to manage
   return (
     <>
-      <div>
-        <Editor options={options}
-                width="100%"
-                height="90vh"
-                defaultLanguage="clojure"
-                path={selectedBufferName}
-                defaultValue={code}
-                onChange={handleEditorChange}
-                onMount={handleEditorDidMount} />
-      </div>
-      <div className="text-xs text-gray-500 border-t border-gray-300">
-        {selectedBufferName}{selectedBuffer?.dirty ? "*" : ""}
+      <div className="flex flex-col h-full">
+        <div className="flex">
+          <div className="text-xs text-gray-500 border-t border-r border-gray-300/25 flex-shrink min-w-[2rem] bg-background-secondary px-2 pt-1">
+            {selectedBufferName ?? '<new>'}{selectedBuffer?.dirty ? "*" : ""}
+          </div>
+          <div className="border-b border-gray-300/25 flex-grow" />
+        </div>
+        <div className="bg-background-secondary flex-grow overflow-hidden" ref={editorContainerRef}>
+          <Editor options={options}
+                  theme={'muscrat'}
+                  defaultLanguage="clojure"
+                  path={selectedBufferName}
+                  defaultValue={code}
+                  onChange={handleEditorChange}
+                  onMount={handleEditorDidMount} />
+        </div>
       </div>
     </>
   );
