@@ -2,7 +2,7 @@
 
 A real-time computer music system and language.
 
-<img alt="muscrat screenshot" src="./docs/screenshot.png" width="512" />
+<img width="816" alt="image" src="https://github.com/user-attachments/assets/23935489-bcea-47a0-8ddf-559ed2dccb82" />
 
 ## Supported Platforms
 
@@ -12,12 +12,9 @@ please open an issue or submit a pull request.
 
 ## Installation
 
-If you're running MacOS on arm64, download the latest release .pkg
-installer from the [releases
-page](https://github.com/jfhamlin/muscrat/releases).
-
-Otherwise, clone the repository and run the following command when in
+Clone the repository and run the following command when in
 the nix shell for the project:
+
 ```shell
 make
 ```
