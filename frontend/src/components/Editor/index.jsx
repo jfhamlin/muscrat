@@ -57,6 +57,27 @@ export default (props) => {
         console.log(err);
       });
     });
+
+    // add a key binding for cmd+n
+    editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyN, () => {
+      const DEFAULT_CONTENT = `(ns user
+  (:use [mrat.core]))`;
+      buffersStore.updateBuffer(null, DEFAULT_CONTENT, true);
+      buffersStore.selectBuffer(null);
+    });
+
+    // add a key binding for cmd+o
+    editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyO, () => {
+      OpenFileDialog().then((response) => {
+        const buffer = {
+          fileName: response.FileName,
+          content: response.Content,
+        };
+        buffersStore.addBuffer(buffer);
+      }).catch((err) => {
+        console.log(err);
+      });
+    });
   };
 
   const handleEditorChange = (value, event) => {
@@ -66,10 +87,7 @@ export default (props) => {
   const editorContainerRef = useCallback((container) => {
     if (!container) return;
 
-    console.log("editorContainerRef", container);
-
     const resizeObserver = new ResizeObserver(() => {
-      console.log("resize");
       if (!container || !editor) {
         return;
       }

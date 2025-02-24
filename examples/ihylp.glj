@@ -28,7 +28,7 @@
 
 (defn synth
   [rate note]
-  (let [osc (sin (mtof note) :duty duty)
+  (let [osc (tri (mtof note) :duty duty)
         trig (impulse rate :iphase (.Float64 mrand))
         amp (env trig [0 1 1 0] [0.01 0.02 0.1] :curve [-5 0 5])]
     (swap! synth-trigs assoc (keyword (str "trig" (count @synth-trigs))) trig)

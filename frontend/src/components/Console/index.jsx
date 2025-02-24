@@ -6,7 +6,9 @@ import {
 
 import { Events } from "@wailsio/runtime";
 
-import Heading from '../Heading';
+import {
+  Trash2 as TrashIcon,
+} from 'lucide-react';
 
 const ErrorIcon = () => {
   return (
@@ -76,12 +78,10 @@ const Event = ({ event, count }) => {
   );
 };
 
-const ClearButton = ({ onClick, color = 'currentColor', size = 18 }) => {
+const ClearButton = ({ onClick, color = 'currentColor', size = 16 }) => {
   return (
-    <button className={`text-${color}`} onClick={onClick} title="Clear console" style={{color: color}}>
-      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke={color} width={size} height={size}>
-        <path strokeLinecap="round" strokeLinejoin="round" d="m9.75 9.75 4.5 4.5m0-4.5-4.5 4.5M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
-      </svg>
+    <button className='text-gray-200' onClick={onClick} title="Clear console">
+      <TrashIcon size={size} />
     </button>
   );
 };
@@ -114,7 +114,7 @@ export default () => {
 
   return (
     <div className="flex flex-col h-full flex-grow">
-      <div className="flex items-center justify-between">
+      <div className="px-1 pb-2 flex items-center justify-end border-b border-gray-600/25">
         <ClearButton onClick={() => setEvents([])} />
       </div>
       <div ref={ref} className="flex-grow overflow-auto">

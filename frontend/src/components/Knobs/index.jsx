@@ -3,8 +3,9 @@ import {
   useEffect,
 } from 'react';
 
-import { Knob as PRKnob } from 'primereact/knob';
-import { InputNumber } from 'primereact/inputnumber';
+import PRKnob from '../Knob';
+
+import { Link } from 'lucide-react';
 
 import {
   GetKnobs,
@@ -30,6 +31,10 @@ const Knob = ({ knob }) => {
   }
 
   const subscribeMidi = () => {
+    if (midiSub) {
+      setMidiSub(null);
+      return;
+    }
     // wait for midi message
     setMidiSub({waiting: true});
   }
@@ -83,35 +88,20 @@ const Knob = ({ knob }) => {
 
   // label is centered
   return (
-    <div className="border border-primary p-2 m-2 noscroll overflow-hidden select-none">
-      <h2 className="font-bold text-center text-black">
-        {knob.name}
-      </h2>
-      <PRKnob value={value}
+    <div className="noscroll overflow-hidden select-none relative">
+      <PRKnob label={knob.name}
+              value={value}
               min={knob.min}
               max={knob.max}
               step={knob.step ?? 0.1}
               size={80}
-              onChange={(e) => knobValueChange(e.value)} />
-      <div className="w-20">
-        <InputNumber value={value}
-                     min={knob.min}
-                     max={knob.max}
-                     step={knob.step ?? 0.1}
-                     maxFractionDigits={4}
-                     onValueChange={(e) => knobValueChange(e.value)} />
-      </div>
-      <button className={"bg-primary p-1 m-1" +
+              onChange={(val) => knobValueChange(val)} />
+      <button className={"absolute -top-2 -left-2 bg-primary p-1 m-1" +
                           (midiSub?.waiting ? " animate-pulse" : "") +
-                          (midiSub ? " text-red-500" : " text-white")}
+                          (midiSub ? " text-accent-primary" : " text-accent-primary/25")}
               onClick={subscribeMidi}>
-        MIDI
+        <Link size={14} />
       </button>
-      {/* if midi is connected, show X button to disconnect */}
-      {midiSub ? <button className="bg-primary text-white p-1 m-1"
-                         onClick={() => setMidiSub(null)}>
-        X
-      </button> : null}
     </div>
   )
 }
@@ -144,10 +134,10 @@ export default () => {
   }, []);
 
   return (
-    <div className="mx-2 my-2 overflow-hidden w-full h-full select-none">
-      <div className="mt-5 overflow-auto">
+    <div className="mt-2 overflow-hidden w-full h-full select-none">
+      <div className="overflow-auto">
         {knobs.length === 0 ? null :
-         <div className="flex flex-wrap justify-center">
+         <div className="flex flex-wrap gap-2">
            {knobs.map((knob) => (
              <Knob key={knob.id} knob={knob} />
            ))}

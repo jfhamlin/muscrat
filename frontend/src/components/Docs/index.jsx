@@ -139,9 +139,9 @@ export default () => {
   return (
     // outer div has fixed height, inner divs scroll
     <div className="pb-4 mx-2 h-full overflow-hidden mb-2 text-gray-200">
-      <div className="flex overflow-hidden h-full">
+      <div className="flex overflow-y-hidden h-full">
         {/* each child scrolls separately */}
-        <div className="w-100 overflow-y-auto">
+        <div className="min-w-100 w-50 overflow-y-auto">
           <Directory symbols={symbols}
                      selectedItemName={selectedSymbol ? selectedSymbol.name : null}
                      selectItem={setSelectedSymbol} />

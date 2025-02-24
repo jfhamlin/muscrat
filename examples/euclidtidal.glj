@@ -12,8 +12,8 @@
 (rhythm :kick (euclid 7 11))
 (rhythm :hat  (euclid 9 11))
 (rhythm :pop (euclid 6 11))
-(rhythm :glitch (euclid 8 11))
+(rhythm :glitch (euclid 4 11))
 
 (play (-> (sin (mtof (noise-quad 32 :mul 4 :add 70)) :duty 0.9)
-          (* 0)
+          (* (knob "squiggle" 0 0 1))
           (bpf (knob "bpf" 500 100 5000) 0.2)))

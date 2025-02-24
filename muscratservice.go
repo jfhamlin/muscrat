@@ -26,7 +26,6 @@ type (
 		channelBuffers [][]float64
 
 		hydraWindow *application.WebviewWindow
-		knobsWindow *application.WebviewWindow
 
 		windowMtx sync.Mutex
 
@@ -87,8 +86,9 @@ func (a *MuscratService) startup(app *application.App) {
 				maxVal := 0.0
 				for _, v := range a.channelBuffers[i] {
 					sum += v * v
-					if v > maxVal {
-						maxVal = v
+					absV := math.Abs(v)
+					if absV > maxVal {
+						maxVal = absV
 					}
 				}
 				rms[i] = math.Sqrt(sum / float64(len(a.channelBuffers[i])))
@@ -108,8 +108,6 @@ func (a *MuscratService) startup(app *application.App) {
 	pubsub.Subscribe(ugen.KnobsChangedEvent, func(event string, data any) {
 		a.windowMtx.Lock()
 		defer a.windowMtx.Unlock()
-
-		a.updateKnobsWindow()
 
 		// send the new knobs to the UI
 		go func() {
@@ -241,41 +239,6 @@ func (a *MuscratService) GetNSPublics() []mrat.Symbol {
 
 func (a *MuscratService) GetKnobs() []*ugen.Knob {
 	return ugen.GetKnobs()
-}
-
-func (a *MuscratService) updateKnobsWindow() {
-	knobs := ugen.GetKnobs()
-	if len(knobs) == 0 {
-		if a.knobsWindow != nil {
-			a.knobsWindow.Close()
-			a.knobsWindow = nil
-		}
-		return
-	}
-	if a.knobsWindow != nil {
-		return
-	}
-
-	a.knobsWindow = a.app.NewWebviewWindowWithOptions(application.WebviewWindowOptions{
-		Title: "muscrat - knobs",
-		Mac: application.MacWindow{
-			InvisibleTitleBarHeight: 50,
-			Backdrop:                application.MacBackdropTranslucent,
-			TitleBar:                application.MacTitleBarHiddenInset,
-		},
-		BackgroundColour: application.NewRGB(27, 38, 54),
-		URL:              "/knobs",
-		Width:            300,
-		Height:           600,
-		MinWidth:         300,
-		MinHeight:        300,
-	})
-	a.knobsWindow.RegisterHook(events.Common.WindowClosing, func(e *application.WindowEvent) {
-		a.windowMtx.Lock()
-		defer a.windowMtx.Unlock()
-
-		a.knobsWindow = nil
-	})
 }
 
 func (a *MuscratService) ToggleHydraWindow() {

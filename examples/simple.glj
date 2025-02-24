@@ -1,0 +1,7 @@
+(ns user
+  (:use [mrat.core]))
+
+
+(-> (saw 800 :mul (knob "vol" 0.5 0 2))
+    tanh
+    play)

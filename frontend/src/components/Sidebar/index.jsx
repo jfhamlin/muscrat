@@ -14,7 +14,9 @@ import VolumeMeter from "../VolumeMeter";
 import Spectrogram from "../Spectrogram";
 import Console from "../Console";
 import Timer from "../Timer";
+import Knobs from "../Knobs";
 import TabBar from "../TabBar";
+import Toolbar from "../Toolbar";
 
 import logo from '../../assets/images/muscrat.svg';
 
@@ -167,11 +169,17 @@ export default () => {
   const [selectedTab, setSelectedTab] = useState("params");
 
   return (
-    <div className="ml-2 mr-5 pt-[6px]">
-      <TabBar options={["params", "graph"]}
-              selected={selectedTab}
-              onSelect={setSelectedTab} />
-      {selectedTab === "params" && <Knob label="cutoff" size={80} value={12} min={0} max={1} />}
+    <div className="ml-2 mr-5 pt-[6px] h-full flex flex-col justify-between">
+      <div>
+        <TabBar options={["params", "graph"]}
+                selected={selectedTab}
+                onSelect={setSelectedTab} />
+        {selectedTab === "params" && <Knobs />}
+      </div>
+      <div className="flex mt-2 mb-5 pt-2 border-t border-gray-300/25">
+        <VolumeMeter />
+        <Toolbar />
+      </div>
     </div>
   );
 };

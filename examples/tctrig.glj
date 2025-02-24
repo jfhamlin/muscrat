@@ -19,14 +19,14 @@
 (play (-> (smp [:HAT "1"] :trigger hat-trig :mul 0.2)))
 
 (def clap-trig (tctrig '(_ _ (_ 1) _)))
-(play (-> (smp [:CLAP "15"] :trigger clap-trig :rate 1.25)))
+(play (-> (smp [:CLAP "20"] :trigger clap-trig :rate 1.25)))
 
 (let [[note trig] (tcvals [[C2 C2] [C2 '_ C2] ['_ Db2] Bb1])
       freq (mtof note)
       amp (env-perc trig [0.01 0.1])
       locut (* 2 freq)
       hicut (* 8 freq)
-      cutoff (env trig [locut hicut locut] [0.03 0.17])]
+      cutoff (env trig [locut hicut locut] [0.01 0.17] :curve [-2 2])]
   (-> (+ (tri freq :mul 0.8)
          (saw freq :mul 0.2))
       (* amp)
