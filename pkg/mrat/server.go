@@ -54,6 +54,9 @@ type (
 		gain       float64
 		targetGain float64
 
+		// if true, audio is played to the system audio output
+		playAudio bool
+
 		runner *graph.Runner
 
 		// channel for raw, unprocessed output samples.
@@ -80,12 +83,13 @@ func NewServer() *Server {
 	}
 }
 
-func (s *Server) Start(ctx context.Context) error {
+func (s *Server) Start(ctx context.Context, noSystemAudio bool) error {
 	s.mtx.Lock()
 	defer s.mtx.Unlock()
 	if s.started {
 		return fmt.Errorf("server already started")
 	}
+
 	s.started = true
 	s.ctx = ctx
 	s.runner = graph.NewRunner(ctx,
@@ -93,10 +97,15 @@ func (s *Server) Start(ctx context.Context) error {
 			SampleRateHz: conf.SampleRate,
 		}, s.outputChannel)
 
-	if err := audio.Open(); err != nil {
-		return err
+	if !noSystemAudio {
+		s.playAudio = true
+		if err := audio.Open(); err != nil {
+			return err
+		}
+		s.sampleRate = audio.SampleRate()
+	} else {
+		s.sampleRate = conf.SampleRate
 	}
-	s.sampleRate = audio.SampleRate()
 
 	go s.runner.Run(ctx)
 	go s.sendSamples()
@@ -152,7 +161,7 @@ func (s *Server) PlayGraph(g *graph.Graph) {
 }
 
 func (s *Server) sendSamples() {
-	timePerBuf := time.Duration(conf.BufferSize) * time.Second / time.Duration(audio.SampleRate())
+	timePerBuf := time.Duration(conf.BufferSize) * time.Second / time.Duration(s.sampleRate)
 	for {
 		start := time.Now()
 		channelSamples := <-s.outputChannel
@@ -178,7 +187,7 @@ func (s *Server) sendSamples() {
 		}
 
 		// send samples to audio output
-		{
+		if s.playAudio {
 			out := bufferpool.Get(2 * len(channelSamples[0]))
 			for i := range channelSamples[0] {
 				(*out)[i*2] = channelSamples[0][i]
