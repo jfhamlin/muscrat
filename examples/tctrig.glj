@@ -5,7 +5,7 @@
 
 (setcps! (/ (knob "bpm" 138 50 250 1) 60 4))
 
-(def kick-trig (tctrig '[1 1 1 1]))
+(def kick-trig (tctrig '[1 1 1 [1 1]]))
 (play (-> (smp [:BASE "12"]
                     :trigger kick-trig
                     :rate 1

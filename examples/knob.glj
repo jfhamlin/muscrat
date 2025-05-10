@@ -65,7 +65,7 @@
 (def notes2-seq (mtof (step notes2-pat notes2)))
 (def lead2 (-> (fm-synth op-conf2 notes2-pat notes2-seq)
                (* 0.3)
-               (rhpf (knob "lead2 hp cutoff" 100 20 135 :xform mtof))
+               (rhpf (knob "lead2 hp cutoff" 135 20 135 :xform mtof))
                (combc 1 0.15 3)
                (* (- 1 (amplitude kick)))
                limiter))

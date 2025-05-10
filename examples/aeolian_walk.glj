@@ -7,7 +7,7 @@
 
 (defn synth
   [gate freq]
-  (sqr (* freq (semitones (* 0.1 (noise-quad 8)))) :duty 0.1))
+  (sqr (* freq (semitones (* 0.1 (noise-quad 8)))) :duty 0.3))
 
 (play (let [gate (noise 16)
             freq (choose gate notes)

@@ -12,7 +12,7 @@
 (def delay-filter
   (-> feedback
       (delayc 0.5 (step metro [0.0001 0.002 0.001 0.01 0.0015 0.0019]))
-      (lores 400 0)
+      (lores (knob "cutoff" 400 100 2000) 0)
       (* 0.98)))
 
 (pipeset! feedback (+ burst delay-filter))
@@ -21,4 +21,4 @@
           (* 0.2)
           tanh
           (rlpf 500 0.2)
-          limiter))
+          (limiter 0.99)))

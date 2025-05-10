@@ -8,7 +8,7 @@
 (def dynamics-in (midi-in "dynamics" :cc :controller 74 :default 0.5))
 (def dynamics-db (dbamp (- (* 40 (- 1.0 dynamics-in)))))
 
-(def room-size (midi-in "room-size" :cc :controller 71 :default 0.0))
+(def room-size (midi-in "room-size" :cc :controller 71 :default 0.5))
 
 ;; transcription of scriabin's Four Preludes, Op. 22, No. 1
 (def score
