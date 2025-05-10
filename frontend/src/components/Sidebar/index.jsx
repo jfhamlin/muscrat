@@ -16,7 +16,6 @@ import Console from "../Console";
 import Timer from "../Timer";
 import Knobs from "../Knobs";
 import TabBar from "../TabBar";
-import Toolbar from "../Toolbar";
 
 import logo from '../../assets/images/muscrat.svg';
 
@@ -178,7 +177,6 @@ export default () => {
       </div>
       <div className="flex mt-2 mb-5 pt-2 border-t border-gray-300/25">
         <VolumeMeter />
-        <Toolbar />
       </div>
     </div>
   );

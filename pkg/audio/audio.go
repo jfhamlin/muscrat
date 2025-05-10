@@ -1,6 +1,7 @@
 package audio
 
 import (
+	"fmt"
 	"sync"
 
 	"github.com/jfhamlin/muscrat/pkg/conf"
@@ -72,6 +73,11 @@ func QueueAudioFloat64(fbuf []float64) error {
 			val = -safetyClipThreshold
 		}
 		buf[i] = float32(val)
+		// if not finite, set to 0
+		if val != val {
+			buf[i] = 0
+			fmt.Printf("audio: non-finite value %v, setting to 0\n", val)
+		}
 	}
 
 	myCtx.input <- buf
