@@ -5,7 +5,10 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"math"
 	"os"
+	"sort"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -15,11 +18,9 @@ import (
 )
 
 func main() {
-	// ---- CLI flags ----------------------------------------------------------
-	var (
-		duration = flag.Int("duration", 10, "How long to run the script (seconds)")
-	)
-	flag.IntVar(duration, "d", 10, "Alias for -duration")
+	// ---------------------------------------------------------------- CLI ----
+	var durSec = flag.Int("duration", 10, "How long to run the script (seconds)")
+	flag.IntVar(durSec, "d", 10, "Alias for -duration")
 	flag.Parse()
 
 	if flag.NArg() < 1 {
@@ -29,25 +30,38 @@ func main() {
 	}
 	scriptFile := flag.Arg(0)
 
-	// ---- Start muscrat DSP server ------------------------------------------
+	// -------------------------------------------------------- start server ----
 	srv := mrat.NewServer()
-	srv.Start(context.Background(), true)
+	srv.Start(context.Background(), false)
 
-	// ---- Subscribe to sample stream & count samples ------------------------
-	var totalSamples uint64 // counts *all* channel samples seen
+	// --------------------------------------------------- counters & latency ---
+	var (
+		totalSamples uint64 // first-channel samples only
+		lastTS       time.Time
+		latencies    []float64 // seconds between buffers
+		latMtx       sync.Mutex
+	)
 
 	pubsub.Subscribe("samples", func(_ string, data any) {
 		s, ok := data.([][]float64)
-		if !ok {
+		if !ok || len(s) == 0 {
 			return
 		}
-		var n uint64
-		ch := s[0]
-		n += uint64(len(ch))
-		atomic.AddUint64(&totalSamples, n)
+
+		// 1) sample count (first channel only)
+		atomic.AddUint64(&totalSamples, uint64(len(s[0])))
+
+		// 2) latency stats
+		now := time.Now()
+		latMtx.Lock()
+		if !lastTS.IsZero() {
+			latencies = append(latencies, now.Sub(lastTS).Seconds())
+		}
+		lastTS = now
+		latMtx.Unlock()
 	})
 
-	// ---- Evaluate the script -----------------------------------------------
+	// ---------------------------------------------- evaluate + run duration ---
 	ctx, cancel := context.WithCancel(context.Background())
 	go func() {
 		if err := mrat.WatchScriptFile(ctx, scriptFile, srv); err != nil {
@@ -55,22 +69,53 @@ func main() {
 		}
 	}()
 
-	// ---- Run for the requested duration ------------------------------------
-	time.Sleep(time.Duration(*duration) * time.Second)
-	cancel() // stop the watcher / playback
+	time.Sleep(time.Duration(*durSec) * time.Second)
+	cancel()
 
-	// ---- Print statistics ---------------------------------------------------
-	elapsed := float64(*duration)
+	// ----------------------------------------------------- sample statistics --
+	elapsed := float64(*durSec)
 	samples := atomic.LoadUint64(&totalSamples)
-	avgPerSec := samples / uint64(elapsed)
+	fmt.Printf("Ran %.0fs (%.0f Hz nominal)\n", elapsed, float64(conf.SampleRate))
+	fmt.Printf("Total samples (ch-0): %d  |  Average/s: %d\n\n",
+		samples, samples/uint64(elapsed))
 
-	fmt.Printf(
-		"Ran %.0fs (%.0f Hz nominal)\n"+
-			"Total samples  : %d\n"+
-			"Average / sec  : %d\n",
-		elapsed,
-		float64(conf.SampleRate),
-		samples,
-		avgPerSec,
-	)
+	// ----------------------------------------------------- latency statistics --
+	latMtx.Lock()
+	lats := append([]float64(nil), latencies...) // copy under lock
+	latMtx.Unlock()
+
+	if len(lats) == 0 {
+		fmt.Println("No latency data recorded.")
+		return
+	}
+
+	sort.Float64s(lats)
+	sum := 0.0
+	for _, v := range lats {
+		sum += v
+	}
+	n := float64(len(lats))
+	quantile := func(p float64) float64 {
+		if n == 1 {
+			return lats[0]
+		}
+		idx := p * (n - 1)
+		lo := int(math.Floor(idx))
+		hi := int(math.Ceil(idx))
+		if lo == hi {
+			return lats[lo]
+		}
+		frac := idx - float64(lo)
+		return lats[lo]*(1-frac) + lats[hi]*frac
+	}
+
+	nominalLatency := float64(conf.BufferSize) / float64(conf.SampleRate)
+	fmt.Println("Latency between successive buffers (ms):")
+	fmt.Printf("  nominal: %.2f\n", nominalLatency*1000)
+	fmt.Printf("  min : %.2f\n", lats[0]*1000)
+	fmt.Printf("  p25 : %.2f\n", quantile(0.25)*1000)
+	fmt.Printf("  p50 : %.2f\n", quantile(0.50)*1000)
+	fmt.Printf("  p75 : %.2f\n", quantile(0.75)*1000)
+	fmt.Printf("  max : %.2f\n", lats[len(lats)-1]*1000)
+	fmt.Printf("  mean: %.2f\n", sum/n*1000)
 }

@@ -28,7 +28,7 @@ import (
 const (
 	float32SizeInBytes = 4
 
-	bufferCount = 8
+	bufferCount = 16
 
 	noErr = 0
 )
@@ -164,18 +164,20 @@ func (c *context) loop() {
 }
 
 func (c *context) fillBuffer() {
+	// --- take a free buffer quickly
 	c.cond.L.Lock()
-	defer c.cond.L.Unlock()
+	n := len(c.unqueuedBuffers) - 1
+	buf := c.unqueuedBuffers[n]
+	c.unqueuedBuffers = c.unqueuedBuffers[:n]
+	c.cond.L.Unlock() // <-- release before anything slow
 
-	buf := c.unqueuedBuffers[len(c.unqueuedBuffers)-1]
-	c.unqueuedBuffers = c.unqueuedBuffers[:len(c.unqueuedBuffers)-1]
+	inBuf := <-c.input // can block safely now
 
-	inBuf := <-c.input
 	if len(inBuf) != int(buf.mAudioDataByteSize/float32SizeInBytes) {
-		panic(fmt.Errorf("unexpected input size: %d != %d", len(c.lastInput), buf.mAudioDataByteSize/float32SizeInBytes))
+		panic(fmt.Errorf("unexpected input size"))
 	}
 
-	copy(unsafe.Slice((*float32)(unsafe.Pointer(buf.mAudioData)), buf.mAudioDataByteSize/float32SizeInBytes), inBuf)
+	copy(unsafe.Slice((*float32)(unsafe.Pointer(buf.mAudioData)), len(inBuf)), inBuf)
 
 	pool.Put(inBuf)
 

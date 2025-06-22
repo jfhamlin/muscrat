@@ -51,7 +51,7 @@ func NewMuscratService() *MuscratService {
 func (a *MuscratService) startup(app *application.App) {
 	a.app = app
 
-	a.srv.Start(context.Background())
+	a.srv.Start(context.Background(), false)
 
 	// send at ~15 times per second, in multiples of conf.BufferSize
 	maxBuffersSamples := conf.SampleRate / 15
