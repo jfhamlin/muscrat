@@ -58,7 +58,8 @@
                                                     NewDelay
                                                     NewAllPass
                                                     NewWaveFolder
-                                                    NewClip)
+                                                    NewClip
+                                                    NewPitchShift)
            (github.com$jfhamlin$muscrat$pkg$sampler NewSampler
                                                     LoadSample)
            (github.com$jfhamlin$muscrat$pkg$aio NewInputDevice
@@ -1122,6 +1123,31 @@
              :in-edges {:in in
                         :rate rate
                         :bits bits}))
+
+(defugen pitch-shift
+  "Pitch shift an input signal using granular synthesis.
+  
+  The effect shifts the pitch of the input signal by the given ratio.
+  A ratio of 2.0 shifts up an octave, 0.5 shifts down an octave.
+  
+  Uses overlapping grains with triangular windows (based on SuperCollider's
+  PitchShift). The window-size parameter controls the grain size in seconds.
+  Smaller windows (0.01-0.05) give lower latency but may have artifacts.
+  Larger windows (0.05-0.2) give better quality but higher latency.
+  
+  The pitch-dispersion and time-dispersion parameters add randomness
+  for chorus-like effects. Values from 0-1, where 0 is no dispersion."
+  [in 0 "The input signal to pitch shift."
+   pitch-ratio 1.0 "Pitch shift ratio (0-4.0). 1.0 = no shift, 2.0 = up octave, 0.5 = down octave."
+   window-size 0.1 "Grain window size in seconds (minimum 3 samples)."
+   pitch-dispersion 0.0 "Random pitch variation (0-1) for chorus effects."
+   time-dispersion 0.0 "Random time variation (0-1) for smearing effects."]
+  (add-node! :pitch-shift NewPitchShift
+             :in-edges {:in in
+                        :pitchRatio pitch-ratio
+                        :windowSize window-size
+                        :pitchDispersion pitch-dispersion
+                        :timeDispersion time-dispersion}))
 
 (docgroup "Distortion")
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

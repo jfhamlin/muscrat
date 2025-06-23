@@ -88,6 +88,7 @@ func RegisterImports(_register func(string, interface{})) {
 	_register("github.com/jfhamlin/muscrat/pkg/effects.NewLoShelf", github_com_jfhamlin_muscrat_pkg_effects.NewLoShelf)
 	_register("github.com/jfhamlin/muscrat/pkg/effects.NewLowpassFilter", github_com_jfhamlin_muscrat_pkg_effects.NewLowpassFilter)
 	_register("github.com/jfhamlin/muscrat/pkg/effects.NewPeakEQ", github_com_jfhamlin_muscrat_pkg_effects.NewPeakEQ)
+	_register("github.com/jfhamlin/muscrat/pkg/effects.NewPitchShift", github_com_jfhamlin_muscrat_pkg_effects.NewPitchShift)
 	_register("github.com/jfhamlin/muscrat/pkg/effects.NewRHPF", github_com_jfhamlin_muscrat_pkg_effects.NewRHPF)
 	_register("github.com/jfhamlin/muscrat/pkg/effects.NewRLPF", github_com_jfhamlin_muscrat_pkg_effects.NewRLPF)
 	_register("github.com/jfhamlin/muscrat/pkg/effects.NewTapeDelay", github_com_jfhamlin_muscrat_pkg_effects.NewTapeDelay)
