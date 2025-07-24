@@ -141,6 +141,18 @@ func (a *MuscratService) startup(app *application.App) {
 		go app.EmitEvent("scopes-changed", data)
 	})
 
+	// Handle trigger level changes from frontend
+	app.OnEvent("scope.setTriggerLevel", func(evt *application.CustomEvent) {
+		data := evt.Data.([]any)
+		id := data[0].(string)
+		level := data[1].(float64)
+		update := ugen.TriggerUpdate{
+			ID:    id,
+			Level: level,
+		}
+		pubsub.Publish(ugen.ScopeTriggerChangeEvent, update)
+	})
+
 	pubsub.Subscribe("", func(event string, data any) {
 		switch event {
 		case "samples", ugen.KnobsChangedEvent, "console.log", "knob-value-change", "scope.data", "scopes-changed":

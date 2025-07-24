@@ -1,7 +1,8 @@
-import React, { useRef, useEffect, useState } from 'react';
+import React, { useRef, useEffect, useState, useCallback } from 'react';
+import { Events } from '@wailsio/runtime';
 import styles from './ScopeDisplay.module.css';
 
-const ScopeDisplay = ({ samples, sampleRate, name, width = 400, height = 200 }) => {
+const ScopeDisplay = ({ id, samples, sampleRate, name, width = 400, height = 200 }) => {
   const canvasRef = useRef(null);
   const animationFrameRef = useRef(null);
   const [yScale, setYScale] = useState(1);
@@ -9,12 +10,41 @@ const ScopeDisplay = ({ samples, sampleRate, name, width = 400, height = 200 }) 
   const [triggerLevel, setTriggerLevel] = useState(0);
   const [frozen, setFrozen] = useState(false);
   const [lastSamples, setLastSamples] = useState(null);
+  const triggerTimeoutRef = useRef(null);
+  const triggerLevelTimeoutRef = useRef(null);
 
   useEffect(() => {
     if (!frozen && samples && samples.length > 0) {
       setLastSamples(samples);
     }
   }, [samples, frozen]);
+
+  // Debounced trigger level update
+  const handleTriggerLevelChange = useCallback((newLevel) => {
+    setTriggerLevel(newLevel);
+    
+    // Clear existing timeout
+    if (triggerLevelTimeoutRef.current) {
+      clearTimeout(triggerLevelTimeoutRef.current);
+    }
+    
+    // Set new timeout to emit event after 100ms of no changes
+    triggerLevelTimeoutRef.current = setTimeout(() => {
+      Events.Emit({
+        name: 'scope.setTriggerLevel',
+        data: [id, new Number(newLevel)]
+      });
+    }, 100);
+  }, [id]);
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (triggerLevelTimeoutRef.current) {
+        clearTimeout(triggerLevelTimeoutRef.current);
+      }
+    };
+  }, []);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -154,7 +184,10 @@ const ScopeDisplay = ({ samples, sampleRate, name, width = 400, height = 200 }) 
             max="1"
             step="0.01"
             value={triggerLevel}
-            onChange={(e) => setTriggerLevel(parseFloat(e.target.value))}
+            onChange={(e) => {
+              const newLevel = parseFloat(e.target.value);
+              handleTriggerLevelChange(newLevel);
+            }}
           />
           <span>{triggerLevel.toFixed(2)}</span>
         </div>

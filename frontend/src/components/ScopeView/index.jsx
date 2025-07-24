@@ -103,8 +103,7 @@ const ScopeView = () => {
             Use the <code>scope</code> function in your code to visualize signals
           </p>
           <pre className={styles.example}>
-{`(def my-osc (sin 440))
-(scope my-osc :name "Oscillator")`}
+{`(play (scope (sin 440)))`}
           </pre>
         </div>
       </div>
@@ -123,6 +122,7 @@ const ScopeView = () => {
         {scopesToDisplay.map(scope => (
           <ScopeDisplay
             key={scope.id}
+            id={scope.id}
             samples={scope.samples}
             sampleRate={scope.sampleRate}
             name={scope.name}

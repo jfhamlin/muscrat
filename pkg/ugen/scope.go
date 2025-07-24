@@ -9,6 +9,18 @@ import (
 	"github.com/jfhamlin/muscrat/pkg/pubsub"
 )
 
+// TriggerUpdate is a message sent to update a scope's trigger level
+type TriggerUpdate struct {
+	ID    string  `json:"id"`
+	Level float64 `json:"level"`
+}
+
+const (
+	// ScopeTriggerChangeEvent is the event that is sent when a scope's
+	// trigger level changes.
+	ScopeTriggerChangeEvent = "scope-trigger-change"
+)
+
 // Scope is a unit generator that passes audio through unchanged while
 // publishing sample buffers for visualization
 type Scope struct {
@@ -187,7 +199,33 @@ func publishScopeList() {
 	})
 }
 
+// SetTriggerLevel updates the trigger level for this scope
+func (s *Scope) SetTriggerLevel(level float64) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.triggerLevel = level
+}
+
 // Ensure Scope implements required interfaces
 var _ UGen = (*Scope)(nil)
 var _ Starter = (*Scope)(nil)
 var _ Stopper = (*Scope)(nil)
+
+// init sets up pubsub listeners
+func init() {
+	// Subscribe to trigger level updates from frontend
+	pubsub.Subscribe(ScopeTriggerChangeEvent, func(event string, data interface{}) {
+		update, ok := data.(TriggerUpdate)
+		if !ok {
+			return
+		}
+		
+		scopeRegistryMu.RLock()
+		scope, exists := scopeRegistry[update.ID]
+		scopeRegistryMu.RUnlock()
+		
+		if exists {
+			scope.SetTriggerLevel(update.Level)
+		}
+	})
+}
