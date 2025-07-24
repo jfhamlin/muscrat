@@ -30,6 +30,15 @@ type (
 		windowMtx sync.Mutex
 
 		playMtx sync.Mutex
+
+		// Volume metering state
+		volumeMeterMtx      sync.Mutex
+		fastRMSBuffers      [][]float64
+		slowRMSBuffers      [][]float64
+		currentRMS          []float64
+		currentPeak         []float64
+		smoothedRMS         []float64
+		smoothedPeak        []float64
 	}
 
 	OpenFileDialogResponse struct {
@@ -58,18 +67,54 @@ func (a *MuscratService) startup(app *application.App) {
 	// round to nearest multiple of conf.BufferSize
 	maxBuffersSamples = (maxBuffersSamples/conf.BufferSize + 1) * conf.BufferSize
 
+	// Time constants for dual RMS windows
+	fastWindowSamples := int(float64(conf.SampleRate) * 0.020) // 20ms fast window
+	slowWindowSamples := int(float64(conf.SampleRate) * 0.300) // 300ms slow window
+
+	// Ballistics constants (at ~15Hz update rate)
+	// Attack: 0.95 means ~3 updates to reach 95% (200ms at 15Hz)
+	// Release: 0.25 means ~12 updates to decay to 5% (800ms at 15Hz)
+	attackRate := 0.95  // Fast attack
+	releaseRate := 0.25 // Moderate release for better responsiveness
+
 	pubsub.Subscribe("samples", func(event string, data any) {
 		samples, ok := data.([][]float64)
 		if !ok {
 			return
 		}
 
+		a.volumeMeterMtx.Lock()
+		defer a.volumeMeterMtx.Unlock()
+
+		// Initialize buffers if needed
 		if len(a.channelBuffers) != len(samples) {
 			a.channelBuffers = make([][]float64, len(samples))
+			a.fastRMSBuffers = make([][]float64, len(samples))
+			a.slowRMSBuffers = make([][]float64, len(samples))
+			a.currentRMS = make([]float64, len(samples))
+			a.currentPeak = make([]float64, len(samples))
+			a.smoothedRMS = make([]float64, len(samples))
+			a.smoothedPeak = make([]float64, len(samples))
 		}
+
+		// Append new samples to all buffers
 		for i := range samples {
 			a.channelBuffers[i] = append(a.channelBuffers[i], samples[i]...)
+			a.fastRMSBuffers[i] = append(a.fastRMSBuffers[i], samples[i]...)
+			a.slowRMSBuffers[i] = append(a.slowRMSBuffers[i], samples[i]...)
+
+			// Trim fast buffer to window size
+			if len(a.fastRMSBuffers[i]) > fastWindowSamples {
+				a.fastRMSBuffers[i] = a.fastRMSBuffers[i][len(a.fastRMSBuffers[i])-fastWindowSamples:]
+			}
+
+			// Trim slow buffer to window size
+			if len(a.slowRMSBuffers[i]) > slowWindowSamples {
+				a.slowRMSBuffers[i] = a.slowRMSBuffers[i][len(a.slowRMSBuffers[i])-slowWindowSamples:]
+			}
 		}
+
+		// Process when we have enough samples
 		if len(a.channelBuffers[0]) >= maxBuffersSamples {
 			cpy := make([][]float64, len(a.channelBuffers))
 			for i := range a.channelBuffers {
@@ -78,27 +123,86 @@ func (a *MuscratService) startup(app *application.App) {
 			}
 			go app.EmitEvent("samples", cpy)
 
-			// publish RMS and max values for each channel
+			// Calculate RMS and peak values with improvements
 			rms := make([]float64, len(a.channelBuffers))
-			max := make([]float64, len(a.channelBuffers))
+			peak := make([]float64, len(a.channelBuffers))
+			rmsDB := make([]float64, len(a.channelBuffers))
+			peakDB := make([]float64, len(a.channelBuffers))
+
 			for i := range a.channelBuffers {
-				sum := 0.0
+				// Calculate fast RMS
+				fastSum := 0.0
+				for _, v := range a.fastRMSBuffers[i] {
+					fastSum += v * v
+				}
+				fastRMS := math.Sqrt(fastSum / float64(len(a.fastRMSBuffers[i])))
+
+				// Calculate slow RMS
+				slowSum := 0.0
+				for _, v := range a.slowRMSBuffers[i] {
+					slowSum += v * v
+				}
+				slowRMS := math.Sqrt(slowSum / float64(len(a.slowRMSBuffers[i])))
+
+				// Use the maximum of fast and slow RMS
+				a.currentRMS[i] = math.Max(fastRMS, slowRMS)
+
+				// Find peak in current buffer
 				maxVal := 0.0
 				for _, v := range a.channelBuffers[i] {
-					sum += v * v
 					absV := math.Abs(v)
 					if absV > maxVal {
 						maxVal = absV
 					}
 				}
-				rms[i] = math.Sqrt(sum / float64(len(a.channelBuffers[i])))
-				max[i] = maxVal
+				a.currentPeak[i] = maxVal
+
+				// Apply ballistics
+				if a.currentRMS[i] > a.smoothedRMS[i] {
+					// Fast attack
+					a.smoothedRMS[i] += (a.currentRMS[i] - a.smoothedRMS[i]) * attackRate
+				} else {
+					// Slow release
+					a.smoothedRMS[i] += (a.currentRMS[i] - a.smoothedRMS[i]) * releaseRate
+				}
+
+				if a.currentPeak[i] > a.smoothedPeak[i] {
+					// Instant attack for peaks
+					a.smoothedPeak[i] = a.currentPeak[i]
+				} else {
+					// Slow decay for peaks
+					a.smoothedPeak[i] += (a.currentPeak[i] - a.smoothedPeak[i]) * releaseRate
+				}
+
+				// Store linear values for compatibility
+				rms[i] = a.smoothedRMS[i]
+				peak[i] = a.smoothedPeak[i]
+
+				// Convert to dB (with -60dB floor)
+				const minDB = -60.0
+				if a.smoothedRMS[i] > 0 {
+					rmsDB[i] = 20 * math.Log10(a.smoothedRMS[i])
+					rmsDB[i] = math.Max(rmsDB[i], minDB)
+				} else {
+					rmsDB[i] = minDB
+				}
+
+				if a.smoothedPeak[i] > 0 {
+					peakDB[i] = 20 * math.Log10(a.smoothedPeak[i])
+					peakDB[i] = math.Max(peakDB[i], minDB)
+				} else {
+					peakDB[i] = minDB
+				}
 			}
+
 			go app.EmitEvent("volume", map[string]any{
-				"rms":  rms,
-				"peak": max,
+				"rms":    rms,
+				"peak":   peak,
+				"rmsDB":  rmsDB,
+				"peakDB": peakDB,
 			})
 
+			// Clear main buffer
 			for i := range a.channelBuffers {
 				a.channelBuffers[i] = a.channelBuffers[i][:0]
 			}

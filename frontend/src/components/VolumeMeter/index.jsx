@@ -11,14 +11,37 @@ const VolumeMeter = ({ }) => {
   const rmsMeterRefR = useRef();
   const peakMeterRefL = useRef();
   const peakMeterRefR = useRef();
+  
+  // Peak hold state
+  const peakHoldL = useRef(0);
+  const peakHoldR = useRef(0);
+  const peakHoldTimerL = useRef(null);
+  const peakHoldTimerR = useRef(null);
 
   useEffect(() => {
     const unsubscribe = Events.On('volume', (event) => {
       const data = event.data[0];
-      const [rmsL, rmsR] = data.rms;
-      const [peakL, peakR] = data.peak;
+      const [rmsL, rmsR] = data.rms || [0, 0];
+      const [peakL, peakR] = data.peak || [0, 0];
+      const [rmsDBL, rmsDBR] = data.rmsDB || [-60, -60];
+      const [peakDBL, peakDBR] = data.peakDB || [-60, -60];
 
       if (!rmsMeterRefL.current) return;
+
+      // Convert dB values to normalized 0-1 range for display
+      // -60dB to 0dB mapped to 0-1
+      const dbToNormalized = (db) => {
+        return Math.max(0, Math.min(1, (db + 60) / 60));
+      };
+
+      // Apply logarithmic curve for better visual response
+      const applyDisplayCurve = (normalized) => {
+        // Square root expands lower values for better visibility
+        return Math.pow(normalized, 0.5);
+      };
+
+      const rmsDisplayL = applyDisplayCurve(dbToNormalized(rmsDBL));
+      const rmsDisplayR = applyDisplayCurve(dbToNormalized(rmsDBR));
 
       // update the colors of children based on the volume
       // when on, upper children are red, lower are green
@@ -46,22 +69,42 @@ const VolumeMeter = ({ }) => {
         }
       }
 
-      updateColor(rmsL, rmsMeterRefL.current.children);
-      updateColor(rmsR, rmsMeterRefR.current.children);
+      updateColor(rmsDisplayL, rmsMeterRefL.current.children);
+      updateColor(rmsDisplayR, rmsMeterRefR.current.children);
 
-      if (peakL >= 1) {
-        peakMeterRefL.current.style.backgroundColor = 'red';
-      } else {
-        peakMeterRefL.current.style.backgroundColor = 'black';
-      }
+      // Peak hold logic
+      const updatePeakHold = (currentPeak, peakHoldRef, peakHoldTimerRef, peakMeterRef) => {
+        if (currentPeak >= 1) {
+          // Set peak hold
+          peakHoldRef.current = 1;
+          peakMeterRef.current.style.backgroundColor = 'red';
+          
+          // Clear existing timer
+          if (peakHoldTimerRef.current) {
+            clearTimeout(peakHoldTimerRef.current);
+          }
+          
+          // Set new timer to clear peak after 2 seconds
+          peakHoldTimerRef.current = setTimeout(() => {
+            peakHoldRef.current = 0;
+            peakMeterRef.current.style.backgroundColor = 'black';
+          }, 2000);
+        } else if (peakHoldRef.current === 0) {
+          // Only update to black if not holding
+          peakMeterRef.current.style.backgroundColor = 'black';
+        }
+      };
 
-      if (peakR >= 1) {
-        peakMeterRefR.current.style.backgroundColor = 'red';
-      } else {
-        peakMeterRefR.current.style.backgroundColor = 'black';
-      }
+      updatePeakHold(peakL, peakHoldL, peakHoldTimerL, peakMeterRefL);
+      updatePeakHold(peakR, peakHoldR, peakHoldTimerR, peakMeterRefR);
     });
-    return unsubscribe;
+    
+    // Cleanup timers on unmount
+    return () => {
+      unsubscribe();
+      if (peakHoldTimerL.current) clearTimeout(peakHoldTimerL.current);
+      if (peakHoldTimerR.current) clearTimeout(peakHoldTimerR.current);
+    };
   }, [])
 
 
