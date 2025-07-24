@@ -16,6 +16,7 @@ import Console from "../Console";
 import Timer from "../Timer";
 import Knobs from "../Knobs";
 import TabBar from "../TabBar";
+import ScopeView from "../ScopeView";
 
 import logo from '../../assets/images/muscrat.svg';
 
@@ -169,11 +170,18 @@ export default () => {
 
   return (
     <div className="ml-2 mr-5 pt-[6px] h-full flex flex-col justify-between">
-      <div>
+      <div className="flex-grow flex flex-col overflow-hidden">
         <TabBar options={["params", "graph"]}
                 selected={selectedTab}
                 onSelect={setSelectedTab} />
-        {selectedTab === "params" && <Knobs />}
+        <div className="flex-grow overflow-hidden relative">
+          <div className={`absolute inset-0 ${selectedTab === "params" ? "block" : "hidden"}`}>
+            <Knobs />
+          </div>
+          <div className={`absolute inset-0 ${selectedTab === "graph" ? "block" : "hidden"}`}>
+            <ScopeView />
+          </div>
+        </div>
       </div>
       <div className="flex mt-2 mb-5 pt-2 border-t border-gray-300/25">
         <VolumeMeter />

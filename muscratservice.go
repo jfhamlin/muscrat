@@ -131,9 +131,19 @@ func (a *MuscratService) startup(app *application.App) {
 		go app.EmitEvent("console.log", data)
 	})
 
+	// Subscribe to scope events
+	pubsub.Subscribe("scope.data", func(event string, data any) {
+		go app.EmitEvent("scope.data", data)
+	})
+
+	pubsub.Subscribe("scopes-changed", func(event string, data any) {
+		fmt.Println("scopes-changed event received", data)
+		go app.EmitEvent("scopes-changed", data)
+	})
+
 	pubsub.Subscribe("", func(event string, data any) {
 		switch event {
-		case "samples", ugen.KnobsChangedEvent, "console.log", "knob-value-change":
+		case "samples", ugen.KnobsChangedEvent, "console.log", "knob-value-change", "scope.data", "scopes-changed":
 		default:
 			app.EmitEvent(event, data)
 		}

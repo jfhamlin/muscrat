@@ -1,0 +1,47 @@
+.container {
+  width: 100%;
+  height: 100%;
+  overflow: auto;
+  background: #0a0a0a;
+  padding: 10px;
+}
+
+.grid {
+  display: grid;
+  gap: 10px;
+  width: 100%;
+  height: 100%;
+  align-content: start;
+}
+
+.empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: #666;
+  text-align: center;
+  font-size: 14px;
+}
+
+.empty p {
+  margin: 10px 0;
+}
+
+.hint {
+  color: #888;
+  font-size: 13px;
+}
+
+.example {
+  background: #1a1a1a;
+  border: 1px solid #333;
+  border-radius: 4px;
+  padding: 15px 20px;
+  margin-top: 20px;
+  color: #aaa;
+  font-family: 'Monaco', 'Consolas', monospace;
+  font-size: 12px;
+  text-align: left;
+}

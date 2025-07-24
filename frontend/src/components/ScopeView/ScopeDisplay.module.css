@@ -1,0 +1,69 @@
+.scopeDisplay {
+  background: #0a0a0a;
+  border: 1px solid #333;
+  border-radius: 4px;
+  padding: 10px;
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.canvas {
+  display: block;
+  border: 1px solid #444;
+  background: #1a1a1a;
+  image-rendering: crisp-edges;
+}
+
+.controls {
+  margin-top: 10px;
+  display: flex;
+  gap: 15px;
+  flex-wrap: wrap;
+  align-items: center;
+  font-size: 12px;
+}
+
+.controlGroup {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.controlGroup label {
+  color: #aaa;
+  font-size: 11px;
+  min-width: 60px;
+}
+
+.controlGroup input[type="range"] {
+  width: 80px;
+  height: 20px;
+}
+
+.controlGroup span {
+  color: #fff;
+  font-family: monospace;
+  font-size: 11px;
+  min-width: 40px;
+  text-align: right;
+}
+
+.freezeButton {
+  background: #333;
+  color: #fff;
+  border: 1px solid #555;
+  border-radius: 3px;
+  padding: 4px 12px;
+  cursor: pointer;
+  font-size: 11px;
+  transition: background 0.2s;
+}
+
+.freezeButton:hover {
+  background: #444;
+}
+
+.freezeButton:active {
+  background: #222;
+}
