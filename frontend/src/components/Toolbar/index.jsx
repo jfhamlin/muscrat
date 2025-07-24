@@ -2,6 +2,7 @@ import {
   OpenFileDialog,
   PlayFile,
   SaveFile,
+  SaveToTemp,
   Silence,
   ToggleHydraWindow,
 } from "../../../bindings/github.com/jfhamlin/muscrat/muscratservice";
@@ -52,10 +53,27 @@ export default (props) => {
     });
   };
 
-  const handlePlayClick = () => {
+  const handlePlayClick = async () => {
     const selectedBufferName = buffersStore.selectedBufferName;
     const buffer = buffersStore.buffers[selectedBufferName];
-    PlayFile(buffer.fileName);
+    
+    let fileToPlay = buffer.fileName;
+    
+    // If no fileName (unsaved buffer), save to temp first
+    if (!fileToPlay) {
+      try {
+        fileToPlay = await SaveToTemp(buffer.content);
+        // Update buffer with temp path for tracking
+        buffersStore.updateBuffer(selectedBufferName, buffer.content, buffer.dirty);
+        buffersStore.buffers[selectedBufferName].fileName = fileToPlay;
+        buffersStore.buffers[selectedBufferName].isTemp = true;
+      } catch (err) {
+        console.error("Failed to save to temp:", err);
+        return;
+      }
+    }
+    
+    PlayFile(fileToPlay);
   };
 
   const handleStopClick = () => {
@@ -89,7 +107,7 @@ export default (props) => {
           <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m.75 12 3 3m0 0 3-3m-3 3v-6m-1.5-9H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" />
         </Svg>
       </Button>
-      <Button disabled={!buffersStore.selectedBufferName}
+      <Button disabled={!selectedBuffer}
               onClick={handlePlayClick}
               title="Play file">
         <Svg>

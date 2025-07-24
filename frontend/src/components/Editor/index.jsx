@@ -118,7 +118,11 @@ export default (props) => {
       <div className="flex flex-col h-full">
         <div className="flex">
           <div className="text-xs text-gray-500 border-t border-r border-gray-300/25 flex-shrink min-w-[2rem] bg-background-secondary px-2 pb-1 pt-1 rounded-t">
-            {selectedBufferName ?? '<new>'}{selectedBuffer?.dirty ? "*" : ""}
+            {selectedBufferName 
+              ? (selectedBufferName.includes('/muscrat_live_') || selectedBuffer?.isTemp 
+                ? '*live*' 
+                : selectedBufferName)
+              : '<new>'}{selectedBuffer?.dirty ? "*" : ""}
           </div>
           <div className="border-b border-gray-300/25 flex-grow" />
         </div>

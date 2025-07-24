@@ -211,6 +211,21 @@ func (a *MuscratService) SaveFile(fileName string, content string) (string, erro
 	return fileName, nil
 }
 
+// SaveToTemp saves content to a temporary file. Returns the temp file path.
+func (a *MuscratService) SaveToTemp(content string) (string, error) {
+	tmpFile, err := os.CreateTemp("", "muscrat_live_*.glj")
+	if err != nil {
+		return "", err
+	}
+	defer tmpFile.Close()
+
+	if _, err := tmpFile.WriteString(content); err != nil {
+		return "", err
+	}
+
+	return tmpFile.Name(), nil
+}
+
 // PlayFile plays a file. The file is re-evaluated whenever it
 // changes.
 func (a *MuscratService) PlayFile(fileName string) error {

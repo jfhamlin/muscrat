@@ -86,6 +86,16 @@ export function SaveFile(fileName, content) {
 }
 
 /**
+ * SaveToTemp saves content to a temporary file. Returns the temp file path.
+ * @param {string} content
+ * @returns {Promise<string> & { cancel(): void }}
+ */
+export function SaveToTemp(content) {
+    let $resultPromise = /** @type {any} */($Call.ByID(3175783248, content));
+    return $resultPromise;
+}
+
+/**
  * @returns {Promise<void> & { cancel(): void }}
  */
 export function Silence() {
