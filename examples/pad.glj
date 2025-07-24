@@ -29,6 +29,8 @@
 (def ping-metro (noise 2))
 (def ping-snd (ping ping-metro (* 4 (choose ping-metro frequencies))))
 
+(defn scopeall [arr n] (map #(scope % :name n) arr))
+
 (play (-> (map #(pad % (choose % frequencies)) (repeatedly 8 #(noise 1/4)))
           sum
           (* 0.3)
@@ -40,4 +42,6 @@
           (peakeq 820 0.1 (+ -8 (noise-quad [16 16])))
           (loshelf 100 1 10)
           (* 0.3)
-          limiter))
+          (scopeall "before")
+          (limiter 0.99)
+          (scopeall "after")))

@@ -1,0 +1,24 @@
+(ns examples.trigger-test
+  (:use [mrat.core]))
+
+;; Test trigger functionality with different waveforms
+;; The trigger should stabilize the waveform display at the specified level
+
+;; Low frequency sine wave - easy to see trigger effect
+(def slow-sine (sin 2))
+(scope slow-sine :name "2Hz Sine - Trigger Test")
+
+;; Square wave - sharp transitions make trigger points clear
+(def square-wave (square 5))
+(scope square-wave :name "5Hz Square - Trigger Test")
+
+;; Sawtooth wave - linear ramp shows trigger clearly
+(def saw-wave (saw 3))
+(scope saw-wave :name "3Hz Saw - Trigger Test")
+
+;; Complex waveform - AM modulation
+(let [carrier (sin 100)
+      modulator (sin 0.5)
+      am-signal (mul carrier (add 1 (mul 0.5 modulator)))]
+  (scope am-signal :name "AM Signal - Trigger Test")
+  am-signal)

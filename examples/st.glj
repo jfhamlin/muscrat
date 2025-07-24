@@ -1,5 +1,5 @@
 (ns examples.st
-  (:require [mrat.core :refer :all] :reload))
+  (:require [mrat.core :refer :all]))
 
 (def song-dur (* 60 3))
 
@@ -81,4 +81,4 @@
         melody
         noise-bursts)))
 ;; (wavout song)
-(play song)
+(-> song scope play)

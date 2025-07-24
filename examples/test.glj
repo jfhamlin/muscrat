@@ -2,7 +2,7 @@
   (:require [mrat.core :refer :all]))
 
 (def pat (euclid 10 13))
-(def metro (impulse (* 11)))
+(def metro (impulse (* 8)))
 (def patimp (impulse-pattern metro pat))
 
 (println pat)
@@ -17,7 +17,8 @@
           tanh
           (rlpf (* 1000 (semitones (noise-quad 8 :mul 24))) 0.15)
           (combc 0.5 0.1 2)
-          (* 0.1)))
+          (* 0.1)
+          scope))
 
 (def rates (map #(* 0.4 %) (range 0.5 3 0.25)))
 (def muls (* (noise-quad 8 :mul 0.03 :add 0.08) (map #(double (/ 1 %)) (range 1 8))))

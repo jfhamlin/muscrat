@@ -53,23 +53,26 @@
 (def metro-bass (:note-clock first-voice-bass))
 
 (def attack 0.0006)
-(def release 0.1)
 (defn mkenv
   [metro dur]
-  (env metro [0 1 0.8 0] [attack (- dur attack release) release] :curve [-2 2 2]))
+  (let [release (* 0.25 dur)]
+    (env metro [0 1 0.15 0] [attack (- dur attack release) release] :curve [-2 2 2])))
 
 (def envelope (mkenv metro dur))
 (def envelope-bass (mkenv metro-bass dur-bass))
 
 (def tune
-  (let [sig (-> (saw (* root (semitones (sin 8 :mul 0.05))) :duty 0.8)
+  (let [sig (-> (saw (* root (semitones (sin 10 :mul 0.05))) :iphase [0 0.32 0.512 0.71 0.12] :mul 0.8)
+                sum
                 (lores (* root (semitones 7)) 0.8)
-                (* envelope))
+                (* envelope)
+                (scope "treble"))
         sig-bass (-> (sin (* root-bass (semitones (sin 6 :mul 0.1))) :duty 0.8)
                      (* 4)
                      tanh
                      (lores (* root-bass 3) 0.9)
-                     (* envelope-bass))]
+                     (* envelope-bass)
+                     (scope "bass"))]
     (-> (+ sig (* (dbamp -5) sig-bass))
         (* dynamics-db)
         (freeverb :room-size room-size))))

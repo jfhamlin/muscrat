@@ -9,4 +9,5 @@
           (* metro)
           (combc 2 0.018 3)
           (rlpf (* freq 8) 1)
-          (* 0.1)))
+          (* 0.1)
+          scope))

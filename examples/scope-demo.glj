@@ -1,0 +1,60 @@
+(ns examples.scope-demo
+  (:use [mrat.core]))
+
+;; Basic scope usage - visualize a simple sine wave
+(def my-osc (sin 440))
+(scope my-osc :name "440Hz Sine")
+
+;; Multiple scopes for different waveforms
+(let [sine-wave (sin 220)
+      saw-wave (saw 110)
+      square-wave (pulse 55 :duty 0.5)
+      triangle-wave (tri 330)]
+  
+  ;; Display each waveform in its own scope
+  (scope sine-wave :name "Sine 220Hz")
+  (scope saw-wave :name "Saw 110Hz")
+  (scope square-wave :name "Square 55Hz")
+  (scope triangle-wave :name "Triangle 330Hz")
+  
+  ;; Mix them all together
+  (def mixed (* 0.25 (+ sine-wave saw-wave square-wave triangle-wave)))
+  (scope mixed :name "Mixed Signal")
+  
+  ;; Play the mixed signal
+  (play mixed))
+
+;; LFO modulation example
+(let [carrier (sin 440)
+      lfo (sin 5)
+      modulated (* carrier (+ 1 (* 0.3 lfo)))]
+  
+  (scope lfo :name "LFO (5Hz)")
+  (scope carrier :name "Carrier (440Hz)")
+  (scope modulated :name "AM Modulated")
+  
+  (play (* 0.3 modulated)))
+
+;; Envelope visualization
+(let [gate (impulse 2) ; 2Hz trigger
+      env (env-adsr gate [0.01 0.1 0.7 0.2])
+      osc (sin 880)
+      sound (* env osc)]
+  
+  (scope gate :name "Gate Trigger")
+  (scope env :name "ADSR Envelope")
+  (scope sound :name "Enveloped Sound")
+  
+  (play (* 0.3 sound)))
+
+;; Filter sweep visualization
+(let [noise-source (noise)
+      lfo (sin 0.5)
+      cutoff (linexp lfo -1 1 200 2000)
+      filtered (rlpf noise-source cutoff 0.5)]
+  
+  (scope noise-source :name "White Noise" :buffer-size 4096)
+  (scope lfo :name "Filter LFO")
+  (scope filtered :name "Filtered Noise" :buffer-size 4096)
+  
+  (play (* 0.2 filtered)))

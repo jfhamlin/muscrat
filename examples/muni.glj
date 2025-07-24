@@ -8,7 +8,16 @@
                    :loop true
                    :trigger 1))
 
-(play (-> muni-snd
-          (* 0.3)
-          (hishelf 15000 :db -80)
-          (peakeq (sin 4 :mul 1000 :add 5000) 1 10)))
+(-> muni-snd
+    (* 0.3)
+    (hishelf 15000 :db -80)
+    (peakeq (sin 4 :mul 1000 :add 5000) 1 10)
+    play)
+
+(-> (tri 60 :mul 0.3 :duty (lfsin 30))
+    (* (lfpulse 0.5))
+    rlpf
+    (freeverb :room-size 0.9)
+    (* 0.7)
+    scope
+    play)

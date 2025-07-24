@@ -1,7 +1,16 @@
 (ns user
   (:use [mrat.core]))
 
+(defn lfsin [freq]
+  (sin freq :mul 0.5 :add 0.5))
 
-(-> (saw 800 :mul (knob "vol" 0.5 0 2))
-    tanh
+(def freq 50)
+(def duty-freqs (map #(* freq %) [0.5 1 2 3 4 1.15]))
+(def trigger (impulse 8))
+(def duty-freq (step trigger duty-freqs))
+
+(-> (sin freq :duty (lfsin duty-freq) :mul (knob "vol" 0.25 0 2))
+    (rlpf 500 1)
+;;    (wfold -0.15 0.15)
+    scope
     play)

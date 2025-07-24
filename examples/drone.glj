@@ -17,4 +17,5 @@
              )
           (freeverb :room-size 0.6)
           (* 0.2)
+          scope
           limiter))
