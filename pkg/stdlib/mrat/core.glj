@@ -24,6 +24,7 @@
                                                  NewKnob
                                                  NewHydra
                                                  NewScope
+                                                 NewLeakDC
                                                  SimpleUGenFunc
                                                  WithInterp
                                                  WithDefaultDutyCycle
@@ -915,6 +916,17 @@
              :in-edges {:in in
                         :freq freq
                         :reson rq}))
+
+(defugen leakdc
+  "DC blocking filter (high-pass filter).
+  Removes DC offset from audio signals.
+  The coef parameter controls the filter coefficient (0.995 is a good default).
+  Higher values (closer to 1) result in lower cutoff frequency."
+  [in 0 "The signal to be processed."
+   coef 0.995 "Filter coefficient (0-1). Higher values = lower cutoff frequency."]
+  (add-node! :leakdc NewLeakDC
+             :in-edges {:in in
+                        :coef coef}))
 
 (defugen bpf
   "A simple bandpass filter with center frequency and bandwidth.
