@@ -17,14 +17,26 @@
         (rlpf cutoff)
         (combc 1 0.2 1))))
 
+(def trig (impulse (knob "trig freq" 8 0.1 20)))
+(def hold (knob "hold" 0.2 0.001 1))
+(def half-trig  (env (pulse-div trig) [0 1 1 0] [0 hold 0]))
+(def trig (env trig [0 1 1 0] [0 0.1 0]))
+(def voices [
+  { :onoff trig :note 45 }
+  { :onoff half-trig :note (step half-trig [75 74 73 72 71 70 69 68]) }
+  { :onoff trig :note 57 }
+  { :onoff half-trig :note (choose half-trig [61 58 65 72 70]) }
+])
+
 (def snd (-> (map #(synth (:onoff %) (:note %)) voices)
              sum
              (freeverb :room-size 0.9)
              (* 0.1)))
+
 (play snd)
 
 (def noise-freq 200)
-(def noise-freq (-> (midi-in "rain-freq" :cc :controller 70) (* 1000) (+ 50)))
+(def noise-freq (knob "rain-freq" 50 50 1000))
 (doseq [seed (range 10)]
   (let [trig (noise noise-freq :add -0.9)
         seed1 (* 2 seed)

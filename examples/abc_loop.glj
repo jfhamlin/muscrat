@@ -7,11 +7,11 @@
 (def max-tempo 220)
 (def tempo (+ min-tempo (* (- max-tempo min-tempo) tempo-in)))
 
-(def cutoff (midi-in "cutoff" :cc :controller 71 :default 0.5))
-(def duty (midi-in "duty" :cc :controller 72 :default 1))
+(def cutoff (knob "cutoff" 0.5 0 1))
+(def duty (knob "duty" 1 0 1))
 
 (def note-in (midi-in "note" :cc :controller 74 :default 0.5))
-(def room-size (midi-in "room-size" :cc :controller 75 :default 0.5))
+(def room-size (knob "room-size" 0.5 0 1))
 
 
 (def score

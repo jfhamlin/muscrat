@@ -17,7 +17,8 @@
 
 (def trig (sqr 0.25))
 
-(def s (step trig (map mtof [E2 G2 F#2 A2 C2 B2])))
+(def offset (knob "offset" 0 -4 4))
+(def s (step trig (map #(mtof (+ % offset)) [E2 G2 F#2 A2 C2 B2])))
 
 (play (-> (sum
           (map #(-> (pad trig (* s %) (dbamp -35))

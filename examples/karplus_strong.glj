@@ -1,7 +1,7 @@
 (ns karplus_strong
   (:require [mrat.core :refer :all]))
 
-(def metro (impulse 8))
+(def metro (impulse 5))
 
 (def burst (-> (saw 50)
                (* (env-adsr metro [0.001 0.001 1 0.1]))
@@ -11,7 +11,7 @@
 
 (def delay-filter
   (-> feedback
-      (delayc 0.5 (step metro [0.0001 0.002 0.001 0.01 0.0015 0.0019]))
+      (delayc 0.5 (step metro [0.0001 0.002 0.001 0.01 0.0015 0.0019 0.005]))
       (lores (knob "cutoff" 400 100 2000) 0)
       (* 0.98)))
 

@@ -3,17 +3,12 @@
 
 (add-sample-path! "/Users/jfhamlin/Projects/muscrat-projects/samples/mine")
 
-(println (search-samples :muni))
-
-;;(def trig (impulse 0.655))
-
 (def muni-snd (smp :muni
-                   :rate 2
+                   :rate 1
                    :loop true
                    :trigger 1))
 
 (play (-> muni-snd
-          sum
-          (* 0.6)
+          (* 0.3)
           (hishelf 15000 :db -80)
           (peakeq (sin 4 :mul 1000 :add 5000) 1 10)))

@@ -5,7 +5,7 @@
 
 (def bps 1.0)
 
-(def speed-factor (knob "speed-factor" 0.005 0.001 0.5 0.001))
+(def speed-factor (knob "speed-factor" 1 0.005 1 0.001))
 
 (def offset-trig (impulse (/ bps 10)))
 (def offset (choose offset-trig [-9 -5 0 3 7 12]))
@@ -20,15 +20,16 @@
                       E2    B1
                       E1]))
 
-(def rand-source (math$rand.NewSource 414)) ;; 214
+(def rand-source (math$rand.NewSource 0)) ;; 214
 (def mrand (math$rand.New rand-source))
-(def duty (knob "duty" 0.6 0 1))
+(def duty (knob "duty" 1 0 1))
 
 (def synth-trigs (atom {}))
 
 (defn synth
   [rate note]
-  (let [osc (tri (mtof note) :duty duty)
+  (let [osc (tri (mtof [note (+ note 5)]) :duty duty)
+        osc (sum osc)
         trig (impulse rate :iphase (.Float64 mrand))
         amp (env trig [0 1 1 0] [0.01 0.02 0.1] :curve [-5 0 5])]
     (swap! synth-trigs assoc (keyword (str "trig" (count @synth-trigs))) trig)
@@ -37,7 +38,7 @@
 (def ihylpr
   (-> (map #(synth (/ bps (+ 1 (* speed-factor %1))) %2) (range (count notes)) notes)
       splay
-      (* (dbamp (knob "dbs" 0 -50 0)))
+      (* (dbamp (knob "dbs" -25 -50 0)))
       (freeverb :room-size (knob "room-size" 0.5 0 1))))
 
 (play ihylpr)
