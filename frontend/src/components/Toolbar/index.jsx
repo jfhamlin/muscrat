@@ -1,8 +1,6 @@
 import {
   OpenFileDialog,
-  PlayFile,
   SaveFile,
-  SaveToTemp,
   Silence,
   ToggleHydraWindow,
 } from "../../../bindings/github.com/jfhamlin/muscrat/muscratservice";
@@ -53,27 +51,8 @@ export default (props) => {
     });
   };
 
-  const handlePlayClick = async () => {
-    const selectedBufferName = buffersStore.selectedBufferName;
-    const buffer = buffersStore.buffers[selectedBufferName];
-    
-    let fileToPlay = buffer.fileName;
-    
-    // If no fileName (unsaved buffer), save to temp first
-    if (!fileToPlay) {
-      try {
-        fileToPlay = await SaveToTemp(buffer.content);
-        // Update buffer with temp path for tracking
-        buffersStore.updateBuffer(selectedBufferName, buffer.content, buffer.dirty);
-        buffersStore.buffers[selectedBufferName].fileName = fileToPlay;
-        buffersStore.buffers[selectedBufferName].isTemp = true;
-      } catch (err) {
-        console.error("Failed to save to temp:", err);
-        return;
-      }
-    }
-    
-    PlayFile(fileToPlay);
+  const handlePlayClick = () => {
+    buffersStore.playBuffer(buffersStore.selectedBufferName);
   };
 
   const handleStopClick = () => {

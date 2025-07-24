@@ -647,13 +647,14 @@
                         :in-edges {"in" in-node "dur" dur-node})]
     node))
 
-(defn scope
+(defugen scope
   "Passes signal through unchanged while displaying it in an oscilloscope.
    Options:
    :name - Display name for the scope
    :buffer-size - Number of samples to display (default 2048)"
-  [signal & {:keys [name buffer-size]
-             :or {name "Scope" buffer-size 2048}}]
+  [signal 0
+   name "Scope"
+   buffer-size 2048]
   (let [signal-node (as-node signal)
         scope-node (add-node! :scope NewScope
                               :args [name buffer-size]

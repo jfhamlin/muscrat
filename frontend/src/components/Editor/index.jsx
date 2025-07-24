@@ -78,6 +78,11 @@ export default (props) => {
         console.log(err);
       });
     });
+
+    // add a key binding for cmd+r (run/play)
+    editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyR, () => {
+      buffersStore.playBuffer(selectedBufferNameRef.current);
+    });
   };
 
   const handleEditorChange = (value, event) => {
