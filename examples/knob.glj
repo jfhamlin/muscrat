@@ -4,11 +4,11 @@
 (def fb2 (sin 2 :mul 0.25 :add 0.25))
 
 (def op-conf
-  ;; freq-ratio    amp  adsr               mod-indexes        feedback carrier
-  [[1              0.8   [0.001 0.15 1   0.15] [1]              0.2    true]
-   [2              0.5   [0.01  0.15 0.1 0.15] [2]              fb2    false]
-   [7 (knob "op2" 0.0 0 1) [0.01 0.05 1  0.02] nil            0.2    false]
-   [0.5              1   [0.1   0.15 0.5 0.001] [1 2]           0.0    true]
+  ;; freq-ratio    amp      adsr               mod-indexes        feedback carrier
+  [[1              0.8      [0.001 0.15 1   0.15] [1]              0.2    true]
+   [2              0.5      [0.01  0.15 0.1 0.15] [2]              fb2    false]
+   [7 (knob "op2"  0.0 0 1) [0.01 0.05 1  0.02] nil                0.2    false]
+   [0.5              1      [0.1   0.15 0.5 0.001] [1 2]           0.0    true]
    ])
 
 (def metro16 (impulse (knob "bps" 6 1 10)))
@@ -27,7 +27,7 @@
 (def notes [D2 C2 D2])
 (def notes-seq (mtof (step metro16 notes)))
 (def lead (-> (fm-synth op-conf metro16 notes-seq)
-              (* 0.6)
+              (* 0.4)
               (rlpf (knob "lead cutoff" 20 10 135 0.25 :xform mtof) (knob "lead rq" 1 0.1 1))
               (* (- 1 (amplitude kick)))))
 

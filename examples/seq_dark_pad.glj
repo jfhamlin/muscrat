@@ -25,4 +25,5 @@
                     (delayl 1 (* 0.01 (math$rand.Float64))))
                ivals))
           (lores (* 4 s) 0.8)
-          (freeverb :room-size 0.6)))
+          (freeverb :room-size 0.6)
+          scope))

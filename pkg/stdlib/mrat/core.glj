@@ -1361,6 +1361,13 @@
       (throw (fmt.Errorf "unsupported midi-in type: %s" typ))
       )))
 
+(defn midi-init
+  "Initialize MIDI input devices. This is a convenience function."
+  []
+  ;; hackily forces initialization by creating a midi note ugen
+  (let [voices (midi-in "__init__" :note :voices 1)]
+    (mapv #(play (* 0 (:note %))) voices)))
+
 (defugen wavout
   "Save the input to a 32-bit wav file (up to two channels) named by
   the :filename flag (default out.wav)."
@@ -1616,13 +1623,12 @@
 (defn- fm-op
   "Creates a simple FM 'operator' in the style of the Yamaha DX series."
   [freq envelope input & {:keys [feedback]}]
-  (let [phase (phasor freq)
-        feedback (or feedback 0)
+  (let [feedback (or feedback 0)
         ;; log2 is used to scale the feedback amount
         feedback (log2 (+ feedback 1))
         has-feedback (or (not (number? feedback)) (> feedback 0))
         fb (if has-feedback (pipe) 0)
-        osc (tri :phase (+ phase input fb)) ;; todo: sync with the trigger so that the phase is reset
+        osc (sin :phase (+ input fb)) ;; todo: sync with the trigger so that the phase is reset
         out (* osc envelope)]
     (if has-feedback (pipeset! fb (* feedback out)))
     out))

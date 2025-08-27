@@ -1,0 +1,25 @@
+(ns examples.sound-bath
+  (:use [mrat.core]))
+
+(-> (sin 200 :mul 0.1)
+    (pan2 (sin 0.7))
+    play)
+
+(-> (sin (* (semitones 7) 200) :mul 0.1)
+    (pan2 (sin 0.3 :iphase 1))
+    play)
+
+(-> (sin (* (semitones 5) 200) :mul 0.1)
+    (pan2 (sin 0.25 :iphase 0.5))
+    play)
+
+(-> (sin 50 :phase (sin 102 :mul (moving-avg (knob "p" 0 0 1))) :mul (line 0.1 0.2 30))
+    (pan2 (sin 0.1 :iphase 0.5 :mul 0.2))
+    play)
+
+(-> (pink-noise)
+    (* 0.01)
+    (rlpf 1000)
+    freeverb
+    (pan2 (sin 600 :mul 0.5))
+    play)

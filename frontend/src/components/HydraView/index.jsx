@@ -129,7 +129,6 @@ export default () => {
           }
         default:
           const args = call.slice(1).map((arg) => evalExpr(synth, arg));
-          console.log("calling", call[0], "with", args);
           return self[call[0]].apply(self, args);
       }
     };

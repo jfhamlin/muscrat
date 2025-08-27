@@ -22,9 +22,10 @@ type (
 
 		initialized bool
 
-		initialPhase float64
-		lastPhase    float64
-		lastSync     float64
+		initialPhase    float64
+		phase           float64
+		lastSamplePhase float64
+		lastSync        float64
 	}
 )
 
@@ -43,9 +44,6 @@ func New(s Sampler, opts ...ugen.Option) *Osc {
 // TODO:
 // auto-gen variants of the inner loop for different input combinations
 //
-// phase overrides frequency
-// phase overrides iphase
-//
 // combinations:
 //
 // ws: [syncs, dcs, iphases] => 8 variants
@@ -55,23 +53,32 @@ func New(s Sampler, opts ...ugen.Option) *Osc {
 
 func (o *Osc) Gen(ctx context.Context, cfg ugen.SampleConfig, out []float64) {
 	ws := cfg.InputSamples["w"]
-	// TODO: generic test that checks that manually oscillating the
-	// phase at a given frequency produces the same output as just
-	// using the frequency input.
 	phases := cfg.InputSamples["phase"]
 	syncs := cfg.InputSamples["sync"]
 	dcs := cfg.InputSamples["dc"]
-	iphases := cfg.InputSamples["iphase"] // todo: handle changing iphase
+	iphases := cfg.InputSamples["iphase"]
 
 	if !o.initialized {
 		o.initialized = true
+		initialW := 440.0
+		if len(ws) > 0 {
+			initialW = ws[0]
+		}
 		if len(iphases) > 0 {
 			o.initialPhase = iphases[0]
-			o.lastPhase = o.initialPhase
+			o.phase = o.initialPhase - (initialW / float64(cfg.SampleRateHz))
+			o.lastSamplePhase = o.initialPhase - (initialW / float64(cfg.SampleRateHz))
 		}
+		if len(phases) > 0 {
+			o.lastSamplePhase += phases[0]
+		}
+		mod1(&o.initialPhase)
+		mod1(&o.lastSamplePhase)
+		mod1(&o.phase)
 	}
 
-	phase := o.lastPhase
+	phase := o.phase
+	lastSamplePhase := o.lastSamplePhase
 	sampler := o.sampler
 	lastSync := o.lastSync
 
@@ -82,26 +89,24 @@ func (o *Osc) Gen(ctx context.Context, cfg ugen.SampleConfig, out []float64) {
 		if len(dcs) > 0 {
 			dc = dcs[i]
 		}
-		var dPhase float64
 		w := 440.0 // default frequency
 		if len(ws) > 0 {
 			w = ws[i]
-			dPhase = w / float64(cfg.SampleRateHz)
 		}
+
+		samplePhase := phase
 		if len(phases) > 0 {
-			dPhase = (phases[i] - phase)
-			w = dPhase * float64(cfg.SampleRateHz)
-			phase = phases[i]
-			// keep in [0, 1)
-			phase -= math.Floor(phase)
+			// phase is an offset in [0, 1)
+			samplePhase += phases[i]
+			mod1(&samplePhase)
 		}
 
-		out[i] = sampler.Sample(phase, dPhase, dc)
+		dPhase := samplePhase - lastSamplePhase
+		lastSamplePhase = samplePhase
+		out[i] = sampler.Sample(samplePhase, dPhase, dc)
 
-		if len(phases) == 0 {
-			phase += w / float64(cfg.SampleRateHz)
-			phase -= math.Floor(phase)
-		}
+		phase += w / float64(cfg.SampleRateHz)
+		mod1(&phase)
 
 		// sync on the falling edge of the sync input if present
 		if len(syncs) > 0 {
@@ -112,10 +117,15 @@ func (o *Osc) Gen(ctx context.Context, cfg ugen.SampleConfig, out []float64) {
 		}
 	}
 
-	o.lastPhase = phase
+	o.phase = phase
+	o.lastSamplePhase = lastSamplePhase
 	o.lastSync = lastSync
 }
 
 func (f SamplerFunc) Sample(phase, dPhase, dutyCycle float64) float64 {
 	return f(phase, dPhase, dutyCycle)
+}
+
+func mod1(x *float64) {
+	*x -= math.Floor(*x)
 }

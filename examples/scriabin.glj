@@ -5,10 +5,10 @@
 (def tempo-in (midi-in "tempo" :cc :controller 70 :default 0.5))
 (def tempo (* 2 72 tempo-in)) ;; 72 quarter notes per minute default
 
-(def dynamics-in (midi-in "dynamics" :cc :controller 74 :default 0.5))
+(def dynamics-in (midi-in "dynamics" :cc :controller 73 :default 0.5))
 (def dynamics-db (dbamp (- (* 40 (- 1.0 dynamics-in)))))
 
-(def room-size (midi-in "room-size" :cc :controller 71 :default 0.5))
+(def room-size (midi-in "room-size" :cc :controller 74 :default 0.5))
 
 ;; transcription of scriabin's Four Preludes, Op. 22, No. 1
 (def score

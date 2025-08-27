@@ -21,12 +21,12 @@
 (def hold (knob "hold" 0.2 0.001 1))
 (def half-trig  (env (pulse-div trig) [0 1 1 0] [0 hold 0]))
 (def trig (env trig [0 1 1 0] [0 0.1 0]))
-(def voices [
-  { :onoff trig :note 45 }
-  { :onoff half-trig :note (step half-trig [75 74 73 72 71 70 69 68]) }
-  { :onoff trig :note 57 }
-  { :onoff half-trig :note (choose half-trig [61 58 65 72 70]) }
-])
+;; (def voices [
+;;   { :onoff trig :note 45 }
+;;   { :onoff half-trig :note (step half-trig [75 74 73 72 71 70 69 68]) }
+;;   { :onoff trig :note 57 }
+;;   { :onoff half-trig :note (choose half-trig [61 58 65 72 70]) }
+;; ])
 
 (def snd (-> (map #(synth (:onoff %) (:note %)) voices)
              sum

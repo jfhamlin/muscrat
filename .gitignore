@@ -5,3 +5,7 @@ frontend/dist
 
 .direnv
 reference
+
+.task/
+
+supercollider

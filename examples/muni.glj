@@ -1,23 +1,38 @@
 (ns user
   (:use [mrat.core]))
 
+(midi-init)
+
 (add-sample-path! "/Users/jfhamlin/Projects/muscrat-projects/samples/mine")
 
+(def choose-freq (knob "choose freq" 0 0 100))
 (def muni-snd (smp :muni
                    :rate 1
+                   ;; :rate (choose (noise choose-freq) [1 2 0.5 0.25 0.125])
                    :loop true
                    :trigger 1))
+
+(def gain (knob "gain" 0 0 (math.Sqrt 2) :xform #(* % %)))
+
+(defn lfsin [freq] (sin freq :mul 0.5 :add 0.5))
 
 (-> muni-snd
     (* 0.3)
     (hishelf 15000 :db -80)
     (peakeq (sin 4 :mul 1000 :add 5000) 1 10)
+    (* (knob "muni" 1 0 1 :xform #(* % %)))
+    (* gain)
+    (scope "muni")
     play)
 
+;; 30 60 120 300**
 (-> (tri 60 :mul 0.3 :duty (lfsin 30))
     (* (lfpulse 0.5))
     rlpf
     (freeverb :room-size 0.9)
+    leakdc
     (* 0.7)
-    scope
+    (* (knob "tone" 0 0 1 :xform #(* % %)))
+    (* gain)
+    (scope "tone")
     play)
