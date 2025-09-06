@@ -18,6 +18,7 @@ import {
 } from "../../contexts/buffers";
 
 import { tailwindTheme } from "../../theme";
+import { setupMuscratAutocomplete } from "../../lib/muscrat-autocomplete";
 
 const theme = {
   base: 'vs-dark',
@@ -43,8 +44,20 @@ export default (props) => {
   selectedBufferNameRef.current = selectedBufferName;
 
   const [editor, setEditor] = useState(null);
-  const handleEditorDidMount = (editor, monaco) => {
+  const [autocompleteInitialized, setAutocompleteInitialized] = useState(false);
+  
+  const handleEditorDidMount = async (editor, monaco) => {
     setEditor(editor);
+    
+    // Initialize autocomplete if not already done
+    if (!autocompleteInitialized) {
+      try {
+        await setupMuscratAutocomplete(monaco, GetNSPublics);
+        setAutocompleteInitialized(true);
+      } catch (error) {
+        console.error('Failed to setup Muscrat autocomplete:', error);
+      }
+    }
 
     // add a key binding for cmd+s
     editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, () => {
