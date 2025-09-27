@@ -1628,7 +1628,7 @@
         feedback (log2 (+ feedback 1))
         has-feedback (or (not (number? feedback)) (> feedback 0))
         fb (if has-feedback (pipe) 0)
-        osc (sin :phase (+ input fb)) ;; todo: sync with the trigger so that the phase is reset
+        osc (sin freq :phase (+ input fb)) ;; todo: sync with the trigger so that the phase is reset
         out (* osc envelope)]
     (if has-feedback (pipeset! fb (* feedback out)))
     out))
