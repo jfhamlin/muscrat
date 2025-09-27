@@ -1,14 +1,12 @@
-import {
-  useState,
-  useCallback,
-} from 'react';
+import React, { useCallback } from 'react';
+import { KnobProps } from '../../types';
 
-const Knob = ({
+const Knob: React.FC<KnobProps> = ({
   label,
   value,
   min,
   max,
-  step,
+  step: _step, // Renamed to indicate it's intentionally unused
   size,
   onChange,
 }) => {
@@ -24,7 +22,7 @@ const Knob = ({
   // 0/360 is the top, 50% of value
   // 180 + gapAngle/2 is 0% of value
   // 180 - gapAngle/2 is 100% of value
-  const angleToValue = (angle) => {
+  const angleToValue = (angle: number): number => {
     const minAngle = 180 + gapAngle / 2;
     if (angle < minAngle) {
       if (angle > 180) {
@@ -39,7 +37,7 @@ const Knob = ({
     return Math.min(max, Math.max(min, val));
   };
 
-  const calculateCoordinates = useCallback((clientX, clientY, container) => {
+  const calculateCoordinates = useCallback((clientX: number, clientY: number, container: HTMLElement) => {
     const rect = container.getBoundingClientRect();
     const centerX = rect.width / 2;
     const centerY = rect.height / 2;
@@ -60,13 +58,13 @@ const Knob = ({
   }, []);
 
 
-  const handleDragStart = useCallback((e) => {
-    const container = e.currentTarget;
+  const handleDragStart = useCallback((e: React.MouseEvent | React.TouchEvent) => {
+    const container = e.currentTarget as HTMLElement;
     const isTouch = e.type === 'touchstart';
-    const clientX = isTouch ? e.touches[0].clientX : e.clientX;
-    const clientY = isTouch ? e.touches[0].clientY : e.clientY;
+    const clientX = isTouch ? (e as React.TouchEvent).touches[0].clientX : (e as React.MouseEvent).clientX;
+    const clientY = isTouch ? (e as React.TouchEvent).touches[0].clientY : (e as React.MouseEvent).clientY;
 
-    const { angle, normalizedRadius, radius } = calculateCoordinates(
+    const { angle } = calculateCoordinates(
       clientX,
       clientY,
       container
@@ -76,9 +74,9 @@ const Knob = ({
 
     onChange?.(angleToValue(trackedAngle));
 
-    const handleDrag = (moveEvent) => {
-      const moveClientX = isTouch ? moveEvent.touches[0].clientX : moveEvent.clientX;
-      const moveClientY = isTouch ? moveEvent.touches[0].clientY : moveEvent.clientY;
+    const handleDrag = (moveEvent: MouseEvent | TouchEvent) => {
+      const moveClientX = isTouch ? (moveEvent as TouchEvent).touches[0].clientX : (moveEvent as MouseEvent).clientX;
+      const moveClientY = isTouch ? (moveEvent as TouchEvent).touches[0].clientY : (moveEvent as MouseEvent).clientY;
 
       const result = calculateCoordinates(
         moveClientX,
@@ -162,7 +160,14 @@ const Knob = ({
 
 export default Knob;
 
-const SvgCircle = ({
+interface SvgCircleProps {
+  radiusPercent: number;
+  strokeOpacity: string;
+  strokeWidth: string;
+  strokePercent: number;
+}
+
+const SvgCircle: React.FC<SvgCircleProps> = ({
   radiusPercent,
   strokeOpacity,
   strokeWidth,

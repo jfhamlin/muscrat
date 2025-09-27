@@ -3,12 +3,14 @@ import ReactDOM from 'react-dom/client'
 import './index.css'
 import App from './App'
 
+// @ts-ignore - Components not yet converted to TypeScript
 import HydraView from "./components/HydraView";
+// @ts-ignore
 import Knobs from "./components/Knobs";
 
-const Root = () => {
+const Root: React.FC = () => {
   const pathname = window.location.pathname;
-  let component;
+  let component: React.ReactElement;
 
   switch (pathname) {
     case '/hydra':
@@ -28,4 +30,7 @@ const Root = () => {
   )
 }
 
-ReactDOM.createRoot(document.getElementById('root')).render(<Root />)
+const rootElement = document.getElementById('root');
+if (rootElement) {
+  ReactDOM.createRoot(rootElement).render(<Root />);
+}

@@ -26,5 +26,9 @@ wails:
 clean:
 	@rm -rf build/bin
 
+.PHONY: typecheck
+typecheck:
+	@cd frontend && npx tsc --noEmit
+
 # run-race: # disable checkptr because glojure uses an unsafe method to support dynamic vars.
 # 	@go run -gcflags=all=-d=checkptr=0 -race cmd/mrat/main.go  $(SCRIPT)

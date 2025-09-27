@@ -1,10 +1,13 @@
 import { create } from "zustand";
 import createContext from "zustand/context";
+// @ts-ignore - Wails generated bindings
 import { SaveToTemp, SaveFile, PlayFile } from "../../bindings/github.com/jfhamlin/muscrat/muscratservice";
+import { BuffersState } from "../types";
 
 const {
   Provider: BuffersProvider,
   useStore: useBuffersStore,
+  // @ts-ignore - zustand context type issue
 } = createContext();
 
 const DEFAULT_CODE = `(ns user
@@ -14,17 +17,17 @@ const DEFAULT_CODE = `(ns user
 `;
 
 const createBuffersStore = () =>
-  create((set, get) => ({
+  create<BuffersState>((set, get) => ({
     selectedBufferName: null,
     buffers: {
-      null: {
+      'null': {
         fileName: '',
         content: DEFAULT_CODE,
         dirty: false,
       },
-    },
-    selectBuffer: (fileName) => set((state) => ({ selectedBufferName: fileName })),
-    addBuffer: ({ fileName, content }) =>
+    } as any,
+    selectBuffer: (fileName: string | null) => set(() => ({ selectedBufferName: fileName })),
+    addBuffer: ({ fileName, content }: { fileName: string; content: string }) =>
       set((state) => ({
         selectedBufferName: fileName,
         buffers: {
@@ -36,36 +39,39 @@ const createBuffersStore = () =>
           },
         },
       })),
-    updateBuffer: (fileName, content, dirty) => {
+    updateBuffer: (fileName: string | null, content: string, dirty?: boolean) => {
+      const key = fileName ?? 'null';
       set((state) => ({
         buffers: {
           ...state.buffers,
-          [fileName]: {
-            ...(state.buffers[fileName] ?? { fileName }),
+          [key]: {
+            ...(state.buffers[key] ?? { fileName }),
             content,
             dirty: dirty ?? true,
           },
         },
       }));
     },
-    cleanBuffer: (fileName, content) => {
+    cleanBuffer: (fileName: string | null, content: string) => {
       // if content is same as buffer content, then un-dirty the buffer
+      const key = fileName ?? 'null';
       set((state) => ({
         buffers: {
           ...state.buffers,
-          [fileName]: {
-            ...state.buffers[fileName],
-            dirty: state.buffers[fileName]?.content !== content,
+          [key]: {
+            ...state.buffers[key],
+            dirty: state.buffers[key]?.content !== content,
           },
         },
       }));
     },
-    playBuffer: async (bufferKey) => {
-      const buffer = get().buffers[bufferKey];
+    playBuffer: async (bufferKey: string | null) => {
+      const key = bufferKey ?? 'null';
+      const buffer = get().buffers[key];
       if (!buffer) return;
-      
+
       let fileToPlay = buffer.fileName;
-      
+
       // If temp file, always update it with current content
       if (buffer.isTemp && fileToPlay) {
         try {
@@ -83,8 +89,8 @@ const createBuffersStore = () =>
           set((state) => ({
             buffers: {
               ...state.buffers,
-              [bufferKey]: {
-                ...state.buffers[bufferKey],
+              [key]: {
+                ...state.buffers[key],
                 fileName: fileToPlay,
                 isTemp: true,
               },
@@ -95,7 +101,7 @@ const createBuffersStore = () =>
           return;
         }
       }
-      
+
       await PlayFile(fileToPlay);
     },
   }));
