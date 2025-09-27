@@ -1,6 +1,6 @@
 (ns mrat.core
-  (:import (github.com$glojurelang$glojure$pkg$lang *Ratio *BigInt)
-           (github.com$jfhamlin$muscrat$pkg$ugen NewConstant
+  (:import (github.com:glojurelang:glojure:pkg:lang *Ratio *BigInt)
+           (github.com:jfhamlin:muscrat:pkg:ugen NewConstant
                                                  NewSum
                                                  NewMovingAverage
                                                  NewProduct
@@ -31,22 +31,22 @@
                                                  InterpNone
                                                  InterpLinear
                                                  InterpCubic)
-           (github.com$jfhamlin$muscrat$pkg$wavtabs Table)
-           (github.com$jfhamlin$muscrat$pkg$osc NewSine
+           (github.com:jfhamlin:muscrat:pkg:wavtabs Table)
+           (github.com:jfhamlin:muscrat:pkg:osc NewSine
                                                 NewSaw
                                                 NewTri
                                                 NewPulse
                                                 NewPhasor
                                                 NewLFSaw
                                                 NewLFPulse)
-           (github.com$jfhamlin$muscrat$pkg$stochastic NewRRand
+           (github.com:jfhamlin:muscrat:pkg:stochastic NewRRand
                                                        NewNoise
                                                        NewNoiseQuad
                                                        NewPinkNoise)
-           (github.com$jfhamlin$muscrat$pkg$mod NewEnvelope
+           (github.com:jfhamlin:muscrat:pkg:mod NewEnvelope
                                                 WithReleaseNode
                                                 WithCurve)
-           (github.com$jfhamlin$muscrat$pkg$effects NewAmplitude
+           (github.com:jfhamlin:muscrat:pkg:effects NewAmplitude
                                                     NewFreeverb
                                                     NewBitcrusher
                                                     NewLimiter
@@ -62,9 +62,9 @@
                                                     NewWaveFolder
                                                     NewClip
                                                     NewPitchShift)
-           (github.com$jfhamlin$muscrat$pkg$sampler NewSampler
+           (github.com:jfhamlin:muscrat:pkg:sampler NewSampler
                                                     LoadSample)
-           (github.com$jfhamlin$muscrat$pkg$aio NewInputDevice
+           (github.com:jfhamlin:muscrat:pkg:aio NewInputDevice
                                                 NewSoftwareKeyboard
                                                 NewMIDIInputDevice
                                                 WithVoices
@@ -74,7 +74,7 @@
                                                 WithController
                                                 WithDefaultValue
                                                 NewWavOut)
-           (github.com$jfhamlin$freeverb-go NewRevModel)))
+           (github.com:jfhamlin:freeverb-go NewRevModel)))
 
 (defn- docgroup
   "Add a 'docgroup' metadata key with the provided value to all public
@@ -85,13 +85,13 @@
           :when (and (var? v) (not (:docgroup (meta v))))]
     (alter-meta! v assoc :docgroup docgroup)))
 
-(def SAMPLE-RATE github.com$jfhamlin$muscrat$pkg$conf.SampleRate)
-(def BUFFER-SIZE github.com$jfhamlin$muscrat$pkg$conf.BufferSize)
+(def SAMPLE-RATE github.com:jfhamlin:muscrat:pkg:conf.SampleRate)
+(def BUFFER-SIZE github.com:jfhamlin:muscrat:pkg:conf.BufferSize)
 (def BUFFER-DUR (/ BUFFER-SIZE SAMPLE-RATE))
 (def SAMPLE-DUR (/ 1 SAMPLE-RATE))
 
 (def ^:dynamic *sample-file-paths*
-  (atom (vec github.com$jfhamlin$muscrat$pkg$conf.SampleFilePaths)))
+  (atom (vec github.com:jfhamlin:muscrat:pkg:conf.SampleFilePaths)))
 
 (docgroup "Constants")
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -181,7 +181,7 @@
     edge))
 
 (extend-protocol AsNode
-  github.com$glojurelang$glojure$pkg$lang.IPersistentMap
+  github.com:glojurelang:glojure:pkg:lang.IPersistentMap
   (as-node [n] n))
 
 (extend-protocol AsNode
@@ -283,7 +283,7 @@
   (let [groups (group-by #(is-node? %) xs)
         nums (get groups false ())
         ugens (get groups true ())
-        num-sum (apply glojure.core/+ nums)]
+        num-sum (apply clojure.core/+ nums)]
     (if (empty? ugens)
       num-sum
       (let [sum-node (add-node! :+ NewSum)
@@ -327,7 +327,7 @@
   (let [groups (group-by #(is-node? %) xs)
         nums (get groups false ())
         ugens (get groups true ())
-        num-prod (apply glojure.core/* nums)]
+        num-prod (apply clojure.core/* nums)]
     (if (empty? ugens)
       num-prod
       (let [prod-node (add-node! :* NewProduct)
@@ -353,7 +353,7 @@
 (defn- div-internal
   [& xs]
   (if (every? #(not (is-node? %)) xs)
-    (apply glojure.core// xs)
+    (apply clojure.core// xs)
     (let [quot-node (add-node! :/ NewQuotient)
           nodes (map as-node xs)]
       (doseq [[n i] (map vector nodes (range (count nodes)))]
@@ -514,7 +514,7 @@
   directly."
   [theta]
   (if (is-node? theta)
-    (add-node! :sine github.com$jfhamlin$muscrat$pkg$ugen.NewSine :in-edges {:in theta})
+    (add-node! :sine github.com:jfhamlin:muscrat:pkg:ugen.NewSine :in-edges {:in theta})
     (math.Sin theta)))
 
 (defn min
@@ -523,7 +523,7 @@
   [& xs]
   (if (some is-node? xs)
     (add-node! :min NewMin :in-edges (zipmap (map str (range (count xs))) xs))
-    (apply glojure.core/min xs)))
+    (apply clojure.core/min xs)))
 
 (defn max
   "Returns the maximum of xs. If any element of xs is a node, creates a new
@@ -531,7 +531,7 @@
   [& xs]
   (if (some is-node? xs)
     (add-node! :max NewMax :in-edges (zipmap (map str (range (count xs))) xs))
-    (apply glojure.core/max xs)))
+    (apply clojure.core/max xs)))
 
 (defn abs
   "Returns the absolute value of x. If x is a node, creates a new node
@@ -775,7 +775,7 @@
    ^:noexpand seed 0 "Seed for the random number generator."]
   (let [add min
         mul (- max min)
-        rnd (math$rand.New (math$rand.NewSource seed))]
+        rnd (math:rand.New (math:rand.NewSource seed))]
     (if (and (number? trigger) (> trigger 0))
       (fma (.Float64 rnd) mul add)
       (add-node! :rrand NewRRand :args [rnd] :in-edges {:min min :max max :trig trigger}))))
@@ -1195,7 +1195,7 @@
         pats (cons pat pats)]
     (letfn [(walk [s dir-entry err]
               (when-not err
-                (let [ext (path$filepath.Ext s)
+                (let [ext (path:filepath.Ext s)
                       [info err] (os.Stat s)]
                   (cond
                     err nil
@@ -1208,7 +1208,7 @@
                          (every? identity)) (do (swap! matches conj s)
                                                 nil)))))]
       (doseq [dir @*sample-file-paths*]
-        (path$filepath.WalkDir dir walk))
+        (path:filepath.WalkDir dir walk))
       @matches)))
 
 (defn find-sample
@@ -1393,7 +1393,7 @@
 (defn step
   "Cycle through a sequence of values on each trigger."
   [trig freqs & {:keys [sync]}]
-  (let [node (add-node! :sequencer github.com$jfhamlin$muscrat$pkg$pattern.NewSequencer)
+  (let [node (add-node! :sequencer github.com:jfhamlin:muscrat:pkg:pattern.NewSequencer)
         trig (as-node trig)
         freqs (map as-node freqs)
         sync (if sync (as-node sync) nil)]
@@ -1407,7 +1407,7 @@
   "Pick randomly from a sequence of values, making a new choice on each
   trigger."
   [trig opts]
-  (let [node (add-node! :choose github.com$jfhamlin$muscrat$pkg$pattern.NewChoose)
+  (let [node (add-node! :choose github.com:jfhamlin:muscrat:pkg:pattern.NewChoose)
         trig (as-node trig)
         opts (map as-node opts)]
     (add-edge! trig node "trigger")
@@ -1701,7 +1701,7 @@
                0.0030115596))
           (center-gain [x] (+ (* -0.55366 x) 0.99785))
           (side-gain [x] (+ (* -0.73764 (pow x 2)) (* 1.2841 x) 0.044372))]
-    (let [center (saw freq :iphase (math$rand.Float64))
+    (let [center (saw freq :iphase (math:rand.Float64))
           detune-factor (* freq (detune-curve detune))
           freqs [(+ freq (* detune-factor 0.11002313))
                  (+ freq (* detune-factor 0.06288439))
@@ -1709,7 +1709,7 @@
                  (+ freq (* detune-factor 0.01991221))
                  (+ freq (* detune-factor 0.06216538))
                  (+ freq (* detune-factor 0.10745242))]
-          side (sum (map #(saw % :iphase (math$rand.Float64)) freqs))
+          side (sum (map #(saw % :iphase (math:rand.Float64)) freqs))
           sig (+ (* center (center-gain mix)) (* side (side-gain mix)))]
       sig)))
 

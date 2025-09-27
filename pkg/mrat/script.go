@@ -106,7 +106,7 @@ func EvalScript(filename string) (res *graph.Graph, err error) {
 		}
 	}()
 
-	require := glj.Var("glojure.core", "require")
+	require := glj.Var("clojure.core", "require")
 	require.Invoke(glj.Read("mrat.core"))
 
 	graphAtom := lang.NewAtom(glj.Read(`{:nodes [] :edges []}`))
@@ -165,15 +165,15 @@ func getScriptThreadBindings(graphAtom *lang.Atom) lang.IPersistentMap {
 	return lang.NewMap(
 		glj.Var("mrat.core", "*graph*"), graphAtom,
 		glj.Var("mrat.core", "*sample-file-paths*"), sampleFilePathsAtom,
-		glj.Var("glojure.core", "*out*"), &consoleWriter{},
+		glj.Var("clojure.core", "*out*"), &consoleWriter{},
 	)
 }
 
 func GetNSPublics() []Symbol {
-	require := glj.Var("glojure.core", "require")
+	require := glj.Var("clojure.core", "require")
 	require.Invoke(glj.Read("mrat.core"))
 
-	nsPublics := glj.Var("glojure.core", "ns-publics")
+	nsPublics := glj.Var("clojure.core", "ns-publics")
 	publics := nsPublics.Invoke(glj.Read("mrat.core"))
 
 	docgroupKW := lang.NewKeyword("docgroup")
