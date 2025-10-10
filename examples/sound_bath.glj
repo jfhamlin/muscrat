@@ -13,13 +13,17 @@
     (pan2 (sin 0.25 :iphase 0.5))
     play)
 
-(-> (sin (step (impulse 8) [50 100 200 250 100 200 250 300]) :phase (sin 102 :mul (moving-avg (knob "p" 0 0 1))) :mul (line 0.1 0.2 30))
+(def trig-pat [1 0 1 0, 1 0 1 0,
+               1 0 0 1, 0 1 0 1])
+(def trig (tctrig trig-pat))
+
+(-> (sin (step trig [50 100 200 250 100 200 250 300]) :phase (sin 102 :mul (moving-avg (knob "p" 0 0 1))) :mul (line 0.1 0.2 30))
     (pan2 (sin 0.1 :iphase 0.5 :mul 0.2))
     play)
 
 (-> (pink-noise)
-    (* 0.01)
-    (rlpf 1000)
+    (* (knob "noiz vol" 0.02 0 0.2))
+    (rlpf (noise-quad 1 :mul 200 :add 1000))
     freeverb
     (pan2 (sin 600 :mul 0.5))
     play)

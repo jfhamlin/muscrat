@@ -7,7 +7,7 @@
 
 (def notes [D0 D1 A1 D2 A2 D3 A3 D4 A4 D5 F#5])
 (def t (line 0 1 sweep-dur))
-(def rnd (math$rand.New (math$rand.NewSource 0)))
+(def rnd (math:rand.New (math:rand.NewSource 0)))
 (defn synth [note]
   (let [dst-freq (mtof note)
     src-freq (-> (.Float64 rnd) (* 200) (+ 200))

@@ -8,7 +8,7 @@
         freqs (* freq offs (->> (cycle [1 2]) (take cnt)))
         cutoff (env gate [1000 1000 100] [0 8] :curve :exp)
         amp (env-asr gate [1 1 8])]
-    (-> (saw freqs)
+    (-> (saw freqs) ;; try saw, sqr
         sum
         (rlpf cutoff)
         (peakeq (* 8 freq) 0.1 8)
@@ -26,7 +26,7 @@
     (-> (sin freq)
         (* amp))))
 
-(def ping-metro (noise 2))
+(def ping-metro (noise (knob "ping rnd rate" 2 0 24)))
 (def ping-snd (ping ping-metro (* 4 (choose ping-metro frequencies))))
 
 (defn scopeall [arr n] (map #(scope % :name n) arr))

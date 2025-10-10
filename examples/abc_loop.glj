@@ -13,7 +13,6 @@
 (def note-in (midi-in "note" :cc :controller 74 :default 0.5))
 (def room-size (knob "room-size" 0.5 0 1))
 
-
 (def score
   (abc/score
    {:tempo [1/4 tempo]

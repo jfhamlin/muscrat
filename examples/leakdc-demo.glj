@@ -1,4 +1,4 @@
-(ns user
+(ns examples.leakdc_demo
   (:require [mrat.core :refer :all]))
 
 ;; Example of using leakdc to remove DC offset from a signal

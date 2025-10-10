@@ -37,7 +37,7 @@
 (def freq (mtof note))
 
 (def hi-pad
-  (-> (sum (map #(sqr % :iphase (math$rand.Float64)) (map #(mtof (+ root-midi 24 %)) [-2 0 7.1 3 12.1 24.1 35.9])))
+  (-> (sum (map #(sqr % :iphase (math:rand.Float64)) (map #(mtof (+ root-midi 24 %)) [-2 0 7.1 3 12.1 24.1 35.9])))
       (* 0.2)
       (lores (mtof (+ root-midi 12 24 (lfpulse 1/8 :mul 24))) res)
       (* (env-adsr metro-slo [1 2 0.5 6]))

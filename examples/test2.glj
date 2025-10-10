@@ -33,4 +33,4 @@
 
 (def crow-rate (* crow-rate-mul (choose crow-metro [1 0.5 0.25 0.76])))
 
-(play (-> (smp :misc_crow :rate crow-rate :trigger crow-metro)))
+(play (-> (smp :misc_crow :rate crow-rate :trigger crow-metro :mul 0)))
