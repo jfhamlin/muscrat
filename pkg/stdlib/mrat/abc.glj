@@ -43,7 +43,7 @@
   # CHORDS AND UNISONS
   "
   (:require [mrat.core :refer :all]
-            [glojure.string :as str]))
+            [clojure.string :as str]))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Parsing

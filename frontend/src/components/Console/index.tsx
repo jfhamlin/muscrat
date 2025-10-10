@@ -1,4 +1,4 @@
-import {
+import React, {
   useState,
   useEffect,
   useRef,
@@ -10,7 +10,14 @@ import {
   Trash2 as TrashIcon,
 } from 'lucide-react';
 
-const ErrorIcon = () => {
+import {
+  ConsoleEvent,
+  EventWithCount,
+  EventProps,
+  ClearButtonProps,
+} from '../../types';
+
+const ErrorIcon: React.FC = () => {
   return (
     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-6 h-6">
       <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 3.75h.008v.008H12v-.008Z" />
@@ -18,7 +25,7 @@ const ErrorIcon = () => {
   );
 };
 
-const WarnIcon = () => {
+const WarnIcon: React.FC = () => {
   return (
     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-6 h-6">
       <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" />
@@ -27,30 +34,26 @@ const WarnIcon = () => {
   );
 }
 
-const COLORS = {
+const COLORS: Record<string, string> = {
   warn: 'bg-yellow-500',
   error: 'bg-red-500',
 };
 
-const Event = ({ event, count }) => {
+const Event: React.FC<EventProps> = ({ event, count }) => {
   const level = event.level; // debug, info, warn, error
   const message = event.message;
   const data = event.data;
 
-  const [dataVisible, setDataVisible] = useState(false);
-  const toggleData = () => setDataVisible((prev) => !prev);
+  const [dataVisible, setDataVisible] = useState<boolean>(false);
+  const toggleData = (): void => setDataVisible((prev) => !prev);
   const dataElement = data && (
     <div className="text-gray-100 text-xs p-1">
       <pre>{data}</pre>
     </div>
   );
 
-  let dataRender = data;
-  if (typeof data === 'object') {
-    dataRender = JSON.stringify(data, null, 2);
-  }
 
-  let icon;
+  let icon: React.ReactNode;
   switch (level) {
     case 'warn':
       icon = <WarnIcon />;
@@ -78,7 +81,7 @@ const Event = ({ event, count }) => {
   );
 };
 
-const ClearButton = ({ onClick, color = 'currentColor', size = 16 }) => {
+const ClearButton: React.FC<ClearButtonProps> = ({ onClick, size = 16 }) => {
   return (
     <button className='text-gray-200' onClick={onClick} title="Clear console">
       <TrashIcon size={size} />
@@ -86,13 +89,17 @@ const ClearButton = ({ onClick, color = 'currentColor', size = 16 }) => {
   );
 };
 
-export default () => {
-  const [events, setEvents] = useState([]);
+interface WailsConsoleEvent {
+  data: [ConsoleEvent];
+}
 
-  const ref = useRef(null);
+const Console: React.FC = () => {
+  const [events, setEvents] = useState<EventWithCount[]>([]);
+
+  const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    return Events.On('console.log', (evt) => {
+    const unsubscribe = Events.On('console.log', (evt: WailsConsoleEvent) => {
       const data = evt.data[0];
 
       setEvents((prev) => {
@@ -106,10 +113,14 @@ export default () => {
       // scroll to bottom if already at bottom
       if (ref.current && ref.current.scrollHeight - ref.current.scrollTop === ref.current.clientHeight) {
         requestAnimationFrame(() => {
-          ref.current.scrollTop = ref.current.scrollHeight;
+          if (ref.current) {
+            ref.current.scrollTop = ref.current.scrollHeight;
+          }
         });
       }
     });
+
+    return () => unsubscribe();
   }, []);
 
   return (
@@ -125,3 +136,5 @@ export default () => {
     </div>
   )
 }
+
+export default Console;

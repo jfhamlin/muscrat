@@ -1,41 +1,41 @@
 import React, {
-  useState,
   useEffect,
   useRef,
 } from 'react';
 
 import { Events } from "@wailsio/runtime";
+import { VolumeMeterProps, VolumeEvent } from '../../types';
 
-const VolumeMeter = ({ }) => {
-  const rmsMeterRefL = useRef();
-  const rmsMeterRefR = useRef();
-  const peakMeterRefL = useRef();
-  const peakMeterRefR = useRef();
-  
+const VolumeMeter: React.FC<VolumeMeterProps> = ({}) => {
+  const rmsMeterRefL = useRef<HTMLDivElement>(null);
+  const rmsMeterRefR = useRef<HTMLDivElement>(null);
+  const peakMeterRefL = useRef<HTMLDivElement>(null);
+  const peakMeterRefR = useRef<HTMLDivElement>(null);
+
   // Peak hold state
-  const peakHoldL = useRef(0);
-  const peakHoldR = useRef(0);
-  const peakHoldTimerL = useRef(null);
-  const peakHoldTimerR = useRef(null);
+  const peakHoldL = useRef<number>(0);
+  const peakHoldR = useRef<number>(0);
+  const peakHoldTimerL = useRef<NodeJS.Timeout | null>(null);
+  const peakHoldTimerR = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
-    const unsubscribe = Events.On('volume', (event) => {
+    const unsubscribe = Events.On('volume', (event: VolumeEvent) => {
       const data = event.data[0];
-      const [rmsL, rmsR] = data.rms || [0, 0];
+      const [, ] = data.rms || [0, 0]; // rmsL, rmsR not used in current implementation
       const [peakL, peakR] = data.peak || [0, 0];
       const [rmsDBL, rmsDBR] = data.rmsDB || [-60, -60];
-      const [peakDBL, peakDBR] = data.peakDB || [-60, -60];
+      const [, ] = data.peakDB || [-60, -60]; // peakDBL, peakDBR not used in current implementation
 
-      if (!rmsMeterRefL.current) return;
+      if (!rmsMeterRefL.current || !rmsMeterRefR.current) return;
 
       // Convert dB values to normalized 0-1 range for display
       // -60dB to 0dB mapped to 0-1
-      const dbToNormalized = (db) => {
+      const dbToNormalized = (db: number): number => {
         return Math.max(0, Math.min(1, (db + 60) / 60));
       };
 
       // Apply logarithmic curve for better visual response
-      const applyDisplayCurve = (normalized) => {
+      const applyDisplayCurve = (normalized: number): number => {
         // Square root expands lower values for better visibility
         return Math.pow(normalized, 0.5);
       };
@@ -48,11 +48,11 @@ const VolumeMeter = ({ }) => {
       // when off, they're black
       // a child is on if its normalized [0, 1] index is less than the volume
 
-      const updateColor = (volume, children) => {
+      const updateColor = (volume: number, children: HTMLCollection): void => {
         // children is an HTMLCollection, not an array
 
         for (let i = 0; i < children.length; i++) {
-          const child = children[i];
+          const child = children[i] as HTMLElement;
           const childValue = (children.length - i) / children.length;
           if (childValue < volume) {
             let color = 'green';
@@ -73,32 +73,43 @@ const VolumeMeter = ({ }) => {
       updateColor(rmsDisplayR, rmsMeterRefR.current.children);
 
       // Peak hold logic
-      const updatePeakHold = (currentPeak, peakHoldRef, peakHoldTimerRef, peakMeterRef) => {
+      const updatePeakHold = (
+        currentPeak: number,
+        peakHoldRef: React.MutableRefObject<number>,
+        peakHoldTimerRef: React.MutableRefObject<NodeJS.Timeout | null>,
+        peakMeterRef: React.RefObject<HTMLDivElement>
+      ): void => {
         if (currentPeak >= 1) {
           // Set peak hold
           peakHoldRef.current = 1;
-          peakMeterRef.current.style.backgroundColor = 'red';
-          
+          if (peakMeterRef.current) {
+            peakMeterRef.current.style.backgroundColor = 'red';
+          }
+
           // Clear existing timer
           if (peakHoldTimerRef.current) {
             clearTimeout(peakHoldTimerRef.current);
           }
-          
+
           // Set new timer to clear peak after 2 seconds
           peakHoldTimerRef.current = setTimeout(() => {
             peakHoldRef.current = 0;
-            peakMeterRef.current.style.backgroundColor = 'black';
+            if (peakMeterRef.current) {
+              peakMeterRef.current.style.backgroundColor = 'black';
+            }
           }, 2000);
         } else if (peakHoldRef.current === 0) {
           // Only update to black if not holding
-          peakMeterRef.current.style.backgroundColor = 'black';
+          if (peakMeterRef.current) {
+            peakMeterRef.current.style.backgroundColor = 'black';
+          }
         }
       };
 
       updatePeakHold(peakL, peakHoldL, peakHoldTimerL, peakMeterRefL);
       updatePeakHold(peakR, peakHoldR, peakHoldTimerR, peakMeterRefR);
     });
-    
+
     // Cleanup timers on unmount
     return () => {
       unsubscribe();

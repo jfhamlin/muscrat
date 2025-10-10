@@ -1,16 +1,25 @@
 import React, {
   useEffect,
-  createRef,
+  useRef,
 } from 'react';
 
 import Heading from '../Heading';
+import { SpectrogramProps } from '../../types';
+
+interface Color {
+  r: number;
+  g: number;
+  b: number;
+}
 
 class Gradient {
-  constructor(colors) {
+  private colors: Color[];
+
+  constructor(colors: Color[]) {
     this.colors = colors;
   }
 
-  getColor(fraction) {
+  getColor(fraction: number): string {
     const index = Math.floor(fraction * (this.colors.length - 1));
     if (index === this.colors.length - 1) {
       return this.mixColors(this.colors[index], this.colors[index], 0);
@@ -21,7 +30,7 @@ class Gradient {
     return this.mixColors(startColor, endColor, fractionOfColor);
   }
 
-  mixColors(startColor, endColor, fraction) {
+  private mixColors(startColor: Color, endColor: Color, fraction: number): string {
     const r = startColor.r + (endColor.r - startColor.r) * fraction;
     const g = startColor.g + (endColor.g - startColor.g) * fraction;
     const b = startColor.b + (endColor.b - startColor.b) * fraction;
@@ -29,10 +38,9 @@ class Gradient {
   }
 }
 
-const GRADIENT_BW = new Gradient([
-  { r: 0, g: 0, b: 0 },
-  { r: 255, g: 255, b: 255 },
-]);
+// Available gradients for potential future use:
+// const GRADIENT_BW = new Gradient([{ r: 0, g: 0, b: 0 }, { r: 255, g: 255, b: 255 }]);
+// const GRADIENT_COOL = new Gradient([{ r: 0, g: 0, b: 128 }, { r: 0, g: 255, b: 255 }, { r: 0, g: 255, b: 128 }, { r: 64, g: 224, b: 208 }]);
 
 const GRADIENT_INFRARED = new Gradient([
   { r: 0, g: 0, b: 0 },
@@ -41,28 +49,25 @@ const GRADIENT_INFRARED = new Gradient([
   { r: 255, g: 255, b: 255 },
 ]);
 
-const GRADIENT_COOL = new Gradient([
-  { r: 0, g: 0, b: 128 },    // Darker Blue
-  { r: 0, g: 255, b: 255 },  // Cyan
-  { r: 0, g: 255, b: 128 },  // Spring Green
-  { r: 64, g: 224, b: 208 }, // Lighter Turquoise
-]);
-
 const gradient = GRADIENT_INFRARED;
 
-export default ({ analyser, sampleRate }) => {
-  const canvasRef = createRef();
+const Spectrogram: React.FC<SpectrogramProps> = ({ analyser, sampleRate }) => {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
     if (!analyser) return;
 
     const canvas = canvasRef.current;
+    if (!canvas) return;
+
     const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
     // clear the canvas with gradient 0 value
     ctx.fillStyle = gradient.getColor(0);
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    const bufferLength = analyser.frequencyBinCount
+    const bufferLength = analyser.frequencyBinCount;
     const dataArray = new Uint8Array(bufferLength);
 
     const nyquist = sampleRate / 2;
@@ -78,7 +83,7 @@ export default ({ analyser, sampleRate }) => {
 
     let stop = false;
 
-    const renderFrame = () => {
+    const renderFrame = (): void => {
       if (stop) return;
 
       requestAnimationFrame(renderFrame);
@@ -106,17 +111,17 @@ export default ({ analyser, sampleRate }) => {
         // Draw the new line at the bottom, in log2 scale
         dataArray.forEach((value, i) => {
           const percent = value / 255;
-          const y = height - 1 - Math.floor((height - 1) * percent); // Draw from bottom
+          // const y = height - 1 - Math.floor((height - 1) * percent); // Draw from bottom (unused)
           const x = logBinPositions[i] * width;
           let x2 = width;
           if (i < bufferLength - 1) {
             x2 = logBinPositions[i + 1] * width;
           }
 
-          ctx.fillStyle = '#000';
-          ctx.fillStyle = gradient.getColor(percent)
+          ctx!.fillStyle = '#000';
+          ctx!.fillStyle = gradient.getColor(percent);
 
-          ctx.fillRect(x, height - 1, x2, 1); // Draw single pixel line
+          ctx!.fillRect(x, height - 1, x2, 1); // Draw single pixel line
         });
       } else {
         const BLOCK_SIZE = 4;
@@ -139,8 +144,8 @@ export default ({ analyser, sampleRate }) => {
           }
 
           const avg = count > 0 ? sum / count / 255 : 0;
-          ctx.fillStyle = gradient.getColor(avg);
-          ctx.fillRect(x, height - 1, BLOCK_SIZE, 1); // Draw four pixels wide
+          ctx!.fillStyle = gradient.getColor(avg);
+          ctx!.fillRect(x, height - 1, BLOCK_SIZE, 1); // Draw four pixels wide
         }
       }
     };
@@ -164,3 +169,5 @@ export default ({ analyser, sampleRate }) => {
     </div>
   );
 };
+
+export default Spectrogram;

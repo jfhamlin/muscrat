@@ -1,12 +1,12 @@
-import {
+import React, {
   createRef,
   useEffect,
-  useState,
+  RefObject,
 } from 'react';
+import { TimerProps } from '../../types';
 
-
-export default ({ startTime, setStartTime }) => {
-  const timeRef = createRef();
+const Timer: React.FC<TimerProps> = ({ startTime, setStartTime }) => {
+  const timeRef: RefObject<HTMLDivElement> = createRef();
 
   // display the time since the start time
   // in format MM:SS
@@ -21,7 +21,7 @@ export default ({ startTime, setStartTime }) => {
         return;
       }
 
-      const time = new Date(new Date() - new Date(startTime));
+      const time = new Date(new Date().getTime() - new Date(startTime).getTime());
       const minutes = time.getMinutes();
       const seconds = time.getSeconds();
       timeRef.current.innerHTML = `${minutes}:${seconds < 10 ? `0${seconds}` : seconds}`;
@@ -31,19 +31,27 @@ export default ({ startTime, setStartTime }) => {
     const interval = setInterval(update, 1000);
 
     return () => clearInterval(interval);
-  }, [startTime]);
+  }, [startTime, timeRef]);
+
+  const handleStart = (): void => {
+    setStartTime(new Date());
+  };
+
+  const handleStop = (): void => {
+    setStartTime();
+  };
 
   return (
     <div className="select-none">
       <div ref={timeRef} />
-      <button
-        onClick={() => {
-          setStartTime(new Date());
-        }}>{startTime ? 'Reset' : 'Start'}</button>
-      <button
-        onClick={() => {
-          setStartTime();
-        }}>Stop</button>
+      <button onClick={handleStart}>
+        {startTime ? 'Reset' : 'Start'}
+      </button>
+      <button onClick={handleStop}>
+        Stop
+      </button>
     </div>
   );
 };
+
+export default Timer;

@@ -1,18 +1,23 @@
 import React, {
   useEffect,
-  createRef,
+  useRef,
 } from 'react';
 
 import Heading from '../Heading';
+import { OscilloscopeProps } from '../../types';
 
-export default ({ analyser }) => {
-  const canvasRef = createRef();
+const Oscilloscope: React.FC<OscilloscopeProps> = ({ analyser }) => {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
     if (!analyser) return;
 
     const canvas = canvasRef.current;
+    if (!canvas) return;
+
     const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
     const bufferLength = analyser.fftSize;
     const dataArray = new Float32Array(bufferLength);
 
@@ -20,7 +25,7 @@ export default ({ analyser }) => {
     let lastTime = performance.now();
 
     let stop = false;
-    const renderFrame = () => {
+    const renderFrame = (): void => {
       if (stop) return;
 
       requestAnimationFrame(renderFrame);
@@ -97,3 +102,5 @@ export default ({ analyser }) => {
     </div>
   );
 };
+
+export default Oscilloscope;

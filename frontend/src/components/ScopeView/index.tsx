@@ -1,17 +1,26 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Events } from "@wailsio/runtime";
 import ScopeDisplay from './ScopeDisplay';
+import { ScopeData, ScopeInfo, ScopeEventData, ScopesChangedData } from '../../types';
 import styles from './index.module.css';
 
-const ScopeView = () => {
-  const [scopes, setScopes] = useState({});
-  const [scopeList, setScopeList] = useState([]);
-  const [containerWidth, setContainerWidth] = useState(800);
-  const containerRef = useRef(null);
+interface ScopeEvent {
+  data: [ScopeEventData];
+}
+
+interface ScopesChangedEvent {
+  data: [ScopesChangedData];
+}
+
+const ScopeView: React.FC = () => {
+  const [scopes, setScopes] = useState<Record<string, ScopeData>>({});
+  const [scopeList, setScopeList] = useState<ScopeInfo[]>([]);
+  const [containerWidth, setContainerWidth] = useState<number>(800);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   // Handle container resize
   useEffect(() => {
-    const updateWidth = () => {
+    const updateWidth = (): void => {
       if (containerRef.current) {
         const width = containerRef.current.offsetWidth - 40; // Subtract padding
         setContainerWidth(Math.max(600, width)); // Minimum width of 600
@@ -25,7 +34,7 @@ const ScopeView = () => {
 
   useEffect(() => {
     // Handle scope data updates
-    const handleScopeData = (data) => {
+    const handleScopeData = (data: ScopeEventData): void => {
       setScopes(prev => ({
         ...prev,
         [data.id]: {
@@ -37,14 +46,14 @@ const ScopeView = () => {
     };
 
     // Handle scope list changes
-    const handleScopesChanged = (data) => {
+    const handleScopesChanged = (data: ScopesChangedData): void => {
       setScopeList(data.scopes || []);
 
       // Remove scopes that no longer exist
       setScopes(prev => {
         try {
           const activeIds = new Set(data.scopes.map(s => s.id));
-          const newScopes = {};
+          const newScopes: Record<string, ScopeData> = {};
           for (const [id, scope] of Object.entries(prev)) {
             if (activeIds.has(id)) {
               newScopes[id] = scope;
@@ -59,8 +68,8 @@ const ScopeView = () => {
     };
 
     // Subscribe to events
-    const unsubscribeData = Events.On('scope.data', (evt) => handleScopeData(evt.data[0]));
-    const unsubscribeList = Events.On('scopes-changed', (evt) => handleScopesChanged(evt.data[0]));
+    const unsubscribeData = Events.On('scope.data', (evt: ScopeEvent) => handleScopeData(evt.data[0]));
+    const unsubscribeList = Events.On('scopes-changed', (evt: ScopesChangedEvent) => handleScopesChanged(evt.data[0]));
 
     // Cleanup
     return () => {
@@ -74,9 +83,9 @@ const ScopeView = () => {
     const interval = setInterval(() => {
       const now = Date.now();
       const staleTimeout = 5000; // 5 seconds
-      
+
       setScopes(prev => {
-        const newScopes = {};
+        const newScopes: Record<string, ScopeData> = {};
         for (const [id, scope] of Object.entries(prev)) {
           if (now - scope.lastUpdate < staleTimeout) {
             newScopes[id] = scope;
@@ -92,7 +101,7 @@ const ScopeView = () => {
   const activeScopeIds = scopeList.map(s => s.id);
   const scopesToDisplay = activeScopeIds
     .map(id => scopes[id])
-    .filter(scope => scope && scope.samples);
+    .filter((scope): scope is ScopeData => scope && scope.samples !== undefined);
 
   if (scopesToDisplay.length === 0) {
     return (
@@ -112,7 +121,7 @@ const ScopeView = () => {
 
   return (
     <div className={styles.container} ref={containerRef}>
-      <div 
+      <div
         className={styles.grid}
         style={{
           gridTemplateColumns: '1fr',

@@ -1,3 +1,5 @@
+import React from 'react';
+// @ts-ignore - Wails generated bindings
 import {
   OpenFileDialog,
   SaveFile,
@@ -9,8 +11,14 @@ import {
   useBuffersStore,
 } from "../../contexts/buffers";
 
-const Button = (props) => {
-  const onClick = props.onClick;
+import {
+  ButtonProps,
+  SvgProps,
+  OpenFileDialogResponse,
+  BuffersState,
+} from '../../types';
+
+const Button: React.FC<ButtonProps> = (props) => {
   // center contents
   let className = "h-5 w-5 bg-gray-500 hover:bg-gray-700 text-gray-200 font-bold rounded m-1 flex items-center justify-center";
   if (props.disabled) {
@@ -22,44 +30,46 @@ const Button = (props) => {
   );
 };
 
-export default (props) => {
-  const buffersStore = useBuffersStore();
+const Toolbar: React.FC = () => {
+  const buffersStore = useBuffersStore() as BuffersState;
 
   const selectedBufferName = buffersStore.selectedBufferName;
-  const selectedBuffer = buffersStore.buffers[selectedBufferName];
+  const selectedBuffer = buffersStore.buffers[selectedBufferName || 'null'];
 
-  const handleLoadClick = () => {
-    OpenFileDialog().then((response) => {
-      const buffer = {
-        fileName: response.FileName,
-        content: response.Content,
-      };
-      buffersStore.addBuffer(buffer);
-    }).catch((err) => {
+  const handleLoadClick = (): void => {
+    OpenFileDialog().then((response: OpenFileDialogResponse | null) => {
+      if (response) {
+        const buffer = {
+          fileName: response.FileName,
+          content: response.Content,
+        };
+        buffersStore.addBuffer(buffer);
+      }
+    }).catch((err: unknown) => {
       console.log(err);
     });
   };
 
-  const handleSaveClick = () => {
+  const handleSaveClick = (): void => {
     const name = selectedBufferName;
     const content = selectedBuffer.content;
-    SaveFile(name, content).then((fileName) => {
+    SaveFile(name || '', content).then((fileName: string) => {
       buffersStore.updateBuffer(fileName, content, false);
       buffersStore.selectBuffer(fileName);
-    }).catch((err) => {
+    }).catch((err: unknown) => {
       console.log(err);
     });
   };
 
-  const handlePlayClick = () => {
+  const handlePlayClick = (): void => {
     buffersStore.playBuffer(buffersStore.selectedBufferName);
   };
 
-  const handleStopClick = () => {
+  const handleStopClick = (): void => {
     Silence();
   };
 
-  const handleNewClick = () => {
+  const handleNewClick = (): void => {
     const DEFAULT_CONTENT = `(ns user
   (:use [mrat.core]))`;
     buffersStore.updateBuffer(null, DEFAULT_CONTENT, true);
@@ -100,7 +110,7 @@ export default (props) => {
         </Svg>
       </Button>
       <Button onClick={ToggleHydraWindow}
-              tytle="Toggle Hydra">
+              title="Toggle Hydra">
         <Svg>
           <path strokeLinecap="round" strokeLinejoin="round" d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z" />
           <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
@@ -110,10 +120,12 @@ export default (props) => {
   );
 };
 
-const Svg = ({ children }) => {
+const Svg: React.FC<SvgProps> = ({ children }) => {
   return (
     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4">
       {children}
     </svg>
   );
 };
+
+export default Toolbar;
