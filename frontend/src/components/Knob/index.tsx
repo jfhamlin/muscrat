@@ -8,9 +8,11 @@ const Knob: React.FC<KnobProps> = ({
   max,
   step: _step, // Renamed to indicate it's intentionally unused
   size,
+  color,
   onChange,
 }) => {
   size = size || 80;
+  const knobColor = color || '#FFC36A';
 
   const gapAngle = 30;
   const fullAngle = 360 - gapAngle;
@@ -110,7 +112,8 @@ const Knob: React.FC<KnobProps> = ({
         width: size,
         height: size,
       }}>
-        <div className="flex rounded-full w-full h-full items-center justify-center relative text-accent-primary"
+        <div className="flex rounded-full w-full h-full items-center justify-center relative"
+             style={{ color: knobColor }}
              onMouseDown={handleDragStart}
         >
           <svg
@@ -133,12 +136,16 @@ const Knob: React.FC<KnobProps> = ({
               strokeWidth="19%"
               strokePercent={valuePercent} />
           </svg>
-          <div className="flex items-center justify-center rounded-full bg-accent-primary/10"
+          <div className="flex items-center justify-center rounded-full"
+               style={{
+                 backgroundColor: `${knobColor}20`,
+               }}
                style={{
                  width: '45%',
                  height: '45%',
                }}>
-            <div className="overflow-hidden text-ellipsis block text-accent-primary"
+            <div className="overflow-hidden text-ellipsis block"
+                 style={{ color: knobColor }}
                  style={{
                    fontSize: 'clamp(0.25rem, 1.5vw, 1rem)',
                  }}>
@@ -151,7 +158,7 @@ const Knob: React.FC<KnobProps> = ({
           </div>
         </div>
       </div>
-      <div className="text-center text-accent-primary text-sm">
+      <div className="text-center text-sm" style={{ color: knobColor }}>
         {label}
       </div>
     </div>

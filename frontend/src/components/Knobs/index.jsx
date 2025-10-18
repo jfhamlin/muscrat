@@ -13,7 +13,7 @@ import {
 
 import { Events } from "@wailsio/runtime";
 
-const Knob = ({ knob }) => {
+const Knob = ({ knob, color }) => {
   const [value, setValue] = useState(knob.def);
   const [midiSub, setMidiSub] = useState(null);
 
@@ -95,6 +95,7 @@ const Knob = ({ knob }) => {
               max={knob.max}
               step={knob.step ?? 0.1}
               size={80}
+              color={color}
               onChange={(val) => knobValueChange(val)} />
       <button className={"absolute -top-2 -left-2 bg-primary p-1 m-1" +
                           (midiSub?.waiting ? " animate-pulse" : "") +
@@ -105,6 +106,32 @@ const Knob = ({ knob }) => {
     </div>
   )
 }
+
+const GROUP_COLORS = [
+  '#ef4444',
+  '#f97316',
+  '#eab308',
+  '#22c55e',
+  '#06b6d4',
+  '#3b82f6',
+  '#a855f7',
+  '#ec4899',
+];
+
+const hashString = (str) => {
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    const char = str.charCodeAt(i);
+    hash = ((hash << 5) - hash) + char;
+    hash = hash & hash;
+  }
+  return Math.abs(hash);
+};
+
+const getGroupColor = (groupName) => {
+  const hash = hashString(groupName);
+  return GROUP_COLORS[hash % GROUP_COLORS.length];
+};
 
 const sortKnobs = (knobs) => {
   return knobs.sort((a, b) => {
@@ -137,14 +164,15 @@ const groupKnobs = (knobs) => {
 }
 
 const KnobGroup = ({ groupName, knobs }) => {
+  const color = getGroupColor(groupName);
   return (
-    <div className="border border-gray-300/25 rounded p-2 relative">
-      <div className="absolute top-1 left-2 text-xs text-accent-primary/75">
+    <div className="border rounded p-2 relative" style={{ borderColor: color }}>
+      <div className="absolute top-1 left-2 text-xs font-medium" style={{ color }}>
         {groupName}
       </div>
       <div className="flex flex-wrap gap-2 mt-4">
         {knobs.map((knob) => (
-          <Knob key={knob.id} knob={knob} />
+          <Knob key={knob.id} knob={knob} color={color} />
         ))}
       </div>
     </div>

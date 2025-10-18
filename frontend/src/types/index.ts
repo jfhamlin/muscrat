@@ -28,6 +28,7 @@ export interface KnobProps {
   max: number;
   step?: number;
   size?: number;
+  color?: string;
   onChange?: (value: number) => void;
 }
 
