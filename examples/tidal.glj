@@ -1,4 +1,0 @@
-(ns user
-  (:use [mrat.core]))
-
-(play (sin 200 :mul 0.1))
