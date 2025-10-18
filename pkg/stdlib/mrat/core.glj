@@ -93,6 +93,8 @@
 (def ^:dynamic *sample-file-paths*
   (atom (vec github.com:jfhamlin:muscrat:pkg:conf.SampleFilePaths)))
 
+(def ^:dynamic *group* "")
+
 (docgroup "Constants")
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -1275,6 +1277,14 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; I/O devices
 
+(defmacro group
+  [group-name & body]
+  (when-not (string? group-name)
+    (throw (ex-info "group macro requires a string as the first argument"
+                    {:got group-name})))
+  `(binding [*group* ~group-name]
+     (do ~@body)))
+
 (defugen sound-in
   []
   (add-node! :in NewInputDevice))
@@ -1286,7 +1296,7 @@
    max-value 1
    step nil
    xform identity
-   group ""]
+   group *group*]
   (let [rng (- max-value min-value)
         step (or step (/ rng 100.0))
         ugen (add-node! :knob NewKnob :args [(str name) default min-value max-value step (str group)])]
