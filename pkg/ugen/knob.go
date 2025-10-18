@@ -13,12 +13,13 @@ type (
 	// Knob is a ugen representing a control that can be turned to
 	// adjust a value.
 	Knob struct {
-		Name string  `json:"name"`
-		ID   uint64  `json:"id"`
-		Min  float64 `json:"min"`
-		Max  float64 `json:"max"`
-		Def  float64 `json:"def"`
-		Step float64 `json:"step"`
+		Name  string  `json:"name"`
+		ID    uint64  `json:"id"`
+		Min   float64 `json:"min"`
+		Max   float64 `json:"max"`
+		Def   float64 `json:"def"`
+		Step  float64 `json:"step"`
+		Group string  `json:"group,omitempty"`
 
 		valueBits atomic.Uint64
 
@@ -60,17 +61,18 @@ func GetKnobs() []*Knob {
 }
 
 // NewKnob returns a new Knob ugen.
-func NewKnob(name string, def, min, max, step float64) *Knob {
+func NewKnob(name string, def, min, max, step float64, group string) *Knob {
 	knobLock.Lock()
 	defer knobLock.Unlock()
 
 	k := &Knob{
-		Name: name,
-		ID:   nextKnobID,
-		Min:  min,
-		Max:  max,
-		Def:  def,
-		Step: step,
+		Name:  name,
+		ID:    nextKnobID,
+		Min:   min,
+		Max:   max,
+		Def:   def,
+		Step:  step,
+		Group: group,
 	}
 	k.valueBits.Store(math.Float64bits(def))
 

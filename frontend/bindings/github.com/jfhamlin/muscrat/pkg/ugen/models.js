@@ -58,6 +58,13 @@ export class Knob {
              */
             this["step"] = 0;
         }
+        if (/** @type {any} */(false)) {
+            /**
+             * @member
+             * @type {string | undefined}
+             */
+            this["group"] = undefined;
+        }
 
         Object.assign(this, $$source);
     }

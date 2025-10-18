@@ -118,6 +118,39 @@ const sortKnobs = (knobs) => {
   });
 }
 
+const groupKnobs = (knobs) => {
+  const groups = {};
+  const ungrouped = [];
+
+  knobs.forEach((knob) => {
+    if (knob.group && knob.group !== '') {
+      if (!groups[knob.group]) {
+        groups[knob.group] = [];
+      }
+      groups[knob.group].push(knob);
+    } else {
+      ungrouped.push(knob);
+    }
+  });
+
+  return { groups, ungrouped };
+}
+
+const KnobGroup = ({ groupName, knobs }) => {
+  return (
+    <div className="border border-gray-300/25 rounded p-2 relative">
+      <div className="absolute top-1 left-2 text-xs text-accent-primary/75">
+        {groupName}
+      </div>
+      <div className="flex flex-wrap gap-2 mt-4">
+        {knobs.map((knob) => (
+          <Knob key={knob.id} knob={knob} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export default () => {
   const [knobs, setKnobs] = useState([]);
 
@@ -133,13 +166,23 @@ export default () => {
     });
   }, []);
 
+  const { groups, ungrouped } = groupKnobs(knobs);
+  const groupNames = Object.keys(groups).sort();
+
   return (
     <div className="mt-2 overflow-hidden w-full h-full select-none">
       <div className="overflow-auto">
         {knobs.length === 0 ? null :
-         <div className="flex flex-wrap gap-2">
-           {knobs.map((knob) => (
-             <Knob key={knob.id} knob={knob} />
+         <div className="flex flex-col gap-2">
+           {ungrouped.length > 0 && (
+             <div className="flex flex-wrap gap-2">
+               {ungrouped.map((knob) => (
+                 <Knob key={knob.id} knob={knob} />
+               ))}
+             </div>
+           )}
+           {groupNames.map((groupName) => (
+             <KnobGroup key={groupName} groupName={groupName} knobs={groups[groupName]} />
            ))}
          </div>}
       </div>

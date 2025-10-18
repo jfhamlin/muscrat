@@ -31,6 +31,16 @@ export interface KnobProps {
   onChange?: (value: number) => void;
 }
 
+export interface KnobData {
+  id: number;
+  name: string;
+  min: number;
+  max: number;
+  def: number;
+  step: number;
+  group: string;
+}
+
 export interface EditorProps {
   [key: string]: any;
 }

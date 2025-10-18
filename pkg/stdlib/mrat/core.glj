@@ -1285,10 +1285,11 @@
    min-value -1
    max-value 1
    step nil
+   group ""
    xform identity]
   (let [rng (- max-value min-value)
         step (or step (/ rng 100.0))
-        ugen (add-node! :knob NewKnob :args [(str name) default min-value max-value step])]
+        ugen (add-node! :knob NewKnob :args [(str name) default min-value max-value step (str group)])]
     (xform ugen)))
 
 (defn qwerty-in

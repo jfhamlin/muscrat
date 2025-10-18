@@ -140,8 +140,16 @@ func seqsEqual(a, b any) bool {
 		}
 		firstA := lang.First(seqA)
 		firstB := lang.First(seqB)
-		kindA := reflect.TypeOf(firstA).Kind()
-		kindB := reflect.TypeOf(firstB).Kind()
+		typeA := reflect.TypeOf(firstA)
+		typeB := reflect.TypeOf(firstB)
+		if typeA == nil || typeB == nil {
+			if typeA != typeB {
+				return false
+			}
+			continue
+		}
+		kindA := typeA.Kind()
+		kindB := typeB.Kind()
 		if kindA == reflect.Slice || kindB == reflect.Slice {
 			if kindA != kindB {
 				return false
