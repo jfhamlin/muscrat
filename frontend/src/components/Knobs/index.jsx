@@ -172,14 +172,10 @@ export default () => {
   return (
     <div className="mt-2 overflow-auto w-full h-full select-none">
       {knobs.length === 0 ? null :
-       <div className="flex flex-col gap-2">
-         {ungrouped.length > 0 && (
-           <div className="flex flex-wrap gap-2">
-             {ungrouped.map((knob) => (
-               <Knob key={knob.id} knob={knob} />
-             ))}
-           </div>
-         )}
+       <div className="flex flex-wrap gap-2">
+         {ungrouped.map((knob) => (
+           <Knob key={knob.id} knob={knob} />
+         ))}
          {groupNames.map((groupName) => (
            <KnobGroup key={groupName} groupName={groupName} knobs={groups[groupName]} />
          ))}
