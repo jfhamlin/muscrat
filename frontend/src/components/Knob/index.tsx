@@ -9,6 +9,7 @@ const Knob: React.FC<KnobProps> = ({
   step: _step, // Renamed to indicate it's intentionally unused
   size,
   color,
+  midiIndicatorValue,
   onChange,
 }) => {
   size = size || 80;
@@ -20,6 +21,11 @@ const Knob: React.FC<KnobProps> = ({
 
   // percent of the circle that the value represents
   const valuePercent = fullPercent * (value - min) / (max - min);
+
+  // Calculate MIDI indicator position if available
+  const midiIndicatorPercent = midiIndicatorValue !== null && midiIndicatorValue !== undefined
+    ? fullPercent * (midiIndicatorValue - min) / (max - min)
+    : null;
 
   // 0/360 is the top, 50% of value
   // 180 + gapAngle/2 is 0% of value
@@ -135,6 +141,13 @@ const Knob: React.FC<KnobProps> = ({
               strokeOpacity="0.75"
               strokeWidth="19%"
               strokePercent={valuePercent} />
+            {midiIndicatorPercent !== null && (
+              <SvgIndicator
+                radiusPercent={40}
+                strokePercent={midiIndicatorPercent}
+                fullCircle={2 * Math.PI * 40}
+              />
+            )}
           </svg>
           <div className="flex items-center justify-center rounded-full"
                style={{
@@ -193,6 +206,37 @@ const SvgCircle: React.FC<SvgCircleProps> = ({
       strokeOpacity={strokeOpacity}
       strokeWidth={strokeWidth}
       strokeDasharray={`${dashPercent}% ${gapPercent}%`}
+    />
+  );
+};
+
+interface SvgIndicatorProps {
+  radiusPercent: number;
+  strokePercent: number;
+  fullCircle: number;
+}
+
+const SvgIndicator: React.FC<SvgIndicatorProps> = ({
+  radiusPercent,
+  strokePercent,
+  fullCircle,
+}) => {
+  const indicatorWidth = 2; // width of the indicator line as percentage of circle
+  const dashOffset = (strokePercent / 100) * fullCircle;
+  const dashLength = indicatorWidth;
+  const gapLength = fullCircle - dashLength;
+
+  return (
+    <circle
+      cx="50"
+      cy="50"
+      r={`${radiusPercent}%`}
+      fill="none"
+      stroke="currentColor"
+      strokeOpacity="1"
+      strokeWidth="20%"
+      strokeDasharray={`${dashLength}% ${gapLength}%`}
+      strokeDashoffset={-dashOffset + '%'}
     />
   );
 };

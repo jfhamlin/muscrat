@@ -16,6 +16,8 @@ import { Events } from "@wailsio/runtime";
 const Knob = ({ knob, color }) => {
   const [value, setValue] = useState(knob.def);
   const [midiSub, setMidiSub] = useState(null);
+  const [midiControllerValue, setMidiControllerValue] = useState(null); // Raw 0-127 value
+  const [midiCaught, setMidiCaught] = useState(false); // Whether MIDI has caught the knob
 
   const updateKnobValue = (value) => {
     Events.Emit({
@@ -28,11 +30,17 @@ const Knob = ({ knob, color }) => {
   const knobValueChange = (value) => {
     // at most 4 decimal places
     updateKnobValue(parseFloat(value.toFixed(4)));
+    // Reset catch mode when user manually changes the knob
+    if (midiSub && !midiSub.waiting) {
+      setMidiCaught(false);
+    }
   }
 
   const subscribeMidi = () => {
     if (midiSub) {
       setMidiSub(null);
+      setMidiControllerValue(null);
+      setMidiCaught(false);
       return;
     }
     // wait for midi message
@@ -60,6 +68,8 @@ const Knob = ({ knob, color }) => {
           controller: controller,
           initialValue: value,
         });
+        setMidiControllerValue(value);
+        setMidiCaught(false);
       });
       return sub;
     } else {
@@ -69,12 +79,37 @@ const Knob = ({ knob, color }) => {
         if (message.type !== 'controlChange') {
           return;
         }
-        const { channel, controller, value } = message;
+        const { channel, controller, value: midiValue } = message;
         if (midiSub.channel !== channel || midiSub.controller !== controller) {
           return;
         }
-        const newValue = knob.min + (value / 127) * (knob.max - knob.min);
-        updateKnobValue(newValue);
+
+        const newValue = knob.min + (midiValue / 127) * (knob.max - knob.min);
+        const prevMidiValue = midiControllerValue !== null
+          ? knob.min + (midiControllerValue / 127) * (knob.max - knob.min)
+          : null;
+
+        setMidiControllerValue(midiValue);
+
+        // Catch mode: check if MIDI controller has crossed the current knob value
+        const threshold = (knob.max - knob.min) * 0.02; // 2% of range as threshold
+
+        if (!midiCaught) {
+          // Check if we've caught the value (MIDI controller crosses knob value)
+          if (prevMidiValue !== null) {
+            const didCross = (prevMidiValue <= value && newValue >= value) ||
+                           (prevMidiValue >= value && newValue <= value);
+            const isClose = Math.abs(newValue - value) < threshold;
+
+            if (didCross || isClose) {
+              setMidiCaught(true);
+              updateKnobValue(newValue);
+            }
+          }
+        } else {
+          // Already caught, update normally
+          updateKnobValue(newValue);
+        }
 
         /* const diff = value - midiSub.initialValue;
          * const newValue = value + diff;
@@ -82,9 +117,14 @@ const Knob = ({ knob, color }) => {
       });
       return sub;
     }
-  }, [midiSub]);
+  }, [midiSub, midiControllerValue, midiCaught, value]);
 
   // component should flash if waiting for midi
+
+  // Calculate MIDI controller position for visual indicator
+  const midiIndicatorValue = midiControllerValue !== null && !midiCaught
+    ? knob.min + (midiControllerValue / 127) * (knob.max - knob.min)
+    : null;
 
   // label is centered
   return (
@@ -96,6 +136,7 @@ const Knob = ({ knob, color }) => {
               step={knob.step ?? 0.1}
               size={80}
               color={color}
+              midiIndicatorValue={midiIndicatorValue}
               onChange={(val) => knobValueChange(val)} />
       <button className={"absolute -top-2 -left-2 bg-primary p-1 m-1" +
                           (midiSub?.waiting ? " animate-pulse" : "") +

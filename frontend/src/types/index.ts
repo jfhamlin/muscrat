@@ -29,6 +29,7 @@ export interface KnobProps {
   step?: number;
   size?: number;
   color?: string;
+  midiIndicatorValue?: number | null;
   onChange?: (value: number) => void;
 }
 
