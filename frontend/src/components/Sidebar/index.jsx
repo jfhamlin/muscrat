@@ -15,7 +15,6 @@ import Spectrogram from "../Spectrogram";
 import Console from "../Console";
 import Timer from "../Timer";
 import Knobs from "../Knobs";
-import TabBar from "../TabBar";
 import ScopeView from "../ScopeView";
 
 import logo from '../../assets/images/muscrat.svg';
@@ -164,23 +163,30 @@ const old = () => {
 };
 
 import Knob from "../Knob";
+import CollapsiblePanel from "../CollapsiblePanel";
 
 export default () => {
-  const [selectedTab, setSelectedTab] = useState("params");
+  const [paramsCollapsed, setParamsCollapsed] = useState(false);
+  const [graphCollapsed, setGraphCollapsed] = useState(false);
 
   return (
     <div className="ml-2 mr-5 pt-[6px] h-full flex flex-col justify-between">
       <div className="flex-grow flex flex-col overflow-hidden">
-        <TabBar options={["params", "graph"]}
-                selected={selectedTab}
-                onSelect={setSelectedTab} />
-        <div className="flex-grow overflow-hidden relative">
-          <div className={`absolute inset-0 ${selectedTab === "params" ? "block" : "hidden"}`}>
+        <div className="flex flex-col h-full">
+          <CollapsiblePanel
+            title="PARAMS"
+            collapsed={paramsCollapsed}
+            onToggle={() => setParamsCollapsed(!paramsCollapsed)}
+          >
             <Knobs />
-          </div>
-          <div className={`absolute inset-0 ${selectedTab === "graph" ? "block" : "hidden"}`}>
+          </CollapsiblePanel>
+          <CollapsiblePanel
+            title="GRAPH"
+            collapsed={graphCollapsed}
+            onToggle={() => setGraphCollapsed(!graphCollapsed)}
+          >
             <ScopeView />
-          </div>
+          </CollapsiblePanel>
         </div>
       </div>
       <div className="flex mt-2 mb-5 pt-2 border-t border-gray-300/25">

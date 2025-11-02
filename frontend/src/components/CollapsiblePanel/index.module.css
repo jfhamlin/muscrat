@@ -1,0 +1,62 @@
+.panel {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  overflow: hidden;
+}
+
+.panel.expanded {
+  flex: 1;
+}
+
+.panel.collapsed {
+  flex: 0 0 auto;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 12px;
+  background: #1a1a1a;
+  border-bottom: 1px solid #333;
+  cursor: pointer;
+  user-select: none;
+  min-height: 36px;
+  transition: background 0.2s;
+}
+
+.header:hover {
+  background: #222;
+}
+
+.title {
+  font-size: 12px;
+  font-weight: 500;
+  color: #aaa;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.toggleButton {
+  background: transparent;
+  border: none;
+  color: #888;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px;
+  transition: color 0.2s;
+}
+
+.toggleButton:hover {
+  color: #fff;
+}
+
+.content {
+  flex: 1;
+  overflow: auto;
+  min-height: 0;
+  position: relative;
+}
