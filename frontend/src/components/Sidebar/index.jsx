@@ -183,6 +183,7 @@ export default () => {
     setAudioResources(audioResources);
 
     let nextBufferTime = audioResources.context.currentTime;
+    let lastSampleTime = Date.now();
 
     const unsubscribe = Events.On("samples", (evt) => {
       const samples = evt.data[0];
@@ -193,6 +194,18 @@ export default () => {
 
       const context = audioResources.context;
       const analyser = audioResources.analyser;
+
+      // Detect gap in playback (stop/start)
+      const now = Date.now();
+      const timeSinceLastSample = now - lastSampleTime;
+      const GAP_THRESHOLD_MS = 200;
+
+      if (timeSinceLastSample > GAP_THRESHOLD_MS) {
+        // Reset timing after a gap
+        nextBufferTime = context.currentTime;
+      }
+
+      lastSampleTime = now;
 
       const buffer = context.createBuffer(2, bufferLength, sampleRate);
       buffer.copyToChannel(samplesChannel0, 0);
