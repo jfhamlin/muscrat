@@ -8,8 +8,6 @@ import (
 	"github.com/jfhamlin/muscrat/pkg/ugen"
 )
 
-const hpfDefaultRQ = math.Sqrt2
-
 func NewHPF() ugen.UGen {
 	sampleRate := float64(conf.SampleRate)
 	radiansPerSample := twopi / sampleRate
@@ -18,14 +16,16 @@ func NewHPF() ugen.UGen {
 	var coefficientsComputed bool
 
 	computeCoefficients := func(freq float64) {
-		pfreq := freq * radiansPerSample
-		D := math.Tan(pfreq * hpfDefaultRQ * 0.5)
-		C := (1.0 - D) / (1.0 + D)
-		cosf := math.Cos(pfreq)
+		// SuperCollider HPF uses Butterworth filter design
+		pfreq := freq * radiansPerSample * 0.5
 
-		b1 = (1.0 + C) * cosf
-		b2 = -C
-		a0 = (1.0 + C + b1) * 0.25
+		C := math.Tan(pfreq)
+		C2 := C * C
+		sqrt2C := C * math.Sqrt2
+
+		a0 = 1.0 / (1.0 + sqrt2C + C2)
+		b1 = 2.0 * (1.0 - C2) * a0
+		b2 = -(1.0 - sqrt2C + C2) * a0
 	}
 
 	return ugen.UGenFunc(func(ctx context.Context, cfg ugen.SampleConfig, out []float64) {
@@ -42,8 +42,8 @@ func NewHPF() ugen.UGen {
 				coefficientsComputed = true
 			}
 
-			y0 := a0*in[i] + b1*y1 + b2*y2
-			out[i] = y0 - 2.0*y1 + y2
+			y0 := in[i] + b1*y1 + b2*y2
+			out[i] = a0 * (y0 - 2.0*y1 + y2)
 
 			y2 = ugen.ZapGremlins(y1)
 			y1 = ugen.ZapGremlins(y0)
