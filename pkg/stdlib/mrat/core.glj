@@ -53,6 +53,8 @@
                                                     NewLowpassFilter
                                                     NewRLPF
                                                     NewRHPF
+                                                    NewLPF
+                                                    NewHPF
                                                     NewBPF
                                                     NewLoShelf
                                                     NewHiShelf
@@ -909,6 +911,14 @@
                         :freq freq
                         :reson rq}))
 
+(defugen lpf
+  "A 12 dB per octave low-pass filter without resonance."
+  [in 0 "The signal to be processed."
+   freq 440 "The cutoff frequency in hertz."]
+  (add-node! :lpf NewLPF
+             :in-edges {:in in
+                        :freq freq}))
+
 (defugen rhpf
   "A resonant high-pass filter."
   [in 0
@@ -918,6 +928,14 @@
              :in-edges {:in in
                         :freq freq
                         :reson rq}))
+
+(defugen hpf
+  "A 12 dB per octave high-pass filter without resonance."
+  [in 0 "The signal to be processed."
+   freq 440 "The cutoff frequency in hertz."]
+  (add-node! :hpf NewHPF
+             :in-edges {:in in
+                        :freq freq}))
 
 (defugen leakdc
   "DC blocking filter (high-pass filter).
