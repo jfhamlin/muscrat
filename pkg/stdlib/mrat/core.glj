@@ -55,6 +55,7 @@
                                                     NewRHPF
                                                     NewLPF
                                                     NewHPF
+                                                    NewMoogFF
                                                     NewBPF
                                                     NewLoShelf
                                                     NewHiShelf
@@ -936,6 +937,21 @@
   (add-node! :hpf NewHPF
              :in-edges {:in in
                         :freq freq}))
+
+(defugen moogff
+  "Moog VCF (Voltage Controlled Filter) digital implementation.
+  A 24 dB per octave (4-pole) low-pass ladder filter with resonance.
+  Based on the paper 'Preserving the Digital Structure of the Moog VCF'
+  by Federico Fontana (ICMC07)."
+  [in 0 "The signal to be processed."
+   freq 440 "The cutoff frequency in hertz."
+   gain 0 "Resonance amount (0-4). Values > 1 cause self-oscillation."
+   reset 0 "When > 0, resets the filter state to zero."]
+  (add-node! :moogff NewMoogFF
+             :in-edges {:in in
+                        :freq freq
+                        :gain gain
+                        :reset reset}))
 
 (defugen leakdc
   "DC blocking filter (high-pass filter).
