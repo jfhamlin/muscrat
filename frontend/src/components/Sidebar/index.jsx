@@ -164,10 +164,53 @@ const old = () => {
 
 import Knob from "../Knob";
 import CollapsiblePanel from "../CollapsiblePanel";
+import SpectrumAnalyzer from "../SpectrumAnalyzer";
 
 export default () => {
   const [paramsCollapsed, setParamsCollapsed] = useState(false);
   const [graphCollapsed, setGraphCollapsed] = useState(false);
+  const [audioResources, setAudioResources] = useState(null);
+  const [sampleRate, setSampleRate] = useState(44100);
+
+  useEffect(() => {
+    GetSampleRate().then((sampleRate) => {
+      setSampleRate(sampleRate);
+    });
+  }, []);
+
+  useEffect(() => {
+    const audioResources = createAudioResources();
+    setAudioResources(audioResources);
+
+    let nextBufferTime = audioResources.context.currentTime;
+
+    const unsubscribe = Events.On("samples", (evt) => {
+      const samples = evt.data[0];
+      const samplesChannel0 = Float32Array.from(samples[0]);
+      const samplesChannel1 = Float32Array.from(samples[1]);
+
+      const bufferLength = samplesChannel0.length;
+
+      const context = audioResources.context;
+      const analyser = audioResources.analyser;
+
+      const buffer = context.createBuffer(2, bufferLength, sampleRate);
+      buffer.copyToChannel(samplesChannel0, 0);
+      buffer.copyToChannel(samplesChannel1, 1);
+
+      const source = context.createBufferSource();
+      source.buffer = buffer;
+      source.connect(analyser);
+      source.start(nextBufferTime);
+
+      nextBufferTime += bufferLength / sampleRate;
+    });
+
+    return () => {
+      unsubscribe();
+      audioResources.context.close();
+    };
+  }, [sampleRate]);
 
   return (
     <div className="ml-2 mr-5 pt-[6px] h-full flex flex-col justify-between">
@@ -189,8 +232,13 @@ export default () => {
           </CollapsiblePanel>
         </div>
       </div>
-      <div className="flex mt-2 mb-5 pt-2 border-t border-gray-300/25">
-        <VolumeMeter />
+      <div className="flex flex-col mt-2 mb-5 pt-2 border-t border-gray-300/25 gap-2">
+        <div className="flex gap-2 h-30">
+          <VolumeMeter />
+          <div className="flex-1">
+            <SpectrumAnalyzer analyser={audioResources?.analyser} sampleRate={sampleRate} />
+          </div>
+        </div>
       </div>
     </div>
   );
