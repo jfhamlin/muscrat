@@ -1,0 +1,124 @@
+(ns user
+  (:require [mrat.core :refer :all]))
+
+;; WebAudio Node Example
+;; =====================
+;;
+;; This example demonstrates the WebAudio node, which broadcasts audio
+;; parameters to connected web clients (e.g., mobile phones) via WebSocket.
+;;
+;; When you run this code, an HTTP server will start and be exposed via ngrok.
+;; Open the ngrok URL on your phone to receive real-time audio parameters
+;; that drive synthesis and visualization in the browser.
+
+;; Example 1: Simple LFO-driven synthesis
+;; --------------------------------------
+;; This sends a slowly modulating frequency and amplitude to connected devices
+
+(comment
+  (play
+   (web-audio {:freq (+ 440 (* 200 (sin 0.5)))
+               :amp (* 0.5 (+ 0.5 (sin 0.3)))}
+              :port 8765
+              :update-hz 20)))
+
+;; Example 2: Interactive with Knobs
+;; ---------------------------------
+;; This example uses knobs that you can control in the Muscrat GUI,
+;; and the values are sent to your phone for synthesis
+
+(comment
+  (play
+   (web-audio {:freq (* 440 (knob "freq-mult" 1 0.5 2))
+               :amp (knob "amplitude" 0.5 0 1)
+               :cutoff (* 1000 (knob "cutoff" 0.5 0.1 2))
+               :resonance (knob "resonance" 1 0.1 10)}
+              :port 8080
+              :update-hz 30)))
+
+;; Example 3: Complex modulation patterns
+;; --------------------------------------
+;; Send multiple LFOs and envelopes to create rich mobile synthesis
+
+(comment
+  (let [lfo1 (sin 0.25)
+        lfo2 (sin 0.4)
+        lfo3 (sin 0.7)]
+    (play
+     (web-audio {:freq (+ 220 (* 100 lfo1))
+                 :amp (* 0.6 (+ 0.5 (* 0.5 lfo2)))
+                 :cutoff (+ 500 (* 1000 (+ 0.5 (* 0.5 lfo3))))
+                 :resonance (* 5 (+ 0.5 (* 0.5 lfo1)))}
+                :port 9000
+                :update-hz 25))))
+
+;; Example 4: Generative patterns
+;; ------------------------------
+;; Use rhythmic patterns to drive parameter changes on connected devices
+
+(comment
+  (let [;; Create a slow impulse for pattern triggering
+        pulse (impulse 2)
+        ;; Euclidean rhythm pattern
+        pattern (impulse-pattern pulse :pattern (euclid 5 8))]
+    (play
+     (web-audio {:freq (* 440 (+ 1 (* pattern 0.5)))
+                 :amp (* 0.5 pattern)
+                 :trigger pattern}
+                :port 8888
+                :update-hz 20))))
+
+;; Example 5: Audio-reactive visuals
+;; ---------------------------------
+;; Send audio analysis data to drive Hydra visualizations on mobile
+
+(comment
+  (let [;; Generate some audio locally (not sent to phone)
+        audio (sin 440 :mul 0.2)
+        ;; Extract amplitude envelope
+        env (amplitude audio :attack 0.01 :release 0.1)
+        ;; Create modulation sources
+        mod1 (sin (* 0.5 (+ 1 env)))
+        mod2 (sin (* 0.3 (+ 1 (* 2 env))))]
+    (play
+     ;; Play audio locally
+     audio
+     ;; Send parameters to phone for visualization
+     (web-audio {:brightness env
+                 :speed (* 10 (+ 0.5 (* 0.5 mod1)))
+                 :kaleid (+ 3 (* 5 mod2))
+                 :color-shift mod1}
+                :port 7777
+                :update-hz 30))))
+
+;; Example 6: Multi-device orchestra
+;; ---------------------------------
+;; Run multiple web-audio nodes on different ports for different devices
+
+(comment
+  (play
+   ;; Device 1: Bass line
+   (web-audio {:freq (* 110 (seq [1 1 1.5 2] 4))
+               :amp 0.7}
+              :port 8001
+              :update-hz 20)
+   ;; Device 2: Melody
+   (web-audio {:freq (* 440 (seq [1 1.25 1.5 2] 3))
+               :amp 0.5}
+              :port 8002
+              :update-hz 20)
+   ;; Device 3: Ambient pad
+   (web-audio {:freq (+ 880 (* 100 (sin 0.1)))
+               :amp (* 0.3 (+ 0.7 (* 0.3 (sin 0.15))))}
+              :port 8003
+              :update-hz 15)))
+
+;; Tips:
+;; -----
+;; 1. The ngrok URL will be printed to the console when you run the code
+;; 2. Open that URL on your phone's browser
+;; 3. Tap "Start Audio" on your phone to begin synthesis
+;; 4. The Hydra visualization will react to the incoming parameters
+;; 5. Parameters are sent at low frequency (default 20Hz) to save bandwidth
+;; 6. Multiple devices can connect to the same server simultaneously
+;; 7. You can run multiple web-audio nodes on different ports for different devices

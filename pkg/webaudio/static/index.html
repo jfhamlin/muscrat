@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Muscrat WebAudio</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #000;
+            color: #fff;
+            overflow: hidden;
+            touch-action: none;
+        }
+
+        #canvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            z-index: 0;
+        }
+
+        #controls {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: rgba(0, 0, 0, 0.8);
+            backdrop-filter: blur(10px);
+            padding: 20px;
+            z-index: 10;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        #status {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            background: rgba(0, 0, 0, 0.8);
+            backdrop-filter: blur(10px);
+            padding: 10px 15px;
+            border-radius: 20px;
+            font-size: 12px;
+            z-index: 10;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .status-indicator {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            margin-right: 8px;
+            background: #f44;
+        }
+
+        .status-indicator.connected {
+            background: #4f4;
+        }
+
+        button {
+            background: #fff;
+            color: #000;
+            border: none;
+            padding: 15px 30px;
+            font-size: 16px;
+            font-weight: 600;
+            border-radius: 25px;
+            cursor: pointer;
+            transition: transform 0.2s;
+            width: 100%;
+            margin-bottom: 10px;
+        }
+
+        button:active {
+            transform: scale(0.95);
+        }
+
+        button.active {
+            background: #4f4;
+        }
+
+        #params {
+            margin-top: 15px;
+            font-family: 'Monaco', 'Courier New', monospace;
+            font-size: 11px;
+            opacity: 0.7;
+            max-height: 100px;
+            overflow-y: auto;
+        }
+
+        .param-line {
+            padding: 2px 0;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="canvas"></canvas>
+
+    <div id="status">
+        <span class="status-indicator" id="indicator"></span>
+        <span id="status-text">Connecting...</span>
+    </div>
+
+    <div id="controls">
+        <button id="start-btn">Start Audio</button>
+        <div id="params"></div>
+    </div>
+
+    <!-- Hydra Synth -->
+    <script src="https://unpkg.com/hydra-synth@1.3.22/dist/hydra-synth.js"></script>
+
+    <script>
+        // Audio Context and Web Audio nodes
+        let audioCtx;
+        let oscillator;
+        let gainNode;
+        let filterNode;
+        let isPlaying = false;
+        let params = {};
+
+        // WebSocket connection
+        let ws;
+        let reconnectInterval;
+
+        // Hydra instance
+        let hydra;
+
+        // Initialize everything
+        function init() {
+            // Initialize Hydra
+            hydra = new Hydra({
+                canvas: document.getElementById('canvas'),
+                detectAudio: false,
+                enableStreamCapture: false
+            });
+
+            // Default visualization
+            osc(10, 0.1, 1.2)
+                .kaleid(4)
+                .color(0.5, 0.3, 0.8)
+                .out();
+
+            // Connect WebSocket
+            connectWebSocket();
+
+            // Start button
+            document.getElementById('start-btn').addEventListener('click', toggleAudio);
+        }
+
+        function connectWebSocket() {
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const wsUrl = `${protocol}//${window.location.host}/ws`;
+
+            ws = new WebSocket(wsUrl);
+
+            ws.onopen = () => {
+                console.log('WebSocket connected');
+                updateStatus(true);
+                clearInterval(reconnectInterval);
+            };
+
+            ws.onmessage = (event) => {
+                try {
+                    const msg = JSON.parse(event.data);
+                    handleMessage(msg);
+                } catch (e) {
+                    console.error('Failed to parse message:', e);
+                }
+            };
+
+            ws.onerror = (error) => {
+                console.error('WebSocket error:', error);
+            };
+
+            ws.onclose = () => {
+                console.log('WebSocket disconnected');
+                updateStatus(false);
+
+                // Attempt reconnect
+                reconnectInterval = setInterval(() => {
+                    console.log('Attempting to reconnect...');
+                    connectWebSocket();
+                }, 3000);
+            };
+        }
+
+        function handleMessage(msg) {
+            switch (msg.type) {
+                case 'connected':
+                    console.log('Connected to Muscrat');
+                    break;
+
+                case 'param':
+                    updateParams(msg.params);
+                    break;
+
+                case 'synth':
+                    if (msg.action === 'start') {
+                        startAudio();
+                    } else if (msg.action === 'stop') {
+                        stopAudio();
+                    }
+                    break;
+
+                case 'pong':
+                    // Heartbeat response
+                    break;
+            }
+        }
+
+        function updateParams(newParams) {
+            params = { ...params, ...newParams };
+
+            // Update Web Audio parameters
+            if (isPlaying && audioCtx) {
+                const now = audioCtx.currentTime;
+
+                if (newParams.freq !== undefined && oscillator) {
+                    oscillator.frequency.setTargetAtTime(newParams.freq, now, 0.05);
+                }
+
+                if (newParams.amp !== undefined && gainNode) {
+                    gainNode.gain.setTargetAtTime(newParams.amp, now, 0.05);
+                }
+
+                if (newParams.cutoff !== undefined && filterNode) {
+                    filterNode.frequency.setTargetAtTime(newParams.cutoff, now, 0.05);
+                }
+
+                if (newParams.resonance !== undefined && filterNode) {
+                    filterNode.Q.setTargetAtTime(newParams.resonance, now, 0.05);
+                }
+            }
+
+            // Update Hydra visualization with parameters
+            updateHydra();
+
+            // Display parameters
+            displayParams();
+        }
+
+        function updateHydra() {
+            // Map parameters to Hydra controls
+            const freq = params.freq || 440;
+            const amp = params.amp || 0.5;
+            const cutoff = params.cutoff || 1000;
+
+            // Create dynamic visualization based on audio params
+            const speed = (freq / 440) * 10;
+            const kaleidScope = Math.floor((amp * 8)) + 2;
+            const colorShift = cutoff / 10000;
+
+            osc(speed, 0.1, colorShift)
+                .kaleid(kaleidScope)
+                .color(amp, 0.3 + amp * 0.5, 0.8 - amp * 0.3)
+                .modulate(noise(3, 0.1), amp * 0.05)
+                .out();
+        }
+
+        function displayParams() {
+            const paramsDiv = document.getElementById('params');
+            const lines = Object.entries(params)
+                .map(([key, value]) => {
+                    const val = typeof value === 'number' ? value.toFixed(2) : value;
+                    return `<div class="param-line">${key}: ${val}</div>`;
+                })
+                .join('');
+            paramsDiv.innerHTML = lines || '<div class="param-line">No parameters</div>';
+        }
+
+        function toggleAudio() {
+            if (isPlaying) {
+                stopAudio();
+            } else {
+                startAudio();
+            }
+        }
+
+        function startAudio() {
+            if (isPlaying) return;
+
+            // Create Audio Context
+            audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+            // Create nodes
+            oscillator = audioCtx.createOscillator();
+            gainNode = audioCtx.createGain();
+            filterNode = audioCtx.createBiquadFilter();
+
+            // Configure nodes
+            oscillator.type = 'sine';
+            oscillator.frequency.value = params.freq || 440;
+
+            gainNode.gain.value = params.amp || 0.3;
+
+            filterNode.type = 'lowpass';
+            filterNode.frequency.value = params.cutoff || 2000;
+            filterNode.Q.value = params.resonance || 1;
+
+            // Connect: oscillator -> filter -> gain -> destination
+            oscillator.connect(filterNode);
+            filterNode.connect(gainNode);
+            gainNode.connect(audioCtx.destination);
+
+            // Start oscillator
+            oscillator.start();
+
+            isPlaying = true;
+            document.getElementById('start-btn').textContent = 'Stop Audio';
+            document.getElementById('start-btn').classList.add('active');
+
+            console.log('Audio started');
+        }
+
+        function stopAudio() {
+            if (!isPlaying) return;
+
+            if (oscillator) {
+                oscillator.stop();
+                oscillator.disconnect();
+                oscillator = null;
+            }
+
+            if (gainNode) {
+                gainNode.disconnect();
+                gainNode = null;
+            }
+
+            if (filterNode) {
+                filterNode.disconnect();
+                filterNode = null;
+            }
+
+            if (audioCtx) {
+                audioCtx.close();
+                audioCtx = null;
+            }
+
+            isPlaying = false;
+            document.getElementById('start-btn').textContent = 'Start Audio';
+            document.getElementById('start-btn').classList.remove('active');
+
+            console.log('Audio stopped');
+        }
+
+        function updateStatus(connected) {
+            const indicator = document.getElementById('indicator');
+            const statusText = document.getElementById('status-text');
+
+            if (connected) {
+                indicator.classList.add('connected');
+                statusText.textContent = 'Connected';
+            } else {
+                indicator.classList.remove('connected');
+                statusText.textContent = 'Disconnected';
+            }
+        }
+
+        // Send periodic ping to keep connection alive
+        setInterval(() => {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({ type: 'ping' }));
+            }
+        }, 30000);
+
+        // Initialize on load
+        window.addEventListener('load', init);
+    </script>
+</body>
+</html>

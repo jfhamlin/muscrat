@@ -25,6 +25,7 @@
                                                  NewHydra
                                                  NewScope
                                                  NewLeakDC
+                                                 NewWebAudioNode
                                                  SimpleUGenFunc
                                                  WithInterp
                                                  WithDefaultDutyCycle
@@ -1335,6 +1336,43 @@
         step (or step (/ rng 100.0))
         ugen (add-node! :knob NewKnob :args [(str name) default min-value max-value step (str group)])]
     (xform ugen)))
+
+(defn web-audio
+  "Creates a WebAudio node that broadcasts audio parameters to connected
+  web clients (e.g., mobile devices) via WebSocket. The node instantiates
+  an HTTP server exposed through ngrok, allowing remote devices to receive
+  real-time parameter updates for synthesis and visualization.
+
+  Parameters:
+  - params: A map of parameter-name to ugen mappings, e.g.,
+            {:freq (sin 0.5 :mul 100 :add 440) :amp 0.5}
+  - port: (optional) HTTP server port, default 8765
+  - update-hz: (optional) Update frequency in Hz, default 20
+
+  The function returns the ngrok URL where clients can connect.
+
+  Example:
+    (web-audio {:freq (sin 0.5 :mul 100 :add 440)
+                :amp (knob \"amp\" 0.5 0 1)
+                :cutoff (* 1000 (knob \"cutoff\" 0.5 0 1))}
+               :port 8080
+               :update-hz 30)"
+  [params & {:keys [port update-hz] :or {port 8765 update-hz 20}}]
+  (let [param-names (vec (map name (keys params)))
+        param-ugens (vec (vals params))
+        node (add-node! :webaudio NewWebAudioNode
+                        :args [port update-hz param-names]
+                        :inputs (zipmap (map name (keys params)) param-ugens))]
+    ;; Log the URL for the user
+    (add-node! :weblog SimpleUGenFunc :args [(fn [cfg out]
+                                                (when (zero? (rem (.getCount cfg) (* (.SampleRateHz cfg) 5)))
+                                                  (let [url (.GetURL node)]
+                                                    (when (not (empty? url))
+                                                      (println "WebAudio URL:" url)
+                                                      (println "Connected clients:" (.GetClientCount node)))))
+                                                (dotimes [i (count out)]
+                                                  (aset out i 0)))])
+    node))
 
 (defn qwerty-in
   [name & {:keys [voices]}]
