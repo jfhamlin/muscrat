@@ -1,6 +1,7 @@
 import {
   useState,
   useEffect,
+  useRef,
 } from 'react';
 
 import PRKnob from '../Knob';
@@ -18,6 +19,7 @@ const Knob = ({ knob, color }) => {
   const [midiSub, setMidiSub] = useState(null);
   const [midiControllerValue, setMidiControllerValue] = useState(null); // Raw 0-127 value
   const [midiCaught, setMidiCaught] = useState(false); // Whether MIDI has caught the knob
+  const isMidiUpdating = useRef(false); // Track if the current update is from MIDI
 
   const updateKnobValue = (value) => {
     Events.Emit({
@@ -30,8 +32,8 @@ const Knob = ({ knob, color }) => {
   const knobValueChange = (value) => {
     // at most 4 decimal places
     updateKnobValue(parseFloat(value.toFixed(4)));
-    // Reset catch mode when user manually changes the knob
-    if (midiSub && !midiSub.waiting) {
+    // Reset catch mode when user manually changes the knob (not MIDI)
+    if (midiSub && !midiSub.waiting && !isMidiUpdating.current) {
       setMidiCaught(false);
     }
   }
@@ -103,12 +105,16 @@ const Knob = ({ knob, color }) => {
 
             if (didCross || isClose) {
               setMidiCaught(true);
+              isMidiUpdating.current = true;
               updateKnobValue(newValue);
+              isMidiUpdating.current = false;
             }
           }
         } else {
           // Already caught, update normally
+          isMidiUpdating.current = true;
           updateKnobValue(newValue);
+          isMidiUpdating.current = false;
         }
 
         /* const diff = value - midiSub.initialValue;
