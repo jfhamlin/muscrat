@@ -152,14 +152,12 @@ const Knob: React.FC<KnobProps> = ({
           <div className="flex items-center justify-center rounded-full"
                style={{
                  backgroundColor: `${knobColor}20`,
-               }}
-               style={{
                  width: '45%',
                  height: '45%',
                }}>
             <div className="overflow-hidden text-ellipsis block"
-                 style={{ color: knobColor }}
                  style={{
+                   color: knobColor,
                    fontSize: 'clamp(0.25rem, 1.5vw, 1rem)',
                  }}>
               {

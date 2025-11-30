@@ -2,6 +2,7 @@ import { useState } from 'react';
 
 import Console from "../Console";
 import Docs from "../Docs";
+import SuperColliderTest from "../SuperColliderTest";
 import TabBar from "../TabBar";
 
 const Debugger = () => {
@@ -13,7 +14,7 @@ const Debugger = () => {
 
   return (
     <div className="mx-5 flex-col h-full">
-      <TabBar options={['console', 'docs']}
+      <TabBar options={['console', 'docs', 'supercollider']}
               selected={selected}
               onSelect={setSelected} />
       <div className="h-full overflow-hidden pb-5">
@@ -22,6 +23,9 @@ const Debugger = () => {
         </div>
         <div className="h-full overflow-hidden" style={contentStyle('docs')}>
           <Docs />
+        </div>
+        <div className="h-full overflow-hidden" style={contentStyle('supercollider')}>
+          <SuperColliderTest />
         </div>
       </div>
     </div>
